@@ -59,9 +59,13 @@ const initializeIndex = async () => {
 initializeIndex().catch(console.error);
 
 // Store embeddings in Pinecone
-const storeEmbeddings = async (caseId, embeddings, metadata, country) => {
+const storeEmbeddings = async (embeddings, metadata) => {
     try {
         const indexInstance = await initializeIndex();
+        
+        // Extract caseId and country from metadata
+        const caseId = metadata.caseId;
+        const country = metadata.country;
         
         const vectors = [
             {
@@ -122,8 +126,8 @@ const searchSimilarCases = async (caseId, searchParams) => {
         twoMonthsBack.setMonth(twoMonthsBack.getMonth() - 2);
         const twoMonthsBackTs = twoMonthsBack.getTime();
         
-        // Use the appropriate namespace based on country
-        const namespace = country?.toLowerCase() === 'india' ? 'india' : 'global';
+        // Use the same namespace as the case being searched (country-specific)
+        const namespace = country?.toLowerCase().replace(/\s+/g, '_') || 'default';
         
         const indexInstance = await initializeIndex();
         
@@ -184,7 +188,16 @@ const searchSimilarCases = async (caseId, searchParams) => {
         // Convert back to array and sort by score
         const sortedResults = Array.from(uniqueMatches.values())
             .sort((a, b) => b.score - a.score)
-            .slice(0, 3); // Return exactly top 3 unique cases
+            .filter(match => match.score >= config.pineconeSearchThreshold) // Apply threshold filter
+            .slice(0, config.pineconeTopK); // Use configurable k value
+        
+        // Log the scores of filtered matches
+        console.log(`Top ${config.pineconeTopK} matches (threshold: ${(config.pineconeSearchThreshold * 100).toFixed(1)}%):`, sortedResults.map((match, index) => ({
+            rank: index + 1,
+            caseId: match.id.split('_')[0],
+            score: match.score,
+            percentage: `${(match.score * 100).toFixed(2)}%`
+        })));
         
         return sortedResults;
     } catch (error) {

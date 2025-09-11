@@ -1,5 +1,5 @@
 import express from 'express';
-import { clerkClient } from '@clerk/express';
+import { requireAuth, clerkClient } from '@clerk/express';
 import Case from '../model/caseModel.js';
 import { searchSimilarCases } from '../services/pineconeService.js';
 import { getPresignedGetUrl } from '../services/s3Service.js';
@@ -7,7 +7,7 @@ import { config } from '../config/config.js';
 
 const router = express.Router();
 
-// Test endpoint to check if server is running
+// Test endpoint to check if server is running (public)
 router.get('/test', (req, res) => {
   res.json({ 
     success: true, 
@@ -16,8 +16,8 @@ router.get('/test', (req, res) => {
   });
 });
 
-// Find Similar Cases endpoint
-router.post('/find-matches', async (req, res) => {
+// Find Similar Cases endpoint (protected)
+router.post('/find-matches', requireAuth(), async (req, res) => {
   try {
     const { caseId, gender, status, country, date } = req.body;
 
@@ -100,22 +100,31 @@ router.post('/find-matches', async (req, res) => {
       similarCaseIds: caseIds
     });
 
-    // Fetch complete case data from MongoDB
+    // Fetch complete case data from MongoDB while preserving order
     const similarCases = await Case.find({
       _id: { $in: caseIds }
     }).select('-notifications').lean();
+    
+    // Preserve the order from Pinecone results
+    const orderedCases = [];
+    for (const id of caseIds) {
+      const foundCase = similarCases.find(caseItem => caseItem._id.toString() === id);
+      if (foundCase) {
+        orderedCases.push(foundCase);
+      }
+    }
 
     // Transform data to match frontend expectations and generate S3 URLs
-    const transformedCases = await Promise.all(similarCases.map(async (caseData) => {
+    const transformedCases = await Promise.all(orderedCases.map(async (caseData) => {
       // Generate S3 keys for both images using country-based prefix (no extension)
       const countryPath = (caseData.country || 'India').replace(/\s+/g, '_').toLowerCase();
       const imageUrls = [];
       
       try {
         for (let i = 1; i <= 2; i++) {
-          const key = `${countryPath}/${caseData._id}_${i}`;
+          const key = `${countryPath}/${caseData._id}_${i}.jpg`;
           try {
-            const imageUrl = await getPresignedGetUrl(config.awsBucketName, key, 14400); // 4 hours expiry for AI search
+            const imageUrl = await getPresignedGetUrl(config.awsBucketName, key, 3600); // 1 hours expiry for AI search
             imageUrls.push(imageUrl);
           } catch (error) {
             // Failed to generate URL for this image

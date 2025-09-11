@@ -25,12 +25,12 @@ export function ThemeToggle() {
       onClick={toggleTheme}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className="relative overflow-hidden hover:scale-110 hover:shadow-lg transition-all duration-300 active:scale-95"
+      className="h-9 w-9 relative overflow-hidden hover:scale-110 hover:shadow-lg transition-all duration-300 active:scale-95 cursor-pointer"
       aria-label={`Switch to ${nextTheme} mode`}
     >
       {/* Current Theme Icon (Sun for light, Moon for dark) */}
       <Sun 
-        className={`h-[1.2rem] w-[1.2rem] transition-all duration-300 ${
+        className={`h-4 w-4 transition-all duration-300 ${
           isLight && !isHovered 
             ? 'rotate-0 scale-100 text-yellow-600' 
             : 'rotate-90 scale-0 text-yellow-400'

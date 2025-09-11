@@ -42,6 +42,7 @@ const moderateImage = async (imageBuffer) => {
         const categoriesAnalysis = response.data.categoriesAnalysis;
         let isAppropriate = true;
         const categoryScores = {};
+        const failedCategories = [];
 
         for (const category of categoriesAnalysis) {
             const categoryName = category.category.toLowerCase();
@@ -50,16 +51,19 @@ const moderateImage = async (imageBuffer) => {
 
             if (thresholds[categoryName] && severity >= thresholds[categoryName]) {
                 isAppropriate = false;
+                failedCategories.push(categoryName);
             }
         }
 
         // Check for blocklist matches
         if (response.data.blocklistsMatch && response.data.blocklistsMatch.length > 0) {
             isAppropriate = false;
+            failedCategories.push('blocklist');
         }
 
         return {
-            isAppropriate
+            isAppropriate,
+            failedCategories
         };
     } catch (error) {
         console.error('Error moderating image:', error);

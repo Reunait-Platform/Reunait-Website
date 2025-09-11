@@ -1,26 +1,35 @@
 export interface ClerkMetadata {
-  onboarding: boolean
+  onboardingCompleted: boolean
   role: 'general_user' | 'police' | 'NGO' | null
   lastUpdated: string
 }
 
 /**
- * Extract onboarding status from Clerk session claims
- * @param sessionClaims - Clerk session claims object
- * @returns boolean | null - onboarding status or null if not found
+ * Extract onboarding status from Clerk user object or session claims
+ * @param userOrSessionClaims - Clerk user object or session claims object
+ * @returns boolean | null - onboardingCompleted status or null if not found
  */
-export const getOnboardingStatus = (sessionClaims: any): boolean | null => {
+export const getOnboardingStatus = (userOrSessionClaims: any): boolean | null => {
   try {
-    const metadata = sessionClaims?.publicMetadata
-    if (!metadata) return null
+    // Try to get metadata from user object first (preferred method)
+    let metadata = userOrSessionClaims?.publicMetadata
     
-    // Validate metadata structure
-    if (typeof metadata.onboarding !== 'boolean') {
-      console.warn('Invalid onboarding metadata:', metadata)
+    // If not found, try sessionClaims (fallback)
+    if (!metadata && userOrSessionClaims?.__raw) {
+      metadata = userOrSessionClaims?.publicMetadata
+    }
+    
+    if (!metadata) {
       return null
     }
     
-    return metadata.onboarding
+    // Validate metadata structure
+    if (typeof metadata.onboardingCompleted !== 'boolean') {
+      console.warn('Invalid onboardingCompleted metadata:', metadata)
+      return null
+    }
+    
+    return metadata.onboardingCompleted
   } catch (error) {
     console.error('Error reading Clerk metadata:', error)
     return null

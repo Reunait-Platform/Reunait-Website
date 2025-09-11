@@ -76,7 +76,7 @@ router.post("/users/profile", requireAuth(), async (req, res) => {
         try {
             await clerkClient.users.updateUserMetadata(userId, {
                 publicMetadata: {
-                    onboarding: true,
+                    onboardingCompleted: true,
                     role: user.role || 'general_user',
                     lastUpdated: new Date().toISOString()
                 }
@@ -215,7 +215,7 @@ router.get("/users/profile", requireAuth(), async (req, res) => {
                 try {
                     const countryPath = (caseData.country || "India").replace(/\s+/g, '_').toLowerCase();
                     for (let i = 1; i <= 2; i++) {
-                        const key = `${countryPath}/${caseData._id}_${i}`;
+                        const key = `${countryPath}/${caseData._id}_${i}.jpg`;
                         try {
                             const imageUrl = await getPresignedGetUrl(config.awsBucketName, key, 180);
                             imageUrls.push(imageUrl);
@@ -326,7 +326,7 @@ router.post("/webhooks/clerk", express.raw({ type: "application/json" }), async 
         try {
           await clerkClient.users.updateUserMetadata(clerkUserId, {
             publicMetadata: {
-              onboarding: false,
+              onboardingCompleted: false,
               role: null,
               lastUpdated: new Date().toISOString()
             }

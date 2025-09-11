@@ -52,7 +52,7 @@ export const getCases = async (req, res) => {
       
       try {
         for (let i = 1; i <= 2; i++) {
-          const key = `${countryPath}/${caseData._id}_${i}`;
+          const key = `${countryPath}/${caseData._id}_${i}.jpg`;
           try {
             const imageUrl = await getPresignedGetUrl(config.awsBucketName, key, 180);
             imageUrls.push(imageUrl);

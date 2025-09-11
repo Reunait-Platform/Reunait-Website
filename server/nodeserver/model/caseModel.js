@@ -51,8 +51,15 @@ const caseModel = new mongoose.Schema(
       type: String 
     },
     addedBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      required: true,
+      clerkId: {
+        type: String,
+        required: true,
+      },
+      role: {
+        type: String,
+        required: true,
+        enum: ['general_user', 'police', 'ngo']
+      }
     },
     landMark: {
       type: String,
@@ -103,6 +110,10 @@ const caseModel = new mongoose.Schema(
     similarCaseIds: {
         type: [mongoose.Schema.Types.ObjectId],
         default: []
+    },
+    verificationBypassed: {
+        type: Boolean,
+        default: false
     }
   },
   { timestamps: true }

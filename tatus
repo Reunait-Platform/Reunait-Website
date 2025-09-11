@@ -1,0 +1,5 @@
+[33m27b169c[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m feat: implement AI search role-based access, profile cases display, shimmer effects, and optimized OAuth flow
+[33m79cf784[m feat: Implement comprehensive profile page with user cases display
+[33m9f6a849[m feat: similar-cases dialog and dock UI; mobile actions layout; fish-eye dock behavior; progress dialog control; toast z-index; dialog spacing; style alignment
+[33ma12f07d[m Add client folder: Next.js frontend application
+[33m973c221[m Initial commit: Missing/Found cases platform

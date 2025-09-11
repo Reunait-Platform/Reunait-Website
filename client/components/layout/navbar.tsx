@@ -5,7 +5,7 @@ import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/nextjs"
-import { Bell, Heart, Menu, Plus, Coffee, MapPin, X } from "lucide-react"
+import { Bell, Heart, Menu, Plus, Coffee, MapPin, X, CupSoda } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Typography } from "@/components/ui/typography"
 import { LocationService } from "@/lib/location"
@@ -38,16 +38,15 @@ export function Navbar() {
           <div className="hidden md:flex items-center gap-1 lg:gap-2 animate-in fade-in-0 slide-in-from-top-4 duration-700 delay-200">
 
             {/* Keep legacy primary actions (always visible) */}
-            <Link href="/report" className="cursor-pointer">
+            <Link href="/register-case" className="cursor-pointer">
               <Button className="flex items-center gap-1.5 hover:scale-105 transition-all duration-300 font-semibold shadow-md hover:shadow-lg bg-gradient-to-r from-primary to-primary/90 text-primary-foreground border-0 rounded-lg px-4 py-2 h-10 cursor-pointer">
                 <Plus className="h-4 w-4" />
                 Report Missing Person
               </Button>
             </Link>
             <Link href="/donate" className="cursor-pointer">
-              <Button variant="outline" className="flex items-center gap-1.5 hover:scale-105 transition-all duration-300 font-medium border-2 rounded-lg px-3 py-2 h-10 cursor-pointer">
-                <Coffee className="h-4 w-4" />
-                Donate
+              <Button variant="outline" size="icon" className="h-9 w-9 cursor-pointer hover:scale-110 hover:shadow-lg transition-all duration-300 ease-in-out group" aria-label="Buy me a coffee">
+                <CupSoda className="h-5 w-5 transition-transform duration-300 group-hover:rotate-12" />
               </Button>
             </Link>
 
@@ -104,14 +103,14 @@ export function Navbar() {
         {mobileOpen && (
           <div className="md:hidden py-3 bg-background/95 backdrop-blur-md border-t-2 border-border animate-in fade-in-0 slide-in-from-top-2 duration-300">
             <div className="flex flex-col space-y-3">
-              <Link href="/report" className="cursor-pointer">
+              <Link href="/register-case" className="cursor-pointer">
                 <Button className="flex items-center gap-2 justify-start font-semibold hover:scale-105 transition-all duration-300 bg-gradient-to-r from-primary to-primary/90 text-primary-foreground border-0 rounded-lg shadow-md h-10 cursor-pointer">
                   <Plus className="h-4 w-4" /> Report Missing Person
                 </Button>
               </Link>
               <Link href="/donate" className="cursor-pointer">
-                <Button variant="outline" className="flex items-center gap-2 justify-start font-medium shadow-sm hover:scale-105 transition-all duration-300 border-2 rounded-lg h-10 cursor-pointer">
-                  <Coffee className="h-4 w-4" /> Donate
+                <Button variant="outline" size="icon" className="h-9 w-9 cursor-pointer hover:scale-110 hover:shadow-lg transition-all duration-300 ease-in-out group" aria-label="Buy me a coffee">
+                  <CupSoda className="h-5 w-5 transition-transform duration-300 group-hover:rotate-12" />
                 </Button>
               </Link>
 

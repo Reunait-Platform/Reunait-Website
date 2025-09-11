@@ -66,12 +66,11 @@ export function CaseHero({ data }: CaseHeroProps) {
                 className="px-3 sm:px-4 py-1.5 sm:py-2 bg-secondary text-secondary-foreground border border-border font-semibold tracking-wide shadow-sm max-w-[180px] sm:max-w-[220px] whitespace-nowrap text-xs sm:text-sm"
               >
                 <span className="font-bold mr-1 text-yellow-700">Reward</span>
-                <span className="font-bold text-yellow-700">₹</span>
                 <span
-                  className="font-bold ml-1 tabular-nums overflow-hidden text-ellipsis inline-block max-w-[100px] sm:max-w-[140px] text-yellow-700"
-                  title={`${typeof data.reward === 'string' ? data.reward.replace('₹', '').replace(/,/g, '') : data.reward}`}
+                  className="font-bold tabular-nums overflow-hidden text-ellipsis inline-block max-w-[100px] sm:max-w-[140px] text-yellow-700"
+                  title={typeof data.reward === 'string' ? data.reward : data.reward?.toString()}
                 >
-                  {typeof data.reward === 'string' ? data.reward.replace('₹', '').replace(/,/g, '') : data.reward}
+                  {typeof data.reward === 'string' ? data.reward : data.reward}
                 </span>
               </MovingBorderButton>
             </div>

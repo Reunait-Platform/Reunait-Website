@@ -2,7 +2,6 @@ import { LambdaClient, InvokeCommand } from '@aws-sdk/client-lambda';
 import { config } from '../config/config.js';
 import { uploadToS3, getPresignedGetUrl } from './s3Service.js';
 import { S3Client, DeleteObjectCommand } from '@aws-sdk/client-s3';
-import axios from 'axios'; // Added axios for URL accessibility testing
 
 // Configure AWS Lambda client using config values
 const lambdaClient = new LambdaClient({
@@ -22,10 +21,6 @@ const s3Client = new S3Client({
     }
 });
 
-// Helper to get S3 object URL
-const getS3Url = (key) => {
-    return `https://${config.awsTempImageBucket}.s3.${config.awsRegion}.amazonaws.com/${key}`;
-};
 
 // Helper to delete from S3
 const deleteFromS3 = async (key) => {
@@ -46,39 +41,53 @@ const generateEmbeddings = async (image1, image2, doVerify = true, caseId = 'def
     // caseId, country: for S3 path uniqueness
     let key1, key2;
     try {
-        // Upload both images to S3
-        key1 = `${country.replace(/\s+/g, '_').toLowerCase()}/${caseId}_1.${image1.originalname.split('.').pop()}`;
-        key2 = `${country.replace(/\s+/g, '_').toLowerCase()}/${caseId}_2.${image2.originalname.split('.').pop()}`;
+        // Upload both images to S3 (uploadToS3 now generates keys with extensions)
         await uploadToS3(image1, caseId, 1, country, config.awsTempImageBucket);
         await uploadToS3(image2, caseId, 2, country, config.awsTempImageBucket);
-        // Generate presigned GET URLs for Lambda
-        const url1 = await getPresignedGetUrl(config.awsTempImageBucket, key1, 300); // 5 min expiry
-        const url2 = await getPresignedGetUrl(config.awsTempImageBucket, key2, 300);
         
-        // Test if the URLs are accessible before calling Lambda
-        try {
-            const test1 = await axios.head(url1, { timeout: 5000 });
-        } catch (testError) {
-            console.error('URL accessibility test failed:', testError.message);
-            // Continue anyway, as Lambda might still be able to access them
-        }
+        // Generate the correct keys (standardized to .jpg) to match what uploadToS3 creates
+        const countryPath = country.replace(/\s+/g, '_').toLowerCase();
+        key1 = `${countryPath}/${caseId}_1.jpg`;  // Standardized to JPEG
+        key2 = `${countryPath}/${caseId}_2.jpg`;  // Standardized to JPEG
+        
+        // ===== IMAGEKIT APPROACH (NEW) =====
+        // Generate ImageKit URLs with smart crop and face detection
+        const imageKitBaseUrl = `${config.imageKitBaseUrl}/${config.imageKitId}`;
+        const imageKitUrl1 = `${imageKitBaseUrl}/${key1}?tr=w-224,h-224,c-maintain_ratio,fo-face,q-80`;
+        const imageKitUrl2 = `${imageKitBaseUrl}/${key2}?tr=w-224,h-224,c-maintain_ratio,fo-face,q-80`;
+        
+        
+        // Use ImageKit URLs for Lambda
+        const url1 = imageKitUrl1;
+        const url2 = imageKitUrl2;
+        
+        // ===== S3 PRESIGNED URL APPROACH (COMMENTED OUT) =====
+        // Generate presigned GET URLs for Lambda
+        // const url1 = await getPresignedGetUrl(config.awsTempImageBucket, key1, 300); // 5 min expiry
+        // const url2 = await getPresignedGetUrl(config.awsTempImageBucket, key2, 300);
+        
         // Prepare payload for Lambda
         const payload = {
             url1,
             url2,
             do_verify: doVerify
         };
+        
+        
         // Create invoke command
         const command = new InvokeCommand({
             FunctionName: 'face_embedding_microservice', // Your Lambda function name
             Payload: JSON.stringify(payload),
             InvocationType: 'RequestResponse' // Synchronous invocation
         });
+        
         // Invoke Lambda function
         const result = await lambdaClient.send(command);
-        // Debug: Print the full Lambda response
+        
         // Parse the response
-        const responseData = JSON.parse(new TextDecoder().decode(result.Payload));
+        const rawResponse = new TextDecoder().decode(result.Payload);
+        const responseData = JSON.parse(rawResponse);
+        
         // Check for Lambda errors
         if (responseData.statusCode && responseData.statusCode !== 200) {
             const errorBody = JSON.parse(responseData.body);

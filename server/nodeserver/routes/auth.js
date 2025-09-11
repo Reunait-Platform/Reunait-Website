@@ -1,9 +1,6 @@
 import express from "express";
-import { registerUser } from "../controllers/registerUser.js";
 import { registerCase } from "../controllers/registerCase.js";
-import { loginUser } from "../controllers/loginUser.js";
-import { logoutUser } from "../controllers/logoutUser.js";
-import { verifyToken } from "../middleware/verifyToken.js";
+import { requireAuth } from "@clerk/express";
 import multer from "multer";
 
 const router = express.Router();
@@ -16,9 +13,7 @@ const upload = multer({
     }
 });
 
-router.post("/registerUser", registerUser);
-router.post("/registerCase", upload.array('images', 2), registerCase);
-router.post("/login", loginUser);
-router.post("/logout", verifyToken, logoutUser);
+// Only register case endpoint - authentication handled by Clerk
+router.post("/registerCase", requireAuth(), upload.array('images', 2), registerCase);
 
 export default router;

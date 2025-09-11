@@ -13,18 +13,19 @@ const s3Client = new S3Client({
     }
 });
 
-// Upload file to S3 using a presigned URL (no extension in key)
+// Upload file to S3 using a presigned URL (standardized to JPEG format)
 const uploadToS3 = async (file, caseId, imageIndex, country, bucket = config.awsBucketName) => {
     try {
         // Clean country name for S3 path
-        const countryPath = country.replace(/\s+/g, '_').toLowerCase();
-        // No extension in the key - just the case ID and image index
-        const key = `${countryPath}/${caseId}_${imageIndex}`;
+        const countryPath = country ? country.replace(/\s+/g, '_').toLowerCase() : 'default';
+        
+        // Standardize to JPEG format for consistency
+        const key = `${countryPath}/${caseId}_${imageIndex}.jpg`;
 
         const command = new PutObjectCommand({
             Bucket: bucket,
             Key: key,
-            ContentType: file.mimetype // Preserve original MIME type
+            ContentType: 'image/jpeg' // Standardized to JPEG format
         });
 
         // Generate a presigned URL for uploading

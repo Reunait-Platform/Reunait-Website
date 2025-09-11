@@ -15,10 +15,6 @@ export const config = {
     // MongoDB Configuration
     mongoUri: process.env.MONGODB_URI,
     
-    // JWT Configuration
-    jwtSecret: process.env.JWT_SECRET,
-    jwtExpiresIn: process.env.JWT_EXPIRES_IN || '24h',
-    
     // AWS Configuration
     awsAccessKeyId: process.env.AWS_ACCESS_KEY_ID,
     awsSecretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
@@ -37,6 +33,12 @@ export const config = {
     // Pinecone
     pineconeApiKey: process.env.PINECONE_API_KEY,
     pineconeIndex: process.env.PINECONE_INDEX,
+    pineconeSearchThreshold: parseFloat(process.env.PINECONE_SEARCH_THRESHOLD) || 0.6, // 60% similarity threshold
+    pineconeTopK: parseInt(process.env.PINECONE_TOP_K) || 3, // Number of results to return
+    
+    // ImageKit Configuration
+    imageKitId: process.env.IMAGEKIT_ID,
+    imageKitBaseUrl: process.env.IMAGEKIT_BASE_URL || 'https://ik.imagekit.io',
     
     // Rate Limiting
     rateLimitWindow: process.env.RATE_LIMIT_WINDOW || 15 * 60 * 1000, // 15 minutes in milliseconds

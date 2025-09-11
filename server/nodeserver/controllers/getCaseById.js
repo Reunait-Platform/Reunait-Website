@@ -7,7 +7,7 @@ export const getCaseById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Extract user role from Clerk public metadata
+    // Extract user role from Clerk public metadata (if authenticated)
     let userRole = 'general_user';
     const auth = req.auth();
     if (auth?.userId) {
@@ -19,6 +19,7 @@ export const getCaseById = async (req, res) => {
         userRole = 'general_user';
       }
     }
+    // If not authenticated, default to general_user (public access)
     
 
     const caseData = await Case.findById(id).select('-notifications').lean();
@@ -26,12 +27,12 @@ export const getCaseById = async (req, res) => {
       return res.status(404).json({ success: false, message: "Case not found" });
     }
 
-    // Generate image URLs using country-based key prefix without extensions
+    // Generate image URLs using country-based key prefix with .jpg extension
     const imageUrls = [];
     try {
       const countryPath = (caseData.country || "India").replace(/\s+/g, '_').toLowerCase();
       for (let i = 1; i <= 2; i++) {
-        const key = `${countryPath}/${caseData._id}_${i}`;
+        const key = `${countryPath}/${caseData._id}_${i}.jpg`;
         try {
           const imageUrl = await getPresignedGetUrl(config.awsBucketName, key, 180);
           imageUrls.push(imageUrl);
@@ -57,7 +58,7 @@ export const getCaseById = async (req, res) => {
         try {
           const countryPath = (similarCase.country || "India").replace(/\s+/g, '_').toLowerCase();
           for (let i = 1; i <= 2; i++) {
-            const key = `${countryPath}/${similarCase._id}_${i}`;
+            const key = `${countryPath}/${similarCase._id}_${i}.jpg`;
             try {
               const imageUrl = await getPresignedGetUrl(config.awsBucketName, key, 180);
               similarImageUrls.push(imageUrl);
