@@ -44,9 +44,16 @@ export interface CaseDetail {
   policeStationName?: string;
   isAssigned?: boolean;
   addedBy?: string;
+  caseOwner?: string;
   lastSearched?: string;
   lastSearchedTime?: string;
-  notifications?: any[];
+  notifications?: Array<{
+    message: string
+    time: string
+    ipAddress?: string
+    phoneNumber?: string
+    isRead: boolean
+  }>;
   sections?: { title: string; items: { label: string; value: string }[] }[];
   similarCases?: Case[];
 }

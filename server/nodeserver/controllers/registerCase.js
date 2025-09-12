@@ -31,13 +31,16 @@ export const registerCase = async (req, res) => {
             });
         }
 
-        // Check FIR number uniqueness if provided
+        // Check FIR number uniqueness within the same country if provided
         if (req.body.FIRNumber) {
-            const existingCase = await Case.findOne({ FIRNumber: req.body.FIRNumber });
+            const existingCase = await Case.findOne({ 
+                FIRNumber: req.body.FIRNumber,
+                policeStationCountry: req.body.policeStationCountry 
+            });
             if (existingCase) {
                 return res.status(409).json({
                     status: false,
-                    message: 'FIR number already exists. Please provide a unique FIR number.'
+                    message: 'Case reference number already exists in this country. Please provide a unique case reference number.'
                 });
             }
         }
@@ -73,10 +76,8 @@ export const registerCase = async (req, res) => {
             pincode: req.body.pincode,
             country: req.body.country,
             description: req.body.description || "",
-            addedBy: {
-                clerkId: req.auth?.userId || null,
-                role: req.body.reportedBy || 'general_user'
-            },
+            addedBy: req.body.reportedBy || 'general_user',
+            caseOwner: req.auth?.userId || null,
             landMark: req.body.landMark || "",
             FIRNumber: req.body.FIRNumber,
             policeStationState: req.body.policeStationState || "",
@@ -99,6 +100,20 @@ export const registerCase = async (req, res) => {
 
         // Save the case
         const savedCase = await newCase.save();
+
+        // Add case creation notification
+        const caseCreationNotification = {
+            message: `Case registered`,
+            time: new Date(),
+            ipAddress: (req.headers["x-forwarded-for"]?.split(",")[0]?.trim()) || req.ip || req.connection.remoteAddress || 'Unknown',
+            phoneNumber: req.body.contactNumber || 'Not provided',
+            isRead: false
+        };
+        
+        // Add notification to the case
+        await Case.findByIdAndUpdate(savedCase._id, {
+            $push: { notifications: caseCreationNotification }
+        });
 
         // Generate embeddings for the images (now that we have the case ID)
         let embeddings;

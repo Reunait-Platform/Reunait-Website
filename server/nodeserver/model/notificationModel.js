@@ -16,6 +16,9 @@ const notificationSchema = new mongoose.Schema(
         },
         ipAddress: {
             type: String
+        },
+        phoneNumber: {
+            type: String
         }
     }
 );

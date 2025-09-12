@@ -22,9 +22,32 @@ export const getCaseById = async (req, res) => {
     // If not authenticated, default to general_user (public access)
     
 
-    const caseData = await Case.findById(id).select('-notifications').lean();
+    const caseData = await Case.findById(id).lean();
     if (!caseData) {
       return res.status(404).json({ success: false, message: "Case not found" });
+    }
+
+    // Filter notifications based on user role and case ownership
+    let filteredNotifications = [];
+    if (caseData.notifications && caseData.notifications.length > 0) {
+      if (userRole === 'police') {
+        // Police users get full notifications with IP addresses and phone numbers
+        filteredNotifications = caseData.notifications.map(notification => ({
+          message: notification.message,
+          time: notification.time,
+          ipAddress: notification.ipAddress,
+          phoneNumber: notification.phoneNumber,
+          isRead: notification.isRead
+        }));
+      } else if (auth?.userId && caseData.addedBy?.clerkId === auth.userId) {
+        // Case owner gets notifications with phone number but no IP
+        filteredNotifications = caseData.notifications.map(notification => ({
+          message: "An update has been made to your case",
+          time: notification.time,
+          isRead: notification.isRead
+        }));
+      }
+      // Other users get no notifications (privacy protection)
     }
 
     // Generate image URLs using country-based key prefix with .jpg extension
@@ -109,7 +132,10 @@ export const getCaseById = async (req, res) => {
       state: caseData.state,
       country: caseData.country,
       contactNumber: caseData.contactNumber,
+      addedBy: caseData.addedBy,
+      caseOwner: caseData.caseOwner,
       similarCases,
+      notifications: filteredNotifications.reverse(),
       // Precomputed sections for direct rendering on the client
       sections: (() => {
         const sections = [];
@@ -155,7 +181,19 @@ export const getCaseById = async (req, res) => {
         if (caseData.reward) caseDetailItems.push({ label: 'Reward', value: toStr(caseData.reward) });
         if (caseData.reportedBy) caseDetailItems.push({ label: 'Reported By', value: String(caseData.reportedBy).charAt(0).toUpperCase() + String(caseData.reportedBy).slice(1) });
         if (typeof caseData.isAssigned === 'boolean') caseDetailItems.push({ label: 'Assigned', value: caseData.isAssigned ? 'Yes' : 'No' });
-        if (caseData.addedBy) caseDetailItems.push({ label: 'Added By', value: toStr(caseData.addedBy) });
+        if (caseData.addedBy) {
+          const item = { 
+            label: 'Added By', 
+            value: toStr(caseData.addedBy)
+          };
+          
+          // Only add link for police users
+          if (userRole === 'police') {
+            item.link = `/caseOwnerProfile?caseOwner=${caseData.caseOwner}`;
+          }
+          
+          caseDetailItems.push(item);
+        }
         if (caseDetailItems.length) sections.push({ title: 'Case Details', items: caseDetailItems });
 
         // Location
@@ -169,7 +207,7 @@ export const getCaseById = async (req, res) => {
 
         // Police Station
         const policeStationItems = [];
-        if (caseData.FIRNumber) policeStationItems.push({ label: 'FIR Number', value: toStr(caseData.FIRNumber) });
+        if (caseData.FIRNumber) policeStationItems.push({ label: 'Case Reference Number', value: toStr(caseData.FIRNumber) });
         if (caseData.caseRegisterDate) policeStationItems.push({ label: 'Case Registered On', value: formatDate(caseData.caseRegisterDate) });
         if (caseData.policeStationName) policeStationItems.push({ label: 'Police Station Name', value: toStr(caseData.policeStationName) });
         if (caseData.policeStationCity) policeStationItems.push({ label: 'Police Station City', value: toStr(caseData.policeStationCity) });

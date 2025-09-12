@@ -18,7 +18,7 @@ export function CasePoliceDetails({ data }: CasePoliceDetailsProps) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
           {data.FIRNumber && (
             <div className="space-y-1.5">
-              <div className="font-semibold">FIR Number</div>
+              <div className="font-semibold">Case Reference Number</div>
               <div className="text-muted-foreground">{data.FIRNumber}</div>
             </div>
           )}

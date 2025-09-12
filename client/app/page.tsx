@@ -1,17 +1,33 @@
 "use client"
 
+import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Vortex } from "@/components/ui/vortex"
 import { Typography } from "@/components/ui/typography"
 import { Button } from "@/components/ui/button"
+import { SimpleLoader } from "@/components/ui/simple-loader"
 import { APP_FEATURES, APP_STATS } from "@/lib/constants"
 import { Search, Users, Shield, Heart } from "lucide-react"
 
 export default function Home() {
+  const router = useRouter()
+  const [isNavigating, setIsNavigating] = useState(false)
+
   const handleLearnMore = () => {}
-  const handleViewCases = () => { window.location.href = "/cases" }
+  
+  const handleViewCases = async () => {
+    setIsNavigating(true)
+    router.push("/cases")
+  }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-black">
+    <div className="min-h-screen bg-white dark:bg-black relative">
+      {/* Full-screen loading overlay - loader only */}
+      {isNavigating && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+          <SimpleLoader />
+        </div>
+      )}
       {/* Hero Section with Vortex (demo settings) */}
       <div className="relative h-screen overflow-hidden">
         <Vortex

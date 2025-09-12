@@ -9,6 +9,8 @@ import authRoutes from "./routes/auth.js"
 import casesRoutes from "./routes/cases.js"
 import findMatchesRoutes from "./routes/find-matches.js"
 import userAuthRoutes from "./routes/user-auth.js"
+import reportRoutes from "./routes/report.js"
+import caseOwnerProfileRoutes from "./routes/caseOwnerProfile.js"
 import { clerkMiddleware } from "@clerk/express";
 import { rateLimiter } from "./middleware/rateLimiter.js";
 import { fileURLToPath } from 'url';
@@ -69,6 +71,8 @@ app.use("/auth", authRoutes);
 app.use("/cases", casesRoutes);
 app.use("/api", findMatchesRoutes);
 app.use("/api", userAuthRoutes);
+app.use("/api", reportRoutes);
+app.use("/api", caseOwnerProfileRoutes);
 
 
 /*  MONGOOSE SETUP  */

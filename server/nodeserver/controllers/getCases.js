@@ -32,6 +32,9 @@ export const getCases = async (req, res) => {
       filter.city = city;
     }
 
+    // Always show only cases where showCase is true
+    filter.showCase = true;
+
     // Get total count for pagination
     const totalCases = await Case.countDocuments(filter);
     const totalPages = Math.ceil(totalCases / limitNumber);

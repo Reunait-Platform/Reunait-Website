@@ -53,6 +53,7 @@ export function ReportInfoDemo() {
         isOpen={isPopupOpen}
         onClose={() => setIsPopupOpen(false)}
         caseId="demo-case-123"
+        addedBy="demo-user-123"
       />
     </div>
   );

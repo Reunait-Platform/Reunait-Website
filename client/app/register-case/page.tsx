@@ -20,6 +20,39 @@ import { useToast } from "@/contexts/toast-context"
 import { User, MapPin, Camera, FileText, Shield } from "lucide-react"
 import { ImageUploadDropzone } from "@/components/cases/image-upload-dropzone"
 import { countries } from "countries-list"
+import { MultiStepLoader as Loader } from "@/components/ui/multi-step-loader"
+import { IconSquareRoundedX } from "@tabler/icons-react"
+
+// Loading states for multi-step loader
+const loadingStates = [
+  {
+    text: "Validating case information",
+  },
+  {
+    text: "Checking case reference number uniqueness",
+  },
+  {
+    text: "Scanning images for content safety",
+  },
+  {
+    text: "Processing and optimizing images",
+  },
+  {
+    text: "Analyzing case details",
+  },
+  {
+    text: "Uploading images to secure storage",
+  },
+  {
+    text: "Storing case in secure database",
+  },
+  {
+    text: "Setting up AI matching system",
+  },
+  {
+    text: "Finalizing case registration and encryption",
+  },
+];
 
 // Validation schema
 const schema = z
@@ -69,7 +102,7 @@ const schema = z
     }, "Maximum 75 characters allowed"),
     
     // Police Information
-    FIRNumber: z.string().min(1, "FIR Number is required"),
+    FIRNumber: z.string().min(1, "Case Reference Number is required"),
     policeStationName: z.string().min(1, "Police Station Name is required"),
     policeStationCountry: z.string().min(1, "Police station country is required"),
     policeStationState: z.string().optional(),
@@ -84,13 +117,13 @@ const schema = z
   })
   .superRefine((val, ctx) => {
     
-    // FIR Number validation if provided
+    // Case Reference Number validation if provided
     if (val.FIRNumber && val.FIRNumber.trim() !== "") {
       if (!/^[A-Za-z0-9\- ]+$/.test(val.FIRNumber.trim()) || val.FIRNumber.trim().length < 2) {
         ctx.addIssue({ 
           path: ["FIRNumber"], 
           code: z.ZodIssueCode.custom, 
-          message: "FIR number must contain only letters, numbers, dashes, and spaces (minimum 2 characters)" 
+          message: "Case reference number must contain only letters, numbers, dashes, and spaces (minimum 2 characters)" 
         })
       }
     }
@@ -183,6 +216,7 @@ export default function RegisterCasePage() {
   const { showSuccess, showError } = useToast()
   const [submitting, setSubmitting] = useState(false)
   const [userProfile, setUserProfile] = useState<any>(null)
+  const [loading, setLoading] = useState(false)
 
   // Location state
   const [countries, setCountries] = useState<string[]>([])
@@ -331,9 +365,11 @@ export default function RegisterCasePage() {
   const onSubmit = async (values: FormValues) => {
     try {
       setSubmitting(true)
+      setLoading(true)
       const token = await getToken()
       if (!token) {
         showError("Not authenticated. Please sign in again.")
+        setLoading(false)
         return
       }
 
@@ -380,13 +416,19 @@ export default function RegisterCasePage() {
       
       if (data.status === true) {
         showSuccess(data.message || "Case registered successfully!")
-        router.push(`/cases/${data.caseId}`)
+        // Small delay to show the final loading state
+        setTimeout(() => {
+          setLoading(false)
+          router.push(`/cases/${data.caseId}`)
+        }, 1000)
       } else {
+        setLoading(false)
         showError(data.message || "Failed to register case. Please try again.")
         // Stay on the same page to allow user to retry
       }
     } catch (error) {
       console.error("Registration error:", error)
+      setLoading(false)
       showError("Unable to register case. Check your connection and try again.")
     } finally {
       setSubmitting(false)
@@ -398,6 +440,9 @@ export default function RegisterCasePage() {
 
   return (
     <div className="container mx-auto px-4 sm:px-6 md:px-4 lg:px-8 py-10 lg:py-14 max-w-6xl">
+      {/* Multi Step Loader */}
+      <Loader loadingStates={loadingStates} loading={loading} duration={1500} />
+
       <div className="w-full">
         {/* Form */}
         <div className="w-full max-w-4xl mx-auto">
@@ -410,7 +455,7 @@ export default function RegisterCasePage() {
               
             </div>
 
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8" style={{ pointerEvents: loading ? 'none' : 'auto', opacity: loading ? 0.5 : 1 }}>
               {/* Personal Information Section */}
               <Card>
                 <CardHeader>
@@ -851,10 +896,10 @@ export default function RegisterCasePage() {
                 <CardContent className="space-y-8">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                      <Label htmlFor="FIRNumber">FIR Number *</Label>
+                      <Label htmlFor="FIRNumber">Case Reference Number *</Label>
                       <Input 
                         id="FIRNumber" 
-                        placeholder="Enter FIR number" 
+                        placeholder="Enter case reference number" 
                         {...form.register("FIRNumber")}
                         aria-invalid={!!form.formState.errors.FIRNumber}
                       />
@@ -969,10 +1014,10 @@ export default function RegisterCasePage() {
               <div className="space-y-3 pt-4">
                 <Button 
                   type="submit" 
-                  className="w-full h-12 text-base" 
-                  disabled={submitting || !form.formState.isValid}
+                  className="w-full h-12 text-base cursor-pointer" 
+                  disabled={submitting || loading || !form.formState.isValid}
                 >
-                  {submitting ? "Registering Case..." : "Register Case"}
+                  {submitting || loading ? "Registering Case..." : "Register Case"}
                 </Button>
                 <p className="text-xs text-muted-foreground text-center">
                   By submitting this form, you confirm that all information provided is accurate and you have the right to share these details.

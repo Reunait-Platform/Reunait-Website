@@ -191,6 +191,7 @@ export default function CaseDetailPage() {
             remainingTimeFormatted={remainingTimeFormatted}
             hasSimilarResults={hasSimilarResults}
             onOpenSimilar={openSimilarDialog}
+            notifications={data?.notifications || []}
           />
 
           {/* Description */}
@@ -207,6 +208,7 @@ export default function CaseDetailPage() {
           isOpen={isReportInfoOpen}
           onClose={handleReportInfoClose}
           caseId={data?._id}
+          addedBy={data?.caseOwner}
           onSuccess={handleReportSuccess}
         />
         

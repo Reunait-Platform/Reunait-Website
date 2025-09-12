@@ -161,7 +161,7 @@ export function CasesSearch({ onSearch, onClear, loading = false }: CasesSearchP
             <div className="relative w-full lg:w-1/2 animate-in fade-in-0 slide-in-from-left-2 duration-500 delay-100">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
               <Input
-                placeholder="Name, mobile, or FIR number..."
+                placeholder="Name, mobile, or case reference number..."
                 value={filters.keyword}
                 onChange={(e) => createFilterChangeHandler("keyword")(e.target.value)}
                 className="pl-10 h-9 text-sm border-2 border-border bg-background/80 focus:bg-background transition-all duration-300 hover:bg-background/90 rounded-lg"

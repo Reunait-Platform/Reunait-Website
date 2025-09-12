@@ -16,6 +16,13 @@ interface CaseActionsProps {
   remainingTimeFormatted?: string
   hasSimilarResults?: boolean
   onOpenSimilar?: () => void
+  notifications?: Array<{
+    message: string
+    time: string
+    ipAddress?: string
+    phoneNumber?: string
+    isRead: boolean
+  }>
 }
 
 export function CaseActions({ 
@@ -28,6 +35,7 @@ export function CaseActions({
   remainingTimeFormatted = '',
   hasSimilarResults = false,
   onOpenSimilar,
+  notifications = [],
 }: CaseActionsProps) {
   
   const [isProgressOpen, setIsProgressOpen] = useState(false)
@@ -95,16 +103,16 @@ export function CaseActions({
           Share
         </Button>
         
-        <CaseProgressTimeline>
+        <CaseProgressTimeline notifications={notifications}>
           <Button 
             variant="outline" 
-            className="gap-2 px-4 sm:px-5 py-2.5 sm:py-3 border-border dark:border-border/80 hover:bg-muted/50 font-semibold text-xs sm:text-sm min-w-[120px] sm:min-w-[140px] justify-center cursor-pointer"
+            className="gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 border-border dark:border-border/80 hover:bg-muted/50 font-semibold text-xs sm:text-sm min-w-[100px] sm:min-w-[120px] justify-center cursor-pointer"
           >
             <Activity className="w-3 h-3 sm:w-4 sm:h-4" />
             <span className="hidden sm:inline">Track Progress</span>
             <span className="sm:hidden">Progress</span>
-            <Badge variant="secondary" className="ml-1 text-xs">
-              5
+            <Badge variant="secondary" className="ml-1 text-xs px-1.5 py-0.5 min-w-[18px] h-[18px] flex items-center justify-center">
+              {notifications?.length || 0}
             </Badge>
           </Button>
         </CaseProgressTimeline>
@@ -127,6 +135,7 @@ export function CaseActions({
       title: "Progress",
       icon: <Activity className="w-5 h-5" />,
       onClick: () => setIsProgressOpen(true),
+      badge: notifications?.length || 0,
     },
   ]
 
@@ -243,16 +252,23 @@ export function CaseActions({
           <Button
             variant="outline"
             onClick={() => setIsProgressOpen(true)}
-            className="flex-1 gap-1.5 px-2.5 py-2.5 border-border dark:border-border/80 hover:bg-muted/50 font-semibold text-xs min-w-0 justify-center"
+            className="flex-1 gap-1 px-2 py-2 border-border dark:border-border/80 hover:bg-muted/50 font-semibold text-xs min-w-0 justify-center"
             aria-label="Progress"
           >
             <Activity className="w-3 h-3" />
             <span>Progress</span>
+            <Badge variant="secondary" className="ml-1 text-xs px-1.5 py-0.5 min-w-[18px] h-[18px] flex items-center justify-center">
+              {notifications?.length || 0}
+            </Badge>
           </Button>
         </div>
       </div>
 
-      <CaseProgressTimeline open={isProgressOpen} onOpenChange={setIsProgressOpen} />
+      <CaseProgressTimeline 
+        open={isProgressOpen} 
+        onOpenChange={setIsProgressOpen} 
+        notifications={notifications}
+      />
     </div>
   )
 }

@@ -191,13 +191,6 @@ const searchSimilarCases = async (caseId, searchParams) => {
             .filter(match => match.score >= config.pineconeSearchThreshold) // Apply threshold filter
             .slice(0, config.pineconeTopK); // Use configurable k value
         
-        // Log the scores of filtered matches
-        console.log(`Top ${config.pineconeTopK} matches (threshold: ${(config.pineconeSearchThreshold * 100).toFixed(1)}%):`, sortedResults.map((match, index) => ({
-            rank: index + 1,
-            caseId: match.id.split('_')[0],
-            score: match.score,
-            percentage: `${(match.score * 100).toFixed(2)}%`
-        })));
         
         return sortedResults;
     } catch (error) {

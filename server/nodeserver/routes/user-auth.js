@@ -196,11 +196,18 @@ router.get("/users/profile", requireAuth(), async (req, res) => {
         let hasMoreCases = false;
         
         if (caseIds && caseIds.length > 0) {
-            totalCases = caseIds.length;
+            // First, get all visible case IDs (where showCase is true)
+            const visibleCaseIds = await Case.find({ 
+                _id: { $in: caseIds }, 
+                showCase: true 
+            }).select('_id').lean();
+            
+            const visibleIds = visibleCaseIds.map(c => c._id);
+            totalCases = visibleIds.length;
             hasMoreCases = totalCases > skip + limit;
             
-            // Get paginated case IDs
-            const paginatedCaseIds = caseIds.slice(skip, skip + limit);
+            // Get paginated case IDs from visible cases only
+            const paginatedCaseIds = visibleIds.slice(skip, skip + limit);
             
             // Fetch only the fields needed for case cards
             const casesData = await Case.find({ _id: { $in: paginatedCaseIds } })
@@ -360,5 +367,3 @@ router.post("/webhooks/clerk", express.raw({ type: "application/json" }), async 
 });
 
 export default router;
-
-

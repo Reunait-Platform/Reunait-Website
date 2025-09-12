@@ -23,25 +23,26 @@ export function Navbar() {
     <nav className="sticky top-0 z-50 bg-background/95 backdrop-blur-md supports-[backdrop-filter]:bg-background/80 border-b-2 border-border animate-in fade-in-0 slide-in-from-top-2 duration-500">
       <div className="mx-auto w-full md:max-w-none lg:max-w-screen-2xl px-3 sm:px-4 md:px-5 lg:px-8 xl:px-10">
         <div className="flex h-14 items-center justify-between">
-          {/* Brand (restored legacy styling) */}
-          <Link href="/" className="flex items-center gap-1 lg:gap-2 group animate-in fade-in-0 slide-in-from-top-4 duration-700 delay-100 cursor-pointer">
+          {/* Brand */}
+          <Link href="/" className="flex items-center gap-2 group animate-in fade-in-0 slide-in-from-top-4 duration-700 delay-100 cursor-pointer">
             <div className="relative">
-              <Heart className="h-6 w-6 text-destructive group-hover:scale-110 transition-transform duration-300" />
+              <Heart className="h-6 w-6 sm:h-7 sm:w-7 text-destructive group-hover:scale-110 transition-transform duration-300" />
               <div className="absolute inset-0 bg-destructive/20 rounded-full blur-sm group-hover:blur-md transition-all duration-300" />
             </div>
-            <Typography variant="h4" as="h1" className="font-bold leading-none group-hover:text-primary transition-colors duration-300 animate-in fade-in-0 scale-in-95 duration-700 delay-300">
+            <Typography variant="h4" as="h1" className="font-bold leading-none group-hover:text-primary transition-colors duration-300 animate-in fade-in-0 scale-in-95 duration-700 delay-300 text-lg sm:text-xl">
               FindMe
             </Typography>
           </Link>
 
-          {/* Desktop actions (restored placement/size) */}
+          {/* Desktop actions */}
           <div className="hidden md:flex items-center gap-1 lg:gap-2 animate-in fade-in-0 slide-in-from-top-4 duration-700 delay-200">
 
-            {/* Keep legacy primary actions (always visible) */}
+            {/* Primary actions */}
             <Link href="/register-case" className="cursor-pointer">
-              <Button className="flex items-center gap-1.5 hover:scale-105 transition-all duration-300 font-semibold shadow-md hover:shadow-lg bg-gradient-to-r from-primary to-primary/90 text-primary-foreground border-0 rounded-lg px-4 py-2 h-10 cursor-pointer">
+              <Button className="flex items-center gap-2 hover:scale-105 transition-all duration-300 font-semibold shadow-md hover:shadow-lg bg-gradient-to-r from-primary to-primary/90 text-primary-foreground border-0 rounded-lg px-4 py-2 h-10 cursor-pointer">
                 <Plus className="h-4 w-4" />
-                Report Missing Person
+                <span className="hidden lg:inline">Report Case</span>
+                <span className="lg:hidden">Report</span>
               </Button>
             </Link>
             <Link href="/donate" className="cursor-pointer">
@@ -86,55 +87,83 @@ export function Navbar() {
             <ThemeToggle />
           </div>
 
-          {/* Mobile toggle */}
+          {/* Mobile actions */}
           <div className="md:hidden flex items-center gap-2">
-            <ThemeToggle />
-            <Button variant="ghost" size="icon" onClick={() => setMobileOpen(v => !v)} aria-label="Toggle menu" className="cursor-pointer">
-              {mobileOpen ? (
-                <X className="h-5 w-5 transition-transform duration-300 rotate-90" />
-              ) : (
-                <Menu className="h-5 w-5 transition-transform duration-300" />
-              )}
-            </Button>
+            {/* Primary action - always visible */}
+            <Link href="/register-case" className="cursor-pointer">
+              <Button className="flex items-center gap-1.5 hover:scale-105 transition-all duration-300 font-semibold shadow-md hover:shadow-lg bg-gradient-to-r from-primary to-primary/90 text-primary-foreground border-0 rounded-lg px-3 py-2 h-9 cursor-pointer">
+                <Plus className="h-4 w-4" />
+                <span className="text-sm">Report</span>
+              </Button>
+            </Link>
+            
+            {/* Right side actions */}
+            <div className="flex items-center gap-2 ml-auto">
+              <SignedIn>
+                <UserButton appearance={{ elements: { avatarBox: "h-8 w-8" } }} />
+              </SignedIn>
+              <SignedOut>
+                <ThemeToggle />
+              </SignedOut>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => setMobileOpen(v => !v)} 
+                aria-label="Toggle menu" 
+                className="cursor-pointer"
+              >
+                {mobileOpen ? (
+                  <X className="h-5 w-5 transition-transform duration-300 rotate-90" />
+                ) : (
+                  <Menu className="h-5 w-5 transition-transform duration-300" />
+                )}
+              </Button>
+            </div>
           </div>
         </div>
 
-        {/* Mobile menu */}
+        {/* Mobile menu - secondary actions only */}
         {mobileOpen && (
           <div className="md:hidden py-3 bg-background/95 backdrop-blur-md border-t-2 border-border animate-in fade-in-0 slide-in-from-top-2 duration-300">
             <div className="flex flex-col space-y-3">
-              <Link href="/register-case" className="cursor-pointer">
-                <Button className="flex items-center gap-2 justify-start font-semibold hover:scale-105 transition-all duration-300 bg-gradient-to-r from-primary to-primary/90 text-primary-foreground border-0 rounded-lg shadow-md h-10 cursor-pointer">
-                  <Plus className="h-4 w-4" /> Report Missing Person
-                </Button>
-              </Link>
-              <Link href="/donate" className="cursor-pointer">
-                <Button variant="outline" size="icon" className="h-9 w-9 cursor-pointer hover:scale-110 hover:shadow-lg transition-all duration-300 ease-in-out group" aria-label="Buy me a coffee">
-                  <CupSoda className="h-5 w-5 transition-transform duration-300 group-hover:rotate-12" />
-                </Button>
-              </Link>
+              {/* Secondary actions */}
+              <div className="flex items-center justify-end gap-3">
+                <Link href="/donate" className="cursor-pointer" onClick={() => setMobileOpen(false)}>
+                  <Button variant="outline" size="icon" className="h-9 w-9 cursor-pointer hover:scale-110 hover:shadow-lg transition-all duration-300 ease-in-out group" aria-label="Buy me a coffee">
+                    <CupSoda className="h-5 w-5 transition-transform duration-300 group-hover:rotate-12" />
+                  </Button>
+                </Link>
 
+                <SignedIn>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="icon" className="h-9 w-9 cursor-pointer" aria-label="Notifications">
+                        <Bell className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-64">
+                      <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem className="text-muted-foreground">No new notifications</DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                  <ThemeToggle />
+                </SignedIn>
+
+                <SignedOut>
+                  <Link href="/sign-in" className="cursor-pointer" onClick={() => setMobileOpen(false)}>
+                    <Button variant="outline" className="h-9 px-4 text-sm cursor-pointer">Sign in</Button>
+                  </Link>
+                </SignedOut>
+              </div>
+
+              {/* Location display */}
               {savedLocation && savedLocation.city !== 'Unknown' && (
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground pt-2">
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground pt-2 border-t border-border">
                   <MapPin className="h-3.5 w-3.5" />
                   <span className="font-medium">{savedLocation.city}, {savedLocation.state}</span>
                 </div>
               )}
-
-              <SignedOut>
-                <Link href="/sign-in" className="cursor-pointer">
-                  <Button variant="outline" className="h-10 justify-start px-4 text-sm cursor-pointer">Sign in</Button>
-                </Link>
-              </SignedOut>
-
-              <SignedIn>
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="icon" className="h-9 w-9 cursor-pointer" aria-label="Notifications">
-                    <Bell className="h-4 w-4" />
-                  </Button>
-                  <UserButton appearance={{ elements: { avatarBox: "h-8 w-8" } }} />
-                </div>
-              </SignedIn>
             </div>
           </div>
         )}

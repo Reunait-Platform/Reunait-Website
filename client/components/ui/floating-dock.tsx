@@ -9,6 +9,7 @@ type DockItem = {
   icon: React.ReactNode
   href?: string
   onClick?: () => void
+  badge?: number
 }
 
 export function FloatingDock({
@@ -62,10 +63,15 @@ const FloatingDockMobile = ({
               >
                 <button
                   onClick={item.onClick}
-                  className="flex h-10 w-10 items-center justify-center rounded-full bg-card"
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-card relative cursor-pointer"
                   aria-label={item.title}
                 >
                   <div className="h-4 w-4">{item.icon}</div>
+                  {item.badge && item.badge > 0 && (
+                    <div className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-destructive dark:bg-purple-600 text-destructive-foreground dark:text-white text-xs flex items-center justify-center font-medium">
+                      {item.badge > 99 ? '99+' : item.badge}
+                    </div>
+                  )}
                 </button>
               </motion.div>
             ))}
@@ -126,12 +132,14 @@ function IconContainer({
   icon,
   href,
   onClick,
+  badge,
 }: {
   mouseX: MotionValue
   title: string
   icon: React.ReactNode
   href?: string
   onClick?: () => void
+  badge?: number
 }) {
   let ref = React.useRef<HTMLDivElement>(null)
 
@@ -164,7 +172,7 @@ function IconContainer({
         style={{ width: 40, height: 40 }}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
-        className="relative flex aspect-square items-center justify-center rounded-full bg-transparent text-muted-foreground hover:text-foreground transition-colors"
+        className="relative flex aspect-square items-center justify-center rounded-full bg-transparent text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
       >
         <AnimatePresence>
           {hovered && (
@@ -181,6 +189,11 @@ function IconContainer({
         <motion.div style={{ scale }} className="flex items-center justify-center">
           {icon}
         </motion.div>
+        {badge && badge > 0 && (
+          <div className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-destructive dark:bg-purple-600 text-destructive-foreground dark:text-white text-xs flex items-center justify-center font-medium">
+            {badge > 99 ? '99+' : badge}
+          </div>
+        )}
       </motion.div>
     </Wrapper>
   )

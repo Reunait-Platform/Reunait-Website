@@ -11,16 +11,36 @@ interface CasesGridProps {
   emptyMessage?: string
 }
 
-// Optimized loading skeleton
+// Optimized loading skeleton - matches actual case card dimensions
 const LoadingSkeleton = memo(() => (
   <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-5 animate-in fade-in-0 duration-300">
     {Array.from({ length: 6 }).map((_, index) => (
-      <div key={index}>
-        <div className="h-40 mb-3 bg-gradient-to-r from-neutral-200 via-neutral-100 to-neutral-200 dark:from-slate-700 dark:via-slate-600 dark:to-slate-700 animate-shimmer bg-[length:200%_100%] rounded-lg"></div>
-        <div className="space-y-2">
-          <div className="h-4 bg-gradient-to-r from-neutral-200 via-neutral-100 to-neutral-200 dark:from-slate-700 dark:via-slate-600 dark:to-slate-700 animate-shimmer bg-[length:200%_100%] rounded w-3/4"></div>
-          <div className="h-3 bg-gradient-to-r from-neutral-200 via-neutral-100 to-neutral-200 dark:from-slate-700 dark:via-slate-600 dark:to-slate-700 animate-shimmer bg-[length:200%_100%] rounded w-1/2"></div>
-          <div className="h-3 bg-gradient-to-r from-neutral-200 via-neutral-100 to-neutral-200 dark:from-slate-700 dark:via-slate-600 dark:to-slate-700 animate-shimmer bg-[length:200%_100%] rounded w-2/3"></div>
+      <div key={index} className="overflow-hidden rounded-2xl border">
+        {/* Image section - matches h-80 from actual case card */}
+        <div className="h-80 bg-gradient-to-r from-neutral-200 via-neutral-100 to-neutral-200 dark:from-slate-700 dark:via-slate-600 dark:to-slate-700 animate-shimmer bg-[length:200%_100%]"></div>
+        
+        {/* Content section - matches actual case card content */}
+        <div className="px-6 -mt-2 pb-5 space-y-2">
+          {/* Header section */}
+          <div className="space-y-2">
+            <div className="h-6 bg-gradient-to-r from-neutral-200 via-neutral-100 to-neutral-200 dark:from-slate-700 dark:via-slate-600 dark:to-slate-700 animate-shimmer bg-[length:200%_100%] rounded w-3/4"></div>
+            <div className="flex items-center justify-between">
+              <div className="h-6 w-16 bg-gradient-to-r from-neutral-200 via-neutral-100 to-neutral-200 dark:from-slate-700 dark:via-slate-600 dark:to-slate-700 animate-shimmer bg-[length:200%_100%] rounded-full"></div>
+              <div className="h-6 w-20 bg-gradient-to-r from-neutral-200 via-neutral-100 to-neutral-200 dark:from-slate-700 dark:via-slate-600 dark:to-slate-700 animate-shimmer bg-[length:200%_100%] rounded-full"></div>
+            </div>
+          </div>
+          
+          {/* Location section */}
+          <div className="flex items-center gap-3">
+            <div className="h-6 w-6 bg-gradient-to-r from-neutral-200 via-neutral-100 to-neutral-200 dark:from-slate-700 dark:via-slate-600 dark:to-slate-700 animate-shimmer bg-[length:200%_100%] rounded-lg"></div>
+            <div className="h-4 w-32 bg-gradient-to-r from-neutral-200 via-neutral-100 to-neutral-200 dark:from-slate-700 dark:via-slate-600 dark:to-slate-700 animate-shimmer bg-[length:200%_100%] rounded"></div>
+          </div>
+          
+          {/* Status section */}
+          <div className="flex items-center gap-3">
+            <div className="h-6 w-6 bg-gradient-to-r from-neutral-200 via-neutral-100 to-neutral-200 dark:from-slate-700 dark:via-slate-600 dark:to-slate-700 animate-shimmer bg-[length:200%_100%] rounded-lg"></div>
+            <div className="h-4 w-40 bg-gradient-to-r from-neutral-200 via-neutral-100 to-neutral-200 dark:from-slate-700 dark:via-slate-600 dark:to-slate-700 animate-shimmer bg-[length:200%_100%] rounded"></div>
+          </div>
         </div>
       </div>
     ))}

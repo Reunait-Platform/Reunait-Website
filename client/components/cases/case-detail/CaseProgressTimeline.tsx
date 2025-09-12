@@ -9,6 +9,13 @@ interface CaseProgressTimelineProps {
   children?: React.ReactNode
   open?: boolean
   onOpenChange?: (open: boolean) => void
+  notifications?: Array<{
+    message: string
+    time: string
+    ipAddress?: string
+    phoneNumber?: string
+    isRead: boolean
+  }>
 }
 
 const TIMELINE_DATA = [
@@ -39,7 +46,7 @@ const TIMELINE_DATA = [
   }
 ]
 
-export function CaseProgressTimeline({ children, open, onOpenChange }: CaseProgressTimelineProps) {
+export function CaseProgressTimeline({ children, open, onOpenChange, notifications = [] }: CaseProgressTimelineProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {children && (
@@ -59,7 +66,8 @@ export function CaseProgressTimeline({ children, open, onOpenChange }: CaseProgr
         </DialogHeader>
         
         <div className="space-y-4 flex-1 min-h-0 overflow-y-auto pr-2">
-          {TIMELINE_DATA.map((activity, index) => {
+          {notifications.length > 0 ? (
+            notifications.map((activity, index) => {
             // Convert UTC to user's local timezone
             const localTime = new Date(activity.time)
             const relativeTime = formatDate(localTime, 'relative')
@@ -69,9 +77,9 @@ export function CaseProgressTimeline({ children, open, onOpenChange }: CaseProgr
               <div key={index} className="flex items-start gap-3 sm:gap-4">
                 <div className="flex flex-col items-center">
                   <div className={`w-3 h-3 rounded-full mt-1.5 flex-shrink-0 ${
-                    index === 0 ? 'bg-primary' : 'bg-primary/60'
+                    !activity.isRead ? 'bg-primary ring-2 ring-primary/20' : 'bg-primary/60'
                   }`}></div>
-                  {index < 4 && (
+                  {index < notifications.length - 1 && (
                     <div className="w-px h-12 bg-border/50 mt-2"></div>
                   )}
                 </div>
@@ -93,6 +101,12 @@ export function CaseProgressTimeline({ children, open, onOpenChange }: CaseProgr
                       {activity.time && (
                         <>
                           <span className="whitespace-nowrap">{formattedDateTime}</span>
+                          {activity.phoneNumber && (
+                            <>
+                              <span>•</span>
+                              <span className="whitespace-nowrap">Phone: {activity.phoneNumber}</span>
+                            </>
+                          )}
                           {activity.ipAddress && (
                             <>
                               <span>•</span>
@@ -106,7 +120,18 @@ export function CaseProgressTimeline({ children, open, onOpenChange }: CaseProgr
                 </div>
               </div>
             )
-          })}
+          })
+          ) : (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <Activity className="w-12 h-12 text-muted-foreground/50 mb-4" />
+              <p className="text-muted-foreground text-sm">
+                No updates available yet
+              </p>
+              <p className="text-muted-foreground/70 text-xs mt-1">
+                Check back later for case progress updates
+              </p>
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>

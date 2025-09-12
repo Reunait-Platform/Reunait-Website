@@ -14,10 +14,11 @@ interface ReportInfoPopupProps {
   isOpen: boolean;
   onClose: () => void;
   caseId?: string;
+  addedBy?: string;
   onSuccess?: () => void;
 }
 
-export function ReportInfoPopup({ isOpen, onClose, caseId, onSuccess }: ReportInfoPopupProps) {
+export function ReportInfoPopup({ isOpen, onClose, caseId, addedBy, onSuccess }: ReportInfoPopupProps) {
   const [message, setMessage] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [reportType, setReportType] = useState("detailed");
@@ -51,14 +52,14 @@ export function ReportInfoPopup({ isOpen, onClose, caseId, onSuccess }: ReportIn
     setIsSubmitting(true);
     
     try {
-      const response = await fetch('/api/reports', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://192.168.1.3:3001'}/api/report`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           caseId,
-          type: reportType,
+          addedBy,
           message: message.trim(),
           phoneNumber: reportType === "detailed" ? phoneNumber.trim() : undefined
         }),

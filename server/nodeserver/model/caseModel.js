@@ -33,11 +33,9 @@ const caseModel = new mongoose.Schema(
     },
     city: { 
       type: String,
-      required: true,
     },
     state: { 
       type: String,
-      required: true,
     },
     pincode: {
       type: String,
@@ -51,22 +49,18 @@ const caseModel = new mongoose.Schema(
       type: String 
     },
     addedBy: {
-      clerkId: {
-        type: String,
-        required: true,
-      },
-      role: {
-        type: String,
-        required: true,
-        enum: ['general_user', 'police', 'ngo']
-      }
+      type: String,
+      required: true
+    },
+    caseOwner: {
+      type: String,
+      required: true
     },
     landMark: {
       type: String,
     },
     FIRNumber:{
-      type: String,
-      unique: true
+      type: String
     },
     policeStationState: {
       type: String,
@@ -79,6 +73,7 @@ const caseModel = new mongoose.Schema(
     },
     policeStationCountry: {
       type: String,
+      required: true,
     },
     caseRegisterDate: {
       type: Date,
@@ -114,6 +109,10 @@ const caseModel = new mongoose.Schema(
     verificationBypassed: {
         type: Boolean,
         default: false
+    },
+    showCase: {
+        type: Boolean,
+        default: true
     }
   },
   { timestamps: true }
