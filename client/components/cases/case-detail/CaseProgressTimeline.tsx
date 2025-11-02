@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge"
 import { Activity } from "lucide-react"
 import { formatDate } from "@/lib/helpers"
 import { format } from "date-fns"
+import { useRef, useEffect, useState } from "react"
 
 interface CaseProgressTimelineProps {
   children?: React.ReactNode
@@ -46,7 +47,122 @@ const TIMELINE_DATA = [
   }
 ]
 
+// Dynamic Vertical Line Component
+function DynamicVerticalLine({ contentRef, isLast }: { contentRef: React.RefObject<HTMLDivElement | null>, isLast: boolean }) {
+  const [lineHeight, setLineHeight] = useState(0)
+
+  useEffect(() => {
+    if (contentRef.current) {
+      const measureHeight = () => {
+        const contentHeight = contentRef.current?.offsetHeight || 0
+        setLineHeight(contentHeight)
+      }
+      
+      // Measure immediately
+      measureHeight()
+      
+      // Re-measure on window resize
+      window.addEventListener('resize', measureHeight)
+      
+      return () => window.removeEventListener('resize', measureHeight)
+    }
+  }, [contentRef])
+
+  return (
+    <div 
+      className="w-px bg-border/50 mt-2 transition-all duration-200"
+      style={{ height: `${lineHeight}px` }}
+    />
+  )
+}
+
+// Timeline Item Component
+function TimelineItem({ 
+  activity, 
+  isLast, 
+  getDotStyle, 
+  getContentSpacing, 
+  localTime, 
+  relativeTime, 
+  formattedDateTime 
+}: {
+  activity: any
+  isLast: boolean
+  getDotStyle: (isRead: boolean) => string
+  getContentSpacing: (message: string) => string
+  localTime: Date
+  relativeTime: string
+  formattedDateTime: string
+}) {
+  const contentRef = useRef<HTMLDivElement>(null)
+
+  return (
+    <div className="flex items-start gap-3 sm:gap-4 transition-all duration-200 rounded-lg p-2 -m-2 mb-6 sm:mb-8 border-l-4 border-primary/30 pl-4">
+      <div className="flex flex-col items-center">
+        <div className={getDotStyle(!activity.isRead)}></div>
+        <DynamicVerticalLine contentRef={contentRef} isLast={isLast} />
+      </div>
+      
+      <div className="flex-1 min-w-0">
+        <div ref={contentRef} className={`${getContentSpacing(activity.message)}`}>
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-3 mb-1">
+            <div className="flex items-start gap-2 min-w-0">
+              <span className="text-sm font-bold italic text-foreground leading-relaxed break-words">
+                {activity.message}
+              </span>
+            </div>
+            <span className="text-sm font-medium text-muted-foreground whitespace-nowrap flex-shrink-0">
+              {relativeTime}
+            </span>
+          </div>
+        </div>
+        
+        <div className="opacity-100 mt-1">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground/70">
+            {activity.time && (
+              <>
+                <span className="whitespace-nowrap">{formattedDateTime}</span>
+                {activity.phoneNumber && (
+                  <>
+                    <span>•</span>
+                    <span className="whitespace-nowrap">Phone: {activity.phoneNumber}</span>
+                  </>
+                )}
+                {activity.ipAddress && (
+                  <>
+                    <span>•</span>
+                    <span className="whitespace-nowrap">IP: {activity.ipAddress}</span>
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function CaseProgressTimeline({ children, open, onOpenChange, notifications = [] }: CaseProgressTimelineProps) {
+
+  // Content-aware spacing based on message length
+  const getContentSpacing = (message: string) => {
+    const wordCount = message.split(' ').length
+    if (wordCount <= 10) return 'pb-1'        // Short: minimal padding
+    if (wordCount <= 20) return 'pb-1'         // Medium: minimal padding
+    return 'pb-2'                            // Long: minimal padding
+  }
+
+  // Enhanced read/unread states with animations
+  const getDotStyle = (isRead: boolean) => {
+    return `w-3 h-3 rounded-full mt-1.5 flex-shrink-0 transition-all duration-200 ${
+      !isRead 
+        ? 'bg-primary ring-2 ring-primary/20 animate-pulse' 
+        : 'bg-primary/60'
+    }`
+  }
+
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {children && (
@@ -65,7 +181,7 @@ export function CaseProgressTimeline({ children, open, onOpenChange, notificatio
           </DialogDescription>
         </DialogHeader>
         
-        <div className="space-y-4 flex-1 min-h-0 overflow-y-auto pr-2">
+        <div className="space-y-8 sm:space-y-10 flex-1 min-h-0 overflow-y-auto pr-4">
           {notifications.length > 0 ? (
             notifications.map((activity, index) => {
             // Convert UTC to user's local timezone
@@ -74,51 +190,16 @@ export function CaseProgressTimeline({ children, open, onOpenChange, notificatio
             const formattedDateTime = format(localTime, "MMM dd, yyyy 'at' h:mm a")
             
             return (
-              <div key={index} className="flex items-start gap-3 sm:gap-4">
-                <div className="flex flex-col items-center">
-                  <div className={`w-3 h-3 rounded-full mt-1.5 flex-shrink-0 ${
-                    !activity.isRead ? 'bg-primary ring-2 ring-primary/20' : 'bg-primary/60'
-                  }`}></div>
-                  {index < notifications.length - 1 && (
-                    <div className="w-px h-12 bg-border/50 mt-2"></div>
-                  )}
-                </div>
-                
-                <div className="flex-1 min-w-0 pb-4">
-                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-3 mb-2">
-                    <div className="flex items-start gap-2 min-w-0">
-                      <span className="text-sm font-bold italic text-foreground leading-relaxed">
-                        {activity.message}
-                      </span>
-                    </div>
-                    <span className="text-sm font-medium text-muted-foreground whitespace-nowrap flex-shrink-0">
-                      {relativeTime}
-                    </span>
-                  </div>
-                  
-                  <div className="opacity-100">
-                    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground/70">
-                      {activity.time && (
-                        <>
-                          <span className="whitespace-nowrap">{formattedDateTime}</span>
-                          {activity.phoneNumber && (
-                            <>
-                              <span>•</span>
-                              <span className="whitespace-nowrap">Phone: {activity.phoneNumber}</span>
-                            </>
-                          )}
-                          {activity.ipAddress && (
-                            <>
-                              <span>•</span>
-                              <span className="whitespace-nowrap">IP: {activity.ipAddress}</span>
-                            </>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <TimelineItem 
+                key={index} 
+                activity={activity} 
+                isLast={index === notifications.length - 1}
+                getDotStyle={getDotStyle}
+                getContentSpacing={getContentSpacing}
+                localTime={localTime}
+                relativeTime={relativeTime}
+                formattedDateTime={formattedDateTime}
+              />
             )
           })
           ) : (

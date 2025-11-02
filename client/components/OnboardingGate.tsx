@@ -19,17 +19,13 @@ export const OnboardingGate: React.FC<{ children: React.ReactNode }> = ({ childr
   if (!isLoaded || !userLoaded) {
     return (
       <>
-        {/* Full Screen Loader with Background Blur (Portal to body) */}
         {mounted && createPortal(
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 backdrop-blur-md">
             <SimpleLoader />
           </div>,
           document.body
         )}
-        {/* Render children with opacity 0 to maintain layout */}
-        <div className="opacity-0">
-          {children}
-        </div>
+        {children}
       </>
     )
   }

@@ -15,25 +15,34 @@ const STATUS_INFO = {
 } as const
 
 export function CaseHero({ data }: CaseHeroProps) {
-  const dateText = data.dateMissingFound ? formatCaseStatus(data.dateMissingFound, data.status) : null
+  const dateText = data.dateMissingFound ? formatCaseStatus(data.dateMissingFound, data.status, data.originalStatus) : null
+  
+  // Dynamic typography based on name length (max 120 characters)
+  const getTypographyClass = (name: string) => {
+    const length = name.length
+    
+    if (length <= 25) {
+      // Short names: Bold and large for impact
+      return "font-serif font-bold text-3xl sm:text-4xl lg:text-5xl xl:text-6xl tracking-tight"
+    } else if (length <= 45) {
+      // Medium names: Semibold and medium size
+      return "font-serif font-semibold text-2xl sm:text-3xl lg:text-4xl xl:text-5xl tracking-tight"
+    } else if (length <= 70) {
+      // Long names: Medium weight and smaller size
+      return "font-serif font-medium text-xl sm:text-2xl lg:text-3xl xl:text-4xl tracking-tight"
+    } else {
+      // Very long names (71-120): Light weight and smallest size
+      return "font-serif font-normal text-lg sm:text-xl lg:text-2xl xl:text-3xl tracking-tight"
+    }
+  }
 
   return (
     <div className="space-y-4">
-      {/* Name and Status Row */}
-      <div className="flex flex-col sm:flex-row items-start justify-between gap-4 sm:gap-6">
-        <div className="flex-1 min-w-0">
-          <Typography variant="h2" as="h1" className="font-serif font-bold text-3xl sm:text-4xl lg:text-5xl xl:text-6xl tracking-tight text-foreground leading-tight">
-            {data.fullName ?? 'Unknown person'}
-          </Typography>
-        </div>
-        <div className="shrink-0 flex flex-col items-start sm:items-end gap-2">
-          {data.status && (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-border dark:border-border/80 bg-card/80 backdrop-blur-sm shadow-sm">
-              <div className={`w-2 h-2 rounded-full ${data.status === 'missing' ? 'bg-red-500' : data.status === 'found' ? 'bg-emerald-500' : 'bg-slate-400'}`} />
-              <span className="text-sm font-medium text-foreground/90 capitalize">{STATUS_INFO[data.status]?.label ?? 'Unknown'}</span>
-            </div>
-          )}
-        </div>
+      {/* Name Row */}
+      <div className="flex-1 min-w-0">
+        <Typography variant="h2" as="h1" className={`${getTypographyClass(data.fullName ?? 'Unknown person')} text-foreground leading-tight break-words`}>
+          {data.fullName ?? 'Unknown person'}
+        </Typography>
       </div>
 
       {/* Demographics and Location */}

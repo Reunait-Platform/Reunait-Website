@@ -13,7 +13,9 @@ import { CountriesStatesService } from "@/lib/countries-states"
 import { locationService } from "@/lib/location-service"
 import { fetchCases, type CasesParams, type Case } from "@/lib/api"
 import { useRouter } from "next/navigation"
-import { useUser } from "@clerk/nextjs"
+import { useUser, useAuth } from "@clerk/nextjs"
+import { useNavigationLoader } from "@/hooks/use-navigation-loader"
+import { SimpleLoader } from "@/components/ui/simple-loader"
 
 export interface SearchFilters {
   keyword: string
@@ -31,6 +33,7 @@ interface CasesSearchProps {
   onClear: () => void
   loading?: boolean
   hasCasesDisplayed?: boolean
+  presetFilters?: Partial<SearchFilters>
 }
 
 // Initial filter state
@@ -45,8 +48,9 @@ const INITIAL_FILTERS: SearchFilters = {
   dateTo: undefined
 }
 
-export function CasesSearch({ onSearch, onClear, loading = false, hasCasesDisplayed = false }: CasesSearchProps) {
+export function CasesSearch({ onSearch, onClear, loading = false, hasCasesDisplayed = false, presetFilters }: CasesSearchProps) {
   const [filters, setFilters] = useState<SearchFilters>(INITIAL_FILTERS)
+  const [mounted, setMounted] = useState(false)
   const [countries, setCountries] = useState<string[]>([])
   const [states, setStates] = useState<string[]>([])
   const [cities, setCities] = useState<string[]>([])
@@ -55,11 +59,20 @@ export function CasesSearch({ onSearch, onClear, loading = false, hasCasesDispla
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [suggestionsLoading, setSuggestionsLoading] = useState(false)
   const debounceRef = useRef<NodeJS.Timeout | null>(null)
-  const [activeIndex, setActiveIndex] = useState<number>(-1)
   const router = useRouter()
+  const { isLoading: isNavigating, mounted: loaderMounted, startLoading } = useNavigationLoader()
   const inputWrapperRef = useRef<HTMLDivElement | null>(null)
   const [dropdownRect, setDropdownRect] = useState<{ top: number; left: number; width: number } | null>(null)
   const { user } = useUser()
+  const { getToken } = useAuth()
+  const skipFirstFilterSearchRef = useRef(true)
+  const skipFirstKeywordSearchRef = useRef(true)
+  const skipNormalizeOnceRef = useRef(false)
+
+  // Avoid SSR rendering of Radix Select to prevent hydration ID mismatches
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   // Get user role from Clerk metadata
   const userRole = useMemo(() => {
@@ -133,44 +146,68 @@ export function CasesSearch({ onSearch, onClear, loading = false, hasCasesDispla
     initializeData()
   }, [])
 
-  // Update filters when cached location is available
+  // Update filters when cached location is available (only if no preset filters were provided)
   useEffect(() => {
-    const updateFiltersFromLocation = () => {
-      const storedLocation = localStorage.getItem('userLocation')
-      if (storedLocation) {
-        const locationData = JSON.parse(storedLocation)
-        const locationFilters = {
-          country: locationData.country,
-          state: locationData.state !== 'Unknown' ? locationData.state : 'all',
-          city: locationData.city !== 'Unknown' ? locationData.city : 'all'
-        }
-        setFilters(prev => ({ ...prev, ...locationFilters }))
-        
-        // Update states and cities based on location
-        const locationStates = CountriesStatesService.getStates(locationData.country)
-        setStates(locationStates)
-        
-        if (locationData.state !== 'Unknown') {
-          const locationCities = CountriesStatesService.getCities(locationData.country, locationData.state)
-          setCities(locationCities)
+    if (presetFilters) return
+    const storedLocation = localStorage.getItem('userLocation')
+    if (storedLocation) {
+      const locationData = JSON.parse(storedLocation)
+      const locationFilters = {
+        country: locationData.country,
+        state: locationData.state !== 'Unknown' ? locationData.state : 'all',
+        city: locationData.city !== 'Unknown' ? locationData.city : 'all'
+      }
+      skipNormalizeOnceRef.current = true
+      skipFirstFilterSearchRef.current = true
+      skipFirstKeywordSearchRef.current = true
+      setFilters(prev => ({ ...prev, ...locationFilters }))
+      setStates(CountriesStatesService.getStates(locationData.country))
+      if (locationData.state !== 'Unknown') {
+        setCities(CountriesStatesService.getCities(locationData.country, locationData.state))
+      }
+    }
+  }, [presetFilters])
+
+  // Sync initial preset filters from URL/localStorage without triggering auto-search
+  useEffect(() => {
+    if (!presetFilters) return
+    const next: Partial<SearchFilters> = {}
+    if (presetFilters.country && presetFilters.country !== filters.country) next.country = presetFilters.country
+    // Only override state/city if provided in preset; otherwise preserve existing selections
+    if (typeof presetFilters.state === 'string' && presetFilters.state.length > 0 && presetFilters.state !== filters.state) next.state = presetFilters.state
+    if (typeof presetFilters.city === 'string' && presetFilters.city.length > 0 && presetFilters.city !== filters.city) next.city = presetFilters.city
+    if (Object.keys(next).length > 0) {
+      skipNormalizeOnceRef.current = true
+      skipFirstFilterSearchRef.current = true
+      skipFirstKeywordSearchRef.current = true
+      setFilters(prev => ({ ...prev, ...next }))
+      const newCountry = next.country || filters.country
+      const newState = next.state || filters.state
+      if (newCountry) {
+        setStates(CountriesStatesService.getStates(newCountry))
+        if (typeof newState === 'string' && newState !== 'all') {
+          setCities(CountriesStatesService.getCities(newCountry, newState))
+        } else {
+          setCities([])
         }
       }
     }
-
-    updateFiltersFromLocation()
-  }, [])
+  }, [presetFilters])
 
   // Update states when country changes
   useEffect(() => {
     if (filters.country) {
       const newStates = CountriesStatesService.getStates(filters.country)
       setStates(newStates)
-      
-      setFilters(prev => ({
-        ...prev,
-        state: "all",
-        city: "all"
-      }))
+      if (skipNormalizeOnceRef.current) {
+        skipNormalizeOnceRef.current = false
+      } else {
+        setFilters(prev => ({
+          ...prev,
+          state: "all",
+          city: "all"
+        }))
+      }
     }
   }, [filters.country])
 
@@ -179,11 +216,14 @@ export function CasesSearch({ onSearch, onClear, loading = false, hasCasesDispla
     if (filters.country && filters.state && filters.state !== "all") {
       const newCities = CountriesStatesService.getCities(filters.country, filters.state)
       setCities(newCities)
-      
-      setFilters(prev => ({
-        ...prev,
-        city: "all"
-      }))
+      if (skipNormalizeOnceRef.current) {
+        skipNormalizeOnceRef.current = false
+      } else {
+        setFilters(prev => ({
+          ...prev,
+          city: "all"
+        }))
+      }
     } else {
       setCities([])
       setFilters(prev => ({
@@ -205,10 +245,13 @@ export function CasesSearch({ onSearch, onClear, loading = false, hasCasesDispla
 
   // Auto-search when filters change (except keyword for debounced suggestions)
   useEffect(() => {
+    if (skipFirstFilterSearchRef.current) {
+      skipFirstFilterSearchRef.current = false
+      return
+    }
     const timeoutId = setTimeout(() => {
       onSearch(filters)
-    }, 100) // Small delay to batch multiple filter changes
-
+    }, 300)
     return () => clearTimeout(timeoutId)
   }, [filters.country, filters.state, filters.city, filters.status, filters.gender, filters.dateFrom, filters.dateTo, onSearch])
 
@@ -281,24 +324,83 @@ export function CasesSearch({ onSearch, onClear, loading = false, hasCasesDispla
       return
     }
 
+    // Extract search term after "user:" and check minimum length before setting timeout
+    const searchTerm = keyword.substring(5).trim() // Remove "user:" prefix
+    
+    // Require minimum 3 characters - don't even set timeout if less than 3
+    if (searchTerm.length < 3) {
+      setSuggestions([])
+      setShowSuggestions(false)
+      setSuggestionsLoading(false)
+      return
+    }
+
     debounceRef.current = setTimeout(async () => {
       try {
+
+        // Only set loading and make API call if we have at least 3 characters
         setSuggestionsLoading(true)
-        // Extract search term after "user:"
-        const searchTerm = keyword.substring(5).trim() // Remove "user:" prefix
         
-        if (searchTerm.length === 0) {
+        // Call user search API
+        const token = await getToken()
+        
+        if (!token) {
           setSuggestions([])
           setShowSuggestions(false)
           return
         }
 
-        // TODO: Implement user search API call
-        // For now, show empty suggestions
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL
+        if (!backendUrl) {
+          console.error('NEXT_PUBLIC_BACKEND_URL is not configured')
         setSuggestions([])
+          setShowSuggestions(false)
+          return
+        }
+
+        const url = new URL(`${backendUrl}/api/users/search`)
+        url.searchParams.append("query", searchTerm)
+
+        const response = await fetch(url.toString(), {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          signal: AbortSignal.timeout(10000)
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.message || `HTTP error! status: ${response.status}`)
+        }
+
+        const data = await response.json()
+        
+        if (data.success && Array.isArray(data.data)) {
+          // Transform user data to match Case interface for dropdown display
+          const userSuggestions = data.data.map((user: any) => ({
+            _id: user.clerkUserId || `user-${Math.random()}`, // Use clerkUserId as _id for React key compatibility
+            fullName: user.fullName || user.email || "Unknown User",
+            age: user.age ?? undefined,
+            gender: user.gender ?? undefined,
+            email: user.email,
+            phoneNumber: user.phoneNumber,
+            url: user.url || null,
+            clerkUserId: user.clerkUserId || null
+          }))
+          
+          setSuggestions(userSuggestions)
         updateDropdownPosition()
         setShowSuggestions(true)
-      } catch (e) {
+        } else {
+          setSuggestions([])
+          setShowSuggestions(true)
+        }
+      } catch (error: any) {
+        if (error.name === 'AbortError' || error.name === 'TimeoutError') {
+          console.error("Request timeout: Backend server may not be responding")
+        } else {
+          console.error("Error searching users:", error.message || error)
+        }
         setSuggestions([])
         setShowSuggestions(false)
       } finally {
@@ -309,15 +411,23 @@ export function CasesSearch({ onSearch, onClear, loading = false, hasCasesDispla
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
     }
-  }, [filters.keyword, isUserSearch, updateDropdownPosition])
+  }, [filters.keyword, isUserSearch, updateDropdownPosition, getToken])
 
   // Auto-search when keyword changes (restored original debouncing)
   useEffect(() => {
     const keyword = (filters.keyword || "").trim()
     if (keyword.length === 0) {
-      // If keyword is cleared, search immediately
+      if (skipFirstKeywordSearchRef.current) {
+        skipFirstKeywordSearchRef.current = false
+        return
+      }
       onSearch(filters)
       return
+    }
+    
+    // Require minimum 3 characters before making API call
+    if (keyword.length < 3) {
+      return // Don't set timeout, don't make API call
     }
     
     const timeoutId = setTimeout(() => {
@@ -326,6 +436,7 @@ export function CasesSearch({ onSearch, onClear, loading = false, hasCasesDispla
 
     return () => clearTimeout(timeoutId)
   }, [filters.keyword, onSearch])
+
 
   // Keep dropdown aligned on resize/scroll while visible
   useEffect(() => {
@@ -341,10 +452,23 @@ export function CasesSearch({ onSearch, onClear, loading = false, hasCasesDispla
     }
   }, [shouldShowDropdown, updateDropdownPosition])
 
-  const handleSuggestionClick = useCallback((item: Case) => {
+  const handleSuggestionClick = useCallback((item: Case & { email?: string; phoneNumber?: string; url?: string | null }) => {
     setShowSuggestions(false)
+    
+    // For user results (have email/phoneNumber), navigate to user profile using url
+    const isUserResult = (item as any).email || (item as any).phoneNumber
+    if (isUserResult) {
+      const url = (item as any).url
+      if (url) {
+        startLoading({ expectRouteChange: true })
+        router.push(url)
+      }
+    } else {
+      // For case results, navigate to case detail page
+      startLoading({ expectRouteChange: true })
     router.push(`/cases/${item._id}`)
-  }, [router])
+    }
+  }, [router, startLoading])
 
   // Simple highlighter for matched query
   const Highlight = useCallback(({ text, query }: { text?: string; query: string }) => {
@@ -377,7 +501,8 @@ export function CasesSearch({ onSearch, onClear, loading = false, hasCasesDispla
   }, [])
 
   return (
-    <Card className="border border-border bg-card/90 backdrop-blur-md animate-in fade-in-0 slide-in-from-top-2 duration-500">
+    <>
+    <Card className="border border-border bg-card/90 backdrop-blur-md animate-in fade-in-0 slide-in-from-top-2 duration-500 overflow-hidden">
       <CardContent className="pt-0 -mb-4 px-4">
         <div className="space-y-4">
 
@@ -390,23 +515,16 @@ export function CasesSearch({ onSearch, onClear, loading = false, hasCasesDispla
                 placeholder="Name, mobile, or case reference number..."
                 value={filters.keyword}
                 onChange={(e) => createFilterChangeHandler("keyword")(e.target.value)}
-                className="pl-10 h-10 text-sm md:text-base border-2 border-border bg-background/80 focus:bg-background transition-all duration-300 hover:bg-background/90 rounded-lg"
+                className="pl-10 h-10 text-sm md:text-base border-2 border-border bg-background/80 focus:bg-background transition-all duration-300 hover:bg-background/90 rounded-lg cursor-text"
                 onFocus={() => { if (shouldShowDropdown) { updateDropdownPosition(); setShowSuggestions(true) } }}
-                onBlur={() => { setTimeout(() => setShowSuggestions(false), 150) }}
+                onBlur={() => { 
+                  setTimeout(() => {
+                    setShowSuggestions(false)
+                  }, 150) 
+                }}
+                disabled={isNavigating}
                 onKeyDown={(e) => {
-                  if (!showSuggestions) return
-                  if (e.key === 'ArrowDown') {
-                    e.preventDefault()
-                    setActiveIndex((prev) => Math.min(prev + 1, suggestions.length - 1))
-                  } else if (e.key === 'ArrowUp') {
-                    e.preventDefault()
-                    setActiveIndex((prev) => Math.max(prev - 1, 0))
-                  } else if (e.key === 'Enter') {
-                    if (activeIndex >= 0 && activeIndex < suggestions.length) {
-                      e.preventDefault()
-                      handleSuggestionClick(suggestions[activeIndex])
-                    }
-                  } else if (e.key === 'Escape') {
+                  if (e.key === 'Escape') {
                     setShowSuggestions(false)
                   }
                 }}
@@ -414,52 +532,96 @@ export function CasesSearch({ onSearch, onClear, loading = false, hasCasesDispla
 
               {shouldShowDropdown && showSuggestions && dropdownRect && typeof window !== 'undefined' && createPortal(
                 <div
-                  className="absolute z-[2147483647] bg-popover/95 backdrop-blur-xl border border-border/60 rounded-2xl shadow-2xl max-h-96 overflow-auto ring-1 ring-black/5"
+                  className="absolute z-40 bg-popover border border-border rounded-lg shadow-lg max-h-80 overflow-auto"
                   style={{ top: dropdownRect.top, left: dropdownRect.left, width: dropdownRect.width, position: 'absolute' as const }}
                 >
                   {suggestionsLoading && (
-                    <div className="px-4 py-3 text-sm text-muted-foreground">Searching users…</div>
+                    <div className="px-4 py-4 text-sm text-muted-foreground text-center">Searching users…</div>
                   )}
                   {!suggestionsLoading && suggestions.length === 0 && (
-                    <div className="px-4 py-3 text-sm text-muted-foreground">No users found</div>
+                    <div className="px-4 py-4 text-sm text-muted-foreground text-center">No users found</div>
                   )}
-                  {!suggestionsLoading && suggestions.map((item, idx) => (
+                  {!suggestionsLoading && suggestions.map((item, idx) => {
+                    // Extract search term after "user:" for highlighting
+                    const searchTerm = (filters.keyword || "").substring(5).trim()
+                    // Check if this is a user result (has email or phoneNumber)
+                    const isUserResult = (item as any).email || (item as any).phoneNumber
+                    
+                    return (
                     <button
                       key={item._id}
                       type="button"
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => handleSuggestionClick(item)}
-                      className={`w-full text-left px-4 py-3 flex items-center gap-3 ${activeIndex === idx ? 'bg-accent/50' : 'hover:bg-accent/40'} focus:bg-accent/50 focus:outline-none transition-colors ${idx > 0 ? 'border-t border-border/60' : ''}`}
-                      onMouseEnter={() => setActiveIndex(idx)}
+                        className={`w-full text-left px-4 py-3 flex items-center gap-3 transition-colors duration-150 hover:bg-accent/50 focus:bg-accent focus:outline-none cursor-pointer ${idx > 0 ? 'border-t border-border/50' : ''}`}
                     >
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-foreground flex items-center gap-2 min-w-0">
-                          <span className="truncate max-w-[80%]"><Highlight text={item.fullName} query={filters.keyword} /></span>
-                          <span className="inline-flex items-center text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">User</span>
+                        <div className="flex-1 min-w-0 space-y-1.5 overflow-hidden">
+                          {/* Name row with badge */}
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-sm font-medium text-foreground truncate min-w-0 flex-1" title={item.fullName}>
+                              <Highlight text={item.fullName} query={searchTerm} />
+                            </span>
+                            <span className="inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-md bg-primary/10 text-primary shrink-0">
+                              User
+                            </span>
                         </div>
-                        <div className="mt-1 text-xs text-muted-foreground whitespace-nowrap overflow-hidden text-ellipsis flex items-center gap-2">
+                          
+                          {/* Details row */}
+                          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground min-w-0">
+                            {isUserResult ? (
+                              <>
+                                {(item as any).email && (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-muted/60 text-foreground/70 min-w-0 max-w-[calc(100%-8px)] overflow-hidden" title={(item as any).email}>
+                                    <span className="truncate block">
+                                      <Highlight text={(item as any).email} query={searchTerm} />
+                                    </span>
+                                  </span>
+                                )}
+                                {(item as any).phoneNumber && (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-muted/60 text-foreground/70 min-w-0 max-w-[calc(100%-8px)] overflow-hidden" title={(item as any).phoneNumber}>
+                                    <span className="truncate block">
+                                      <Highlight text={(item as any).phoneNumber} query={searchTerm} />
+                                    </span>
+                                  </span>
+                                )}
+                                {(item as any).age !== undefined && (item as any).age !== null && (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-muted/60 text-foreground/70 shrink-0 whitespace-nowrap">
+                                    {(item as any).age} years
+                                  </span>
+                                )}
+                                {(item as any).gender && (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-muted/60 text-foreground/70 capitalize shrink-0 whitespace-nowrap">
+                                    {String((item as any).gender)}
+                                  </span>
+                                )}
+                              </>
+                            ) : (
+                              <>
                           {item.age && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-muted text-foreground/80 max-w-[25%] overflow-hidden text-ellipsis whitespace-nowrap">Age: {item.age}</span>
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-muted/60 text-foreground/70 shrink-0 whitespace-nowrap">{item.age} years</span>
                           )}
                           {item.gender && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-muted text-foreground/80 max-w-[35%] overflow-hidden text-ellipsis whitespace-nowrap">Gender: {item.gender}</span>
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-muted/60 text-foreground/70 capitalize shrink-0 whitespace-nowrap">{item.gender}</span>
+                                )}
+                              </>
                           )}
                         </div>
                       </div>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground/70 shrink-0" />
+                        <ChevronRight className="h-4 w-4 text-muted-foreground/50 shrink-0 ml-1" />
                     </button>
-                  ))}
+                    )
+                  })}
                 </div>, document.body
               )}
             </div>
 
             {/* Main Action Buttons + Advanced Filters Toggle */}
-            <div className="grid grid-cols-2 sm:flex sm:flex-wrap md:flex md:flex-nowrap gap-2 sm:gap-3 lg:gap-2 items-center w-full md:w-auto lg:w-1/2 sm:justify-evenly md:justify-start lg:justify-between md:ml-3 animate-in fade-in-0 slide-in-from-left-2 duration-500 delay-200">
+            <div className="grid grid-cols-2 sm:flex sm:flex-wrap md:flex md:flex-wrap gap-2 sm:gap-3 lg:gap-2 items-center w-full md:w-auto lg:w-auto md:flex-shrink-0 sm:justify-evenly md:justify-start lg:justify-between md:ml-3 animate-in fade-in-0 slide-in-from-left-2 duration-500 delay-200 min-w-0">
               <Button
                 variant={filters.status === "missing" ? "default" : "outline"}
                 size="sm"
                 onClick={handleMissingFilter}
-                className="flex items-center gap-1 sm:gap-1.5 h-9 px-2 sm:px-3 lg:px-3 rounded-lg transition-all duration-300 hover:scale-105 text-xs sm:text-sm font-medium"
+                className="flex items-center gap-1 sm:gap-1.5 h-9 px-2 sm:px-3 lg:px-3 rounded-lg transition-all duration-300 hover:scale-105 text-xs sm:text-sm font-medium cursor-pointer"
               >
                 <User className="w-3 h-3 sm:w-4 sm:h-4" />
                 Missing
@@ -468,7 +630,7 @@ export function CasesSearch({ onSearch, onClear, loading = false, hasCasesDispla
                 variant={filters.status === "found" ? "default" : "outline"}
                 size="sm"
                 onClick={handleFoundFilter}
-                className="flex items-center gap-1 sm:gap-1.5 h-9 px-2 sm:px-3 lg:px-3 rounded-lg transition-all duration-300 hover:scale-105 text-xs sm:text-sm font-medium"
+                className="flex items-center gap-1 sm:gap-1.5 h-9 px-2 sm:px-3 lg:px-3 rounded-lg transition-all duration-300 hover:scale-105 text-xs sm:text-sm font-medium cursor-pointer"
               >
                 <Shield className="w-3 h-3 sm:w-4 sm:h-4" />
                 Found
@@ -480,7 +642,7 @@ export function CasesSearch({ onSearch, onClear, loading = false, hasCasesDispla
                 size="sm"
                 onClick={handleClear}
                 disabled={activeFiltersCount === 0}
-                className="flex items-center gap-1 sm:gap-1.5 h-9 px-2 sm:px-3 lg:px-3 rounded-lg transition-all duration-300 hover:scale-105 text-xs sm:text-sm font-medium border-2 min-w-[120px] sm:min-w-[140px] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:bg-background"
+                className="flex items-center gap-1 sm:gap-1.5 h-9 px-2 sm:px-3 lg:px-3 rounded-lg transition-all duration-300 hover:scale-105 text-xs sm:text-sm font-medium border-2 min-w-[120px] sm:min-w-[140px] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:bg-background cursor-pointer"
               >
                 <X className="w-3 h-3 sm:w-4 sm:h-4" />
                 <span className="hidden sm:inline">Clear All</span>
@@ -491,7 +653,7 @@ export function CasesSearch({ onSearch, onClear, loading = false, hasCasesDispla
               <Button 
                 variant="outline"
                 onClick={toggleAdvancedFilters}
-                className="flex items-center gap-1 sm:gap-1.5 h-9 px-2 sm:px-3 lg:px-3 rounded-lg transition-all duration-300 hover:scale-105 border-2 text-xs sm:text-sm font-medium relative min-w-[120px] sm:min-w-[140px]"
+                className="flex items-center gap-1 sm:gap-1.5 h-9 px-2 sm:px-3 lg:px-3 rounded-lg transition-all duration-300 hover:scale-105 border-2 text-xs sm:text-sm font-medium relative min-w-[120px] sm:min-w-[140px] cursor-pointer"
               >
                 <Filter className="w-3 h-3 sm:w-4 sm:h-4" />
                 <span className="hidden sm:inline">
@@ -515,104 +677,124 @@ export function CasesSearch({ onSearch, onClear, loading = false, hasCasesDispla
           </div>
 
           {/* Advanced Filters Section - Optimized Animation */}
-          <div className={`overflow-hidden transition-all duration-200 ease-out ${isAdvancedOpen ? 'max-h-[30rem] opacity-100' : 'max-h-0 opacity-0'}`}>
+          <div className={`overflow-hidden transition-all duration-200 ease-out ${isAdvancedOpen ? 'max-h-[30rem] opacity-100 pb-4' : 'max-h-0 opacity-0'}`}>
             {/* Subtle Separator */}
             <div className="border-t border-border/30 mx-2 mt-2"></div>
 
             {/* Location Filters and Date Range */}
-            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 pt-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 pt-4">
             {/* Country Filter */}
             <div className="space-y-1.5 min-w-0">
               <Label className="text-xs sm:text-sm font-semibold text-foreground flex items-center gap-1.5 justify-center">
                 <MapPin className="w-4 h-4" />
                 Country
               </Label>
-              <Select value={filters.country} onValueChange={(value) => createFilterChangeHandler("country")(value)}>
-                <SelectTrigger className="h-10 w-full border-2 border-border bg-background/80 focus:bg-background transition-all duration-300 hover:bg-background/90 rounded-lg text-sm focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-0 focus-visible:border-ring">
-                  <SelectValue placeholder="Select country" className="truncate" />
-                </SelectTrigger>
-                <SelectContent className="max-h-60">
-                  {countries.map((country) => (
-                    <SelectItem key={country} value={country} className="text-sm">
-                      {country}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {mounted ? (
+                <Select value={filters.country} onValueChange={(value) => createFilterChangeHandler("country")(value)}>
+                  <SelectTrigger className="h-10 w-full min-w-0 border-2 border-border bg-background/80 focus:bg-background transition-all duration-300 hover:bg-background/90 rounded-lg text-sm focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-0 focus-visible:border-ring cursor-pointer">
+                    <SelectValue placeholder="Select country" className="truncate" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    {countries.map((country) => (
+                      <SelectItem key={country} value={country} className="text-sm">
+                        {country}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="h-10 w-full border-2 border-border rounded-lg bg-muted/30 animate-in fade-in-0" />
+              )}
             </div>
 
             {/* State Filter */}
             <div className="space-y-1.5 min-w-0">
               <Label className="text-xs sm:text-sm font-semibold text-foreground text-center block">State</Label>
-              <Select value={filters.state} onValueChange={(value) => createFilterChangeHandler("state")(value)}>
-                <SelectTrigger className="h-10 w-full border-2 border-border bg-background/80 focus:bg-background transition-all duration-300 hover:bg-background/90 rounded-lg text-sm focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-0 focus-visible:border-ring">
-                  <SelectValue placeholder="Select state" className="truncate" />
-                </SelectTrigger>
-                <SelectContent className="max-h-60">
-                  <SelectItem value="all" className="text-sm">All States</SelectItem>
-                  {states.map((state) => (
-                    <SelectItem key={state} value={state} className="text-sm">
-                      {state}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {mounted ? (
+                <Select value={filters.state} onValueChange={(value) => createFilterChangeHandler("state")(value)}>
+                  <SelectTrigger className="h-10 w-full min-w-0 border-2 border-border bg-background/80 focus:bg-background transition-all duration-300 hover:bg-background/90 rounded-lg text-sm focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-0 focus-visible:border-ring cursor-pointer">
+                    <SelectValue placeholder="Select state" className="truncate" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    <SelectItem value="all" className="text-sm">All States</SelectItem>
+                    {states.map((state) => (
+                      <SelectItem key={state} value={state} className="text-sm">
+                        {state}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="h-10 w-full border-2 border-border rounded-lg bg-muted/30 animate-in fade-in-0" />
+              )}
             </div>
 
             {/* City Filter */}
             <div className="space-y-1.5 min-w-0">
               <Label className="text-xs sm:text-sm font-semibold text-foreground text-center block">City</Label>
-              <Select value={filters.city} onValueChange={(value) => createFilterChangeHandler("city")(value)}>
-                <SelectTrigger className="h-10 w-full border-2 border-border bg-background/80 focus:bg-background transition-all duration-300 hover:bg-background/90 rounded-lg text-sm focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-0 focus-visible:border-ring">
-                  <SelectValue placeholder="Select city" className="truncate" />
-                </SelectTrigger>
-                <SelectContent className="max-h-60">
-                  <SelectItem value="all" className="text-sm">All Cities</SelectItem>
-                  {cities.map((city) => (
-                    <SelectItem key={city} value={city} className="text-sm">
-                      {city}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {mounted ? (
+                <Select value={filters.city} onValueChange={(value) => createFilterChangeHandler("city")(value)}>
+                  <SelectTrigger className="h-10 w-full min-w-0 border-2 border-border bg-background/80 focus:bg-background transition-all duration-300 hover:bg-background/90 rounded-lg text-sm focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-0 focus-visible:border-ring cursor-pointer">
+                    <SelectValue placeholder="Select city" className="truncate" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    <SelectItem value="all" className="text-sm">All Cities</SelectItem>
+                    {cities.map((city) => (
+                      <SelectItem key={city} value={city} className="text-sm">
+                        {city}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="h-10 w-full border-2 border-border rounded-lg bg-muted/30 animate-in fade-in-0" />
+              )}
             </div>
 
             {/* Gender Filter */}
             <div className="space-y-1.5 min-w-0">
               <Label className="text-xs sm:text-sm font-semibold text-foreground text-center block">Gender</Label>
-              <Select value={filters.gender || "all"} onValueChange={(value) => createFilterChangeHandler("gender")(value)}>
-                <SelectTrigger className="h-10 w-full border-2 border-border bg-background/80 focus:bg-background transition-all duration-300 hover:bg-background/90 rounded-lg text-sm focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-0 focus-visible:border-ring">
-                  <SelectValue placeholder="Select gender" className="truncate" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all" className="text-sm">All Genders</SelectItem>
-                  <SelectItem value="male" className="text-sm">Male</SelectItem>
-                  <SelectItem value="female" className="text-sm">Female</SelectItem>
-                  <SelectItem value="other" className="text-sm">Other</SelectItem>
-                </SelectContent>
-              </Select>
+              {mounted ? (
+                <Select value={filters.gender || "all"} onValueChange={(value) => createFilterChangeHandler("gender")(value)}>
+                  <SelectTrigger className="h-10 w-full min-w-0 border-2 border-border bg-background/80 focus:bg-background transition-all duration-300 hover:bg-background/90 rounded-lg text-sm focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-0 focus-visible:border-ring cursor-pointer">
+                    <SelectValue placeholder="Select gender" className="truncate" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" className="text-sm">All Genders</SelectItem>
+                    <SelectItem value="male" className="text-sm">Male</SelectItem>
+                    <SelectItem value="female" className="text-sm">Female</SelectItem>
+                    <SelectItem value="other" className="text-sm">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="h-10 w-full border-2 border-border rounded-lg bg-muted/30 animate-in fade-in-0" />
+              )}
             </div>
 
             {/* Smart Date Range Picker */}
             <div className="space-y-1.5 min-w-0 col-span-2 sm:col-span-1">
               <Label className="text-xs sm:text-sm font-semibold text-foreground text-center block">Date Range</Label>
-              <SmartDateRangePicker
-                dateFrom={filters.dateFrom}
-                dateTo={filters.dateTo}
-                onDateChange={(dateFrom, dateTo) => {
-                  createFilterChangeHandler("dateFrom")(dateFrom)
-                  createFilterChangeHandler("dateTo")(dateTo)
-                }}
-                placeholder="Select date or range"
-                className="w-full"
-              />
+              {mounted ? (
+                <SmartDateRangePicker
+                  dateFrom={filters.dateFrom}
+                  dateTo={filters.dateTo}
+                  onDateChange={(dateFrom, dateTo) => {
+                    createFilterChangeHandler("dateFrom")(dateFrom)
+                    createFilterChangeHandler("dateTo")(dateTo)
+                  }}
+                  placeholder="Select date or range"
+                  className="w-full"
+                />
+              ) : (
+                <div className="h-10 w-full border-2 border-border rounded-lg bg-muted/30 animate-in fade-in-0" />
+              )}
             </div>
             </div>
           </div>
 
           {/* Active Filter Chips */}
           {getActiveFilters().length > 0 && (
-            <div className="-mx-1 px-1">
+            <div className="px-1">
               <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap sm:flex-wrap sm:overflow-visible sm:whitespace-normal">
                 <span className="text-sm text-muted-foreground font-medium flex-shrink-0">Active filters:</span>
                 {getActiveFilters().map((filter) => (
@@ -626,7 +808,7 @@ export function CasesSearch({ onSearch, onClear, loading = false, hasCasesDispla
                     </span>
                     <button
                       onClick={() => removeFilter(filter.key)}
-                      className="ml-1 hover:bg-primary/20 rounded-full p-0.5 transition-colors"
+                      className="ml-1 hover:bg-primary/20 rounded-full p-0.5 transition-colors cursor-pointer"
                       aria-label={`Remove ${filter.label}`}
                     >
                       <X className="w-3 h-3" />
@@ -639,5 +821,12 @@ export function CasesSearch({ onSearch, onClear, loading = false, hasCasesDispla
         </div>
       </CardContent>
     </Card>
+    {loaderMounted && isNavigating && typeof window !== 'undefined' && createPortal(
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-background/80 backdrop-blur-sm">
+        <SimpleLoader />
+      </div>,
+      document.body
+    )}
+  </>
   )
 } 

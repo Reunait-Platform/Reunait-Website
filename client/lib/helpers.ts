@@ -45,11 +45,13 @@ export const formatDate = (
  * Format date for case status display
  * @param date - Date string or Date object
  * @param status - Case status ('missing', 'found', 'closed')
+ * @param originalStatus - Original status before closing (for closed cases)
  * @returns Formatted status text with date
  */
 export const formatCaseStatus = (
   date: string | Date, 
-  status?: 'missing' | 'found' | 'closed'
+  status?: 'missing' | 'found' | 'closed',
+  originalStatus?: 'missing' | 'found'
 ): string => {
   const formattedDate = formatDate(date, 'short')
   
@@ -59,7 +61,11 @@ export const formatCaseStatus = (
     case 'found':
       return `Found on ${formattedDate}`
     case 'closed':
-      return `Case closed ${formattedDate}`
+      // For closed cases, show the original status and date
+      if (originalStatus === 'found') {
+        return `Found on ${formattedDate}`
+      }
+      return `Missing since ${formattedDate}`
     default:
       return formattedDate
   }

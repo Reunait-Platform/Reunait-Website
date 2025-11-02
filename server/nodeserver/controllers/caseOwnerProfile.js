@@ -28,11 +28,11 @@ export const getCaseOwnerProfile = async (req, res) => {
       });
     }
 
-    // Only allow police users to access this endpoint
-    if (userRole !== 'police') {
+    // Only allow police and volunteer users to access this endpoint
+    if (userRole !== 'police' && userRole !== 'volunteer') {
       return res.status(403).json({ 
         success: false, 
-        message: "Access denied. Only police users can view case owner profiles." 
+        message: "Access denied. Only police and volunteer users can view case owner profiles." 
       });
     }
 
@@ -109,7 +109,7 @@ export const getCaseOwnerProfile = async (req, res) => {
       
       // Fetch only the fields needed for case cards
       const casesData = await Case.find({ _id: { $in: paginatedCaseIds } })
-        .select('_id fullName age gender status city state country dateMissingFound reward reportedBy createdAt')
+        .select('_id fullName age gender status city state country dateMissingFound reward reportedBy createdAt isFlagged')
         .sort({ createdAt: -1 }) // Most recent first
         .lean();
 
@@ -144,6 +144,7 @@ export const getCaseOwnerProfile = async (req, res) => {
           dateMissingFound: caseData.dateMissingFound,
           reward: caseData.reward,
           reportedBy: caseData.reportedBy,
+          isFlagged: caseData.isFlagged || false,
           imageUrls: imageUrls // Dynamically generated S3 URLs
         };
       }));

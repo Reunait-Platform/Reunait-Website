@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import notificationSchema from "./notificationModel.js";
+import timelineSchema from "./timelineModel.js";
 
 const caseModel = new mongoose.Schema(
   {
@@ -37,7 +38,8 @@ const caseModel = new mongoose.Schema(
     state: { 
       type: String,
     },
-    pincode: {
+    // Preferred: postalCode (use this going forward)
+    postalCode: {
       type: String,
       required: true,
     },
@@ -47,6 +49,10 @@ const caseModel = new mongoose.Schema(
     },
     description: { 
       type: String 
+    },
+    aiDescription: {
+      type: String,
+      default: "Generating description... it will be available shortly."
     },
     addedBy: {
       type: String,
@@ -73,7 +79,9 @@ const caseModel = new mongoose.Schema(
     },
     policeStationCountry: {
       type: String,
-      required: true,
+    },
+    policeStationPostalCode: {
+      type: String,
     },
     caseRegisterDate: {
       type: Date,
@@ -87,6 +95,14 @@ const caseModel = new mongoose.Schema(
       enum: ["missing", "found", "closed"],
       default: "missing"
     },
+    caseClosingDate: {
+      type: Date
+    },
+    originalStatus: {
+      type: String,
+      enum: ["missing", "found"],
+      default: "missing"
+    },
     reportedBy: {
         type: String,
         enum: ["general_user", "police", "NGO"]
@@ -98,8 +114,8 @@ const caseModel = new mongoose.Schema(
         return this.createdAt || new Date();
       }
     },
-    notifications: {
-        type: [notificationSchema],
+    timelines: {
+        type: [timelineSchema],
         default: []
     },
     similarCaseIds: {
@@ -108,14 +124,50 @@ const caseModel = new mongoose.Schema(
     },
     verificationBypassed: {
         type: Boolean,
-        default: false
+        default: true
     },
     showCase: {
         type: Boolean,
         default: true
+    },
+    flags: {
+        type: [{
+            userId: {
+                type: String,
+                default: null
+            },
+            userRole: {
+                type: String,
+                enum: ["general_user", "police", "NGO"],
+                default: "general_user"
+            },
+            reason: {
+                type: String,
+                required: true
+            },
+            timestamp: {
+                type: Date,
+                default: Date.now
+            },
+            ipAddress: {
+                type: String,
+                required: true
+            }
+        }],
+        default: []
+    },
+    isFlagged: {
+        type: Boolean,
+        default: false
     }
   },
   { timestamps: true }
+);
+
+// Ensure FIRNumber is unique per policeStationCountry only when a non-empty FIRNumber is present
+caseModel.index(
+  { FIRNumber: 1, policeStationCountry: 1 },
+  { unique: true, partialFilterExpression: { FIRNumber: { $exists: true, $ne: "" } } }
 );
 
 const Case = mongoose.model("Case", caseModel);

@@ -2,6 +2,7 @@ export interface ClerkMetadata {
   onboardingCompleted: boolean
   role: 'general_user' | 'police' | 'NGO' | null
   lastUpdated: string
+  unreadNotificationCount?: number
 }
 
 /**
@@ -78,11 +79,26 @@ export const hasRole = (sessionClaims: any, role: string): boolean => {
 }
 
 /**
- * Check if user is police or NGO (for bypassing rate limits)
+ * Check if user is police, NGO, or volunteer (for bypassing rate limits)
  * @param sessionClaims - Clerk session claims object
- * @returns boolean - true if user is police or NGO
+ * @returns boolean - true if user is police, NGO, or volunteer
  */
 export const isPrivilegedUser = (sessionClaims: any): boolean => {
   const role = getUserRole(sessionClaims)
-  return role === 'police' || role === 'NGO'
+  return role === 'police' || role === 'NGO' || role === 'volunteer'
 }
+
+/**
+ * Extract unread notification count from Clerk user object or session claims
+ * @param userOrSessionClaims - Clerk user object or session claims object
+ * @returns number - unread notification count or 0 if not found
+ */
+export const getUnreadNotificationCount = (userOrSessionClaims: any): number => {
+  try {
+    const metadata = userOrSessionClaims?.publicMetadata;
+    return metadata?.unreadNotificationCount || 0;
+  } catch (error) {
+    console.error('Error reading unread notification count:', error);
+    return 0;
+  }
+};

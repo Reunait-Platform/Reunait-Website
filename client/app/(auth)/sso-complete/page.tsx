@@ -45,27 +45,7 @@ export default function SsoCompletePage() {
         return
       }
       
-      // Fallback: try API if metadata missing
-      try {
-        const token = await getToken()
-        if (token) {
-          const base = process.env.NEXT_PUBLIC_BACKEND_URL || "http://192.168.1.3:3001"
-          const res = await fetch(`${base}/api/users/profile`, { 
-            headers: { Authorization: `Bearer ${token}` } 
-          })
-          const data = await res.json().catch(() => null)
-          const completed = res.ok && data?.data?.onboardingCompleted === true
-          
-          if (completed) {
-            router.replace(returnTo)
-          } else {
-            router.replace(`/onboarding?returnTo=${encodeURIComponent(returnTo)}`)
-          }
-          return
-        }
-      } catch {}
-      
-      // Final fallback: assume onboarding needed
+      // Fallback removed to avoid duplicate API calls; assume onboarding needed
       router.replace(`/onboarding?returnTo=${encodeURIComponent(returnTo)}`)
     }
     

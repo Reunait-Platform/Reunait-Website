@@ -10,6 +10,8 @@ interface CasesGridProps {
   loading?: boolean
   emptyMessage?: string
   highlightQuery?: string
+  getMuted?: (c: Case) => boolean
+  showMutedHint?: boolean
 }
 
 // Optimized loading skeleton - matches actual case card dimensions
@@ -65,7 +67,9 @@ export const CasesGrid = memo(({
   cases, 
   loading = false,
   emptyMessage = "No cases found",
-  highlightQuery = ""
+  highlightQuery = "",
+  getMuted,
+  showMutedHint = false
 }: CasesGridProps) => {
   if (loading) {
     return <LoadingSkeleton />
@@ -77,14 +81,18 @@ export const CasesGrid = memo(({
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-8 animate-in fade-in-0 slide-in-from-bottom-4 duration-300">
-      {cases.map((caseData, index) => (
+      {cases.map((caseData, index) => {
+        const stableKey = caseData._id || `case-${index}`
+        return (
         <CaseCard
-          key={caseData._id}
+          key={stableKey}
           case={caseData}
           index={index}
           highlightQuery={highlightQuery}
-        />
-      ))}
+          muted={getMuted ? getMuted(caseData) : false}
+          showMutedHint={showMutedHint}
+        />)
+      })}
     </div>
   )
 })

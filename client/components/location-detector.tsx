@@ -12,10 +12,24 @@ export function LocationDetector() {
     // Only run in browser (client-side)
     if (typeof window === 'undefined') return
 
+    const setLocationCookie = (data: { country: string; state: string; city: string }) => {
+      try {
+        const encoded = encodeURIComponent([data.country, data.state, data.city].join('|'))
+        // 7 days TTL; path=/ so SSR can read it anywhere
+        document.cookie = `loc=${encoded}; Max-Age=${7 * 24 * 60 * 60}; Path=/; SameSite=Lax`
+      } catch {}
+    }
+
     const requestLocation = () => {
       // Check if we already have location data
       const existingLocation = localStorage.getItem('userLocation')
       if (existingLocation) {
+        try {
+          const parsed = JSON.parse(existingLocation)
+          if (parsed?.country && parsed?.state && parsed?.city) {
+            setLocationCookie({ country: parsed.country, state: parsed.state, city: parsed.city })
+          }
+        } catch {}
         return
       }
 
@@ -52,6 +66,7 @@ export function LocationDetector() {
               }
               
               localStorage.setItem('userLocation', JSON.stringify(locationData))
+            setLocationCookie({ country: locationData.country, state: locationData.state, city: locationData.city })
               // Notify any listeners (e.g., /cases page) immediately
               window.dispatchEvent(new CustomEvent('location:updated', { detail: locationData }))
             } else {
@@ -65,6 +80,7 @@ export function LocationDetector() {
                 timestamp: Date.now()
               }
               localStorage.setItem('userLocation', JSON.stringify(fallback))
+            setLocationCookie({ country: fallback.country, state: fallback.state, city: fallback.city })
               window.dispatchEvent(new CustomEvent('location:updated', { detail: fallback }))
             }
           } catch (error) {
@@ -78,6 +94,7 @@ export function LocationDetector() {
               timestamp: Date.now()
             }
             localStorage.setItem('userLocation', JSON.stringify(fallback))
+          setLocationCookie({ country: fallback.country, state: fallback.state, city: fallback.city })
             window.dispatchEvent(new CustomEvent('location:updated', { detail: fallback }))
           }
         },

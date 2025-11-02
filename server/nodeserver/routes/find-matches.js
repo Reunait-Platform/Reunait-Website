@@ -52,11 +52,11 @@ router.post('/find-matches', requireAuth(), async (req, res) => {
       }
     }
 
-    // Check rate limiting (4-hour cooldown) - skip for police and NGO users
+    // Check rate limiting (4-hour cooldown) - skip for police, NGO, and volunteer users
     const currentTime = new Date();
     const lastSearchedTime = caseData.lastSearchedTime;
     
-    // Skip rate limiting for police and NGO users
+    // Skip rate limiting for police, NGO, and volunteer users
     if (userRole === 'general_user' && lastSearchedTime) {
       const timeDiff = currentTime.getTime() - lastSearchedTime.getTime();
       const cooldownPeriod = 4 * 60 * 60 * 1000; // 4 hours in milliseconds

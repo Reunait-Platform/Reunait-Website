@@ -199,4 +199,19 @@ const searchSimilarCases = async (caseId, searchParams) => {
     }
 };
 
-export { storeEmbeddings, searchSimilarCases }; 
+// Delete embeddings from Pinecone
+const deleteEmbeddings = async (caseId, country) => {
+  try {
+    const namespace = country.toLowerCase().replace(/\s+/g, '_');
+    const indexInstance = await initializeIndex();
+    
+    // Delete both vector embeddings for the case
+    await indexInstance.namespace(namespace).deleteMany([`${caseId}_1`, `${caseId}_2`]);
+    return true;
+  } catch (error) {
+    console.error('Error deleting embeddings from Pinecone:', error);
+    throw new Error(`Failed to delete embeddings: ${error.message}`);
+  }
+};
+
+export { storeEmbeddings, searchSimilarCases, deleteEmbeddings }; 

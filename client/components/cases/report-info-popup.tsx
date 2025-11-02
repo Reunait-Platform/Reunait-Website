@@ -52,7 +52,7 @@ export function ReportInfoPopup({ isOpen, onClose, caseId, addedBy, onSuccess }:
     setIsSubmitting(true);
     
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://192.168.1.3:3001'}/api/report`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL as string}/api/report`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

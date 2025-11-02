@@ -1,66 +1,37 @@
 import Case from "../model/caseModel.js";
 import User from "../model/userModel.js";
 import HomepageSection from "../model/homepageModel.js";
+import redis from "../services/redisClient.js";
+import PoliceStation from "../model/policeStationModel.js";
+import { clerkClient } from '@clerk/express';
 import { generateEmbeddings } from "../services/lambdaService.js";
 import { storeEmbeddings } from "../services/pineconeService.js";
 import { uploadToS3 } from "../services/s3Service.js";
+import { generateEnglishCaseSummary } from "../services/googleAiService.js";
 import { moderateImage } from "../services/contentSafetyService.js";
 
-// Helper function to increment impact counter
+// Increment Cases Registered using model helper (numeric-safe)
 const incrementImpactCounter = async () => {
     try {
-        // Find the impact section
-        const impactSection = await HomepageSection.findOne({ section: 'impact' });
-        
-        if (!impactSection) {
-            console.error('Impact section not found in database');
-            return;
-        }
-
-        // Find the "Cases Registered" stat
-        const casesRegisteredStat = impactSection.data.stats.find(stat => 
-            stat.label.includes('Cases Registered')
-        );
-
-        if (!casesRegisteredStat) {
-            console.error('Cases Registered stat not found in impact section');
-            return;
-        }
-
-        // Parse current value (e.g., "1,000+" → 1000)
-        const currentValue = casesRegisteredStat.value;
-        const numericValue = parseInt(currentValue.replace(/[^\d]/g, '')) || 0;
-        
-        // Increment by 1
-        const newValue = numericValue + 1;
-        
-        // Format back (e.g., 1001 → "1,001+")
-        const formattedValue = newValue.toLocaleString() + '+';
-        
-        // Update the value
-        casesRegisteredStat.value = formattedValue;
-        
-        // Mark the nested data object as modified
-        impactSection.markModified('data');
-        
-        // Save the updated section
-        await impactSection.save();
-        
+        await HomepageSection.incrementCasesRegistered(1);
     } catch (error) {
         console.error('Error updating impact counter:', error);
-        // Don't throw error to avoid breaking case registration
     }
 };
 
 export const registerCase = async (req, res) => {
     try {
+        const normalize = (v) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim() : v)
+        const within = (v, max) => (typeof v === 'string' ? v.length <= max : true)
+        const matches = (v, re) => (typeof v === 'string' ? re.test(v) : true)
         // Validate required fields based on frontend schema
-        const requiredFields = [
+        const baseRequired = [
             'fullName', 'age', 'gender', 'contactNumber', 'height', 'complexion',
-            'status', 'dateMissingFound', 'address', 'country', 'pincode',
-            'FIRNumber', 'policeStationName', 'policeStationCountry', 'policeStationPincode'
+            'status', 'dateMissingFound', 'address', 'country', 'postalCode'
         ];
-        const missingFields = requiredFields.filter(field => !req.body[field] || req.body[field].trim() === '');
+        const policeRequired = ['FIRNumber', 'policeStationName', 'policeStationCountry', 'policeStationPostalCode'];
+        const requiredFields = req.body.status === 'missing' ? [...baseRequired, ...policeRequired] : baseRequired;
+        const missingFields = requiredFields.filter(field => !req.body[field] || String(req.body[field]).trim() === '');
         
         if (missingFields.length > 0) {
             return res.status(400).json({
@@ -77,8 +48,58 @@ export const registerCase = async (req, res) => {
             });
         }
 
+        // Normalize and enforce invisible limits
+        req.body.fullName = normalize(req.body.fullName)
+        req.body.contactNumber = normalize(req.body.contactNumber)
+        req.body.identificationMark = normalize(req.body.identificationMark)
+        req.body.description = normalize(req.body.description)
+        req.body.address = normalize(req.body.address)
+        req.body.country = normalize(req.body.country)
+        req.body.state = normalize(req.body.state)
+        req.body.city = normalize(req.body.city)
+        req.body.postalCode = normalize(req.body.postalCode)
+        req.body.FIRNumber = normalize(req.body.FIRNumber)
+        req.body.policeStationName = normalize(req.body.policeStationName)
+        req.body.policeStationCountry = normalize(req.body.policeStationCountry)
+        req.body.policeStationState = normalize(req.body.policeStationState)
+        req.body.policeStationCity = normalize(req.body.policeStationCity)
+        req.body.policeStationPostalCode = normalize(req.body.policeStationPostalCode)
+
+        // If status is 'found' and police info left blank, omit police fields to avoid empty-string duplicates
+        const isMissingStatus = String(req.body.status || '').toLowerCase() === 'missing'
+        if (!isMissingStatus) {
+            if (!req.body.FIRNumber) req.body.FIRNumber = undefined
+            if (!req.body.policeStationName) req.body.policeStationName = undefined
+            if (!req.body.policeStationCountry) req.body.policeStationCountry = undefined
+            if (!req.body.policeStationState) req.body.policeStationState = undefined
+            if (!req.body.policeStationCity) req.body.policeStationCity = undefined
+            if (!req.body.policeStationPostalCode) req.body.policeStationPostalCode = undefined
+        }
+
+        const fail = (field) => res.status(400).json({ status: false, message: `Please shorten the ${field}.` })
+
+        if (!within(req.body.fullName, 120)) return fail('full name')
+        if (!within(req.body.contactNumber, 20)) return fail('contact number')
+        if (!within(req.body.identificationMark || '', 100)) return fail('identification mark')
+        if (!within(req.body.description || '', 250)) return fail('description')
+        if (!within(req.body.address, 300)) return fail('address')
+        if (!within(req.body.country, 64)) return fail('country')
+        if (!within(req.body.state || '', 64)) return fail('state')
+        if (!within(req.body.city || '', 64)) return fail('city')
+        if (req.body.status === 'missing') {
+            if (!within(req.body.policeStationName, 120)) return fail('police station name')
+            if (!within(req.body.policeStationCountry, 64)) return fail('police station country')
+            if (!within(req.body.policeStationState || '', 64)) return fail('police station state')
+            if (!within(req.body.policeStationCity || '', 64)) return fail('police station city')
+        }
+        if (!within(req.body.postalCode, 12) || !matches(req.body.postalCode, /^[A-Za-z0-9 \-]+$/)) return fail('postal code')
+        if (req.body.status === 'missing') {
+            if (!within(req.body.policeStationPostalCode, 12) || !matches(req.body.policeStationPostalCode, /^[A-Za-z0-9 \-]+$/)) return fail('police station postal code')
+            if (!within(req.body.FIRNumber, 50) || !matches(req.body.FIRNumber, /^[A-Za-z0-9 \-]+$/)) return fail('case reference number')
+        }
+
         // Check FIR number uniqueness within the same country if provided
-        if (req.body.FIRNumber) {
+        if (req.body.FIRNumber && req.body.policeStationCountry) {
             const existingCase = await Case.findOne({ 
                 FIRNumber: req.body.FIRNumber,
                 policeStationCountry: req.body.policeStationCountry 
@@ -119,20 +140,20 @@ export const registerCase = async (req, res) => {
             dateMissingFound: req.body.dateMissingFound,
             city: req.body.city || "",
             state: req.body.state || "",
-            pincode: req.body.pincode,
+            postalCode: req.body.postalCode,
             country: req.body.country,
             description: req.body.description || "",
             addedBy: req.body.reportedBy || 'general_user',
             caseOwner: req.auth?.userId || null,
             landMark: req.body.landMark || "",
-            FIRNumber: req.body.FIRNumber,
+            FIRNumber: req.body.FIRNumber || undefined,
             policeStationState: req.body.policeStationState || "",
             policeStationCity: req.body.policeStationCity || "",
-            policeStationName: req.body.policeStationName,
-            policeStationCountry: req.body.policeStationCountry,
-            policeStationPincode: req.body.policeStationPincode,
+            policeStationName: req.body.policeStationName || undefined,
+            policeStationCountry: req.body.policeStationCountry || undefined,
+            policeStationPostalCode: req.body.policeStationPostalCode || undefined,
             status: req.body.status,
-            reportedBy: req.body.reportedBy,
+            reportedBy: req.body.reportedBy || 'general_user',
             caseRegisterDate: new Date(),
             isAssigned: false,
             lastSearchedTime: new Date(req.body.dateMissingFound),
@@ -144,25 +165,92 @@ export const registerCase = async (req, res) => {
             newCase.reward = req.body.reward;
         }
 
-        // Save the case
-        const savedCase = await newCase.save();
+        // Save the case with graceful duplicate handling for FIR uniqueness
+        let savedCase;
+        try {
+            savedCase = await newCase.save();
+        } catch (e) {
+            if (e && e.code === 11000) {
+                return res.status(409).json({
+                    status: false,
+                    message: 'Case reference number already exists for the selected country. Please provide a unique FIR number or leave it blank.'
+                });
+            }
+            throw e;
+        }
 
-        // Increment impact counter for cases registered
-        await incrementImpactCounter();
 
-        // Add case creation notification
-        const caseCreationNotification = {
-            message: `Case registered`,
+        // Add case creation timeline entry with user role
+        const userRole = req.body.reportedBy || 'general_user';
+        const roleDisplayName = userRole === 'police' ? 'Police Station' : 
+                               userRole === 'NGO' ? 'NGO' : 
+                               userRole === 'volunteer' ? 'Volunteer' : 'You';
+        
+        const caseCreationTimeline = {
+            message: `Case registered as ${req.body.status || 'missing'} by ${roleDisplayName}`,
             time: new Date(),
             ipAddress: (req.headers["x-forwarded-for"]?.split(",")[0]?.trim()) || req.ip || req.connection.remoteAddress || 'Unknown',
-            phoneNumber: req.body.contactNumber || 'Not provided',
-            isRead: false
+            phoneNumber: req.body.contactNumber || 'Not provided'
         };
         
-        // Add notification to the case
+        // Add timeline entry to the case
         await Case.findByIdAndUpdate(savedCase._id, {
-            $push: { notifications: caseCreationNotification }
+            $push: { timelines: caseCreationTimeline }
         });
+
+        // Add notification to the user's notification array
+        if (req.auth?.userId) {
+            const notificationData = {
+                message: `Case for ${req.body.fullName} has been successfully registered and is now live on the platform`,
+                time: new Date(),
+                isRead: false,
+                isClickable: true,
+                navigateTo: `/cases/${String(savedCase._id)}`
+            };
+
+            const updatedUser = await User.findOneAndUpdate(
+                { clerkUserId: req.auth.userId },
+                { $push: { notifications: notificationData } },
+                { new: true }
+            ).select('notifications').lean();
+
+            // Broadcast notification via SSE
+            if (updatedUser && updatedUser.notifications && updatedUser.notifications.length > 0) {
+                const newNotification = updatedUser.notifications[updatedUser.notifications.length - 1];
+                const unreadCount = (updatedUser.notifications || []).filter(n => !n.isRead).length;
+                try {
+                    const { broadcastNotification } = await import('../services/notificationBroadcast.js');
+                    broadcastNotification(req.auth.userId, {
+                        id: String(newNotification._id),
+                        message: newNotification.message || '',
+                        isRead: Boolean(newNotification.isRead),
+                        isClickable: newNotification.isClickable !== false,
+                        navigateTo: newNotification.navigateTo || null,
+                        time: newNotification.time || null,
+                        unreadCount,
+                    });
+                } catch (error) {
+                    console.error('Error broadcasting notification:', error);
+                    // Don't fail the request if broadcast fails
+                }
+            }
+
+            // Update Clerk metadata to increment unread count
+            try {
+                const user = await clerkClient.users.getUser(req.auth.userId);
+                const currentCount = user.publicMetadata?.unreadNotificationCount || 0;
+                
+                await clerkClient.users.updateUserMetadata(req.auth.userId, {
+                    publicMetadata: {
+                        ...user.publicMetadata,
+                        unreadNotificationCount: currentCount + 1
+                    }
+                });
+            } catch (error) {
+                console.error('Error updating Clerk metadata for case registration notification:', error);
+                // Don't fail the request if metadata update fails
+            }
+        }
 
         // Generate embeddings for the images (now that we have the case ID)
         let embeddings;
@@ -196,6 +284,78 @@ export const registerCase = async (req, res) => {
             );
         }
 
+        // Tag case to police station if policeStationId is provided
+        if (req.body.policeStationId) {
+            try {
+                const policeStation = await PoliceStation.findById(req.body.policeStationId).lean();
+                if (policeStation && policeStation.registeredBy) {
+                    const policeUserClerkId = policeStation.registeredBy;
+                    
+                    // Append case ID to police user's cases array
+                    await User.findOneAndUpdate(
+                        { clerkUserId: policeUserClerkId },
+                        { $addToSet: { cases: savedCase._id } }
+                    );
+
+                    // Add notification to police user about new case in their jurisdiction
+                    const caseStatus = req.body.status === 'missing' ? 'missing person' : 'found person';
+                    const policeNotificationData = {
+                        message: `New ${caseStatus} case registered for ${req.body.fullName} in your jurisdiction`,
+                        time: new Date(),
+                        isRead: false,
+                        isClickable: true,
+                        navigateTo: `/cases/${String(savedCase._id)}`
+                    };
+
+                    const updatedPoliceUser = await User.findOneAndUpdate(
+                        { clerkUserId: policeUserClerkId },
+                        { $push: { notifications: policeNotificationData } },
+                        { new: true }
+                    ).select('notifications').lean();
+
+                    // Broadcast notification via SSE
+                    if (updatedPoliceUser && updatedPoliceUser.notifications && updatedPoliceUser.notifications.length > 0) {
+                        const newNotification = updatedPoliceUser.notifications[updatedPoliceUser.notifications.length - 1];
+                        const unreadCount = (updatedPoliceUser.notifications || []).filter(n => !n.isRead).length;
+                        try {
+                            const { broadcastNotification } = await import('../services/notificationBroadcast.js');
+                            broadcastNotification(policeUserClerkId, {
+                                id: String(newNotification._id),
+                                message: newNotification.message || '',
+                                isRead: Boolean(newNotification.isRead),
+                                isClickable: newNotification.isClickable !== false,
+                                navigateTo: newNotification.navigateTo || null,
+                                time: newNotification.time || null,
+                                unreadCount,
+                            });
+                        } catch (error) {
+                            console.error('Error broadcasting police notification:', error);
+                            // Don't fail the request if broadcast fails
+                        }
+                    }
+
+                    // Update Clerk metadata to increment unread count for police user
+                    try {
+                        const policeUser = await clerkClient.users.getUser(policeUserClerkId);
+                        const currentCount = policeUser.publicMetadata?.unreadNotificationCount || 0;
+                        
+                        await clerkClient.users.updateUserMetadata(policeUserClerkId, {
+                            publicMetadata: {
+                                ...policeUser.publicMetadata,
+                                unreadNotificationCount: currentCount + 1
+                            }
+                        });
+                    } catch (error) {
+                        console.error('Error updating Clerk metadata for police notification:', error);
+                        // Don't fail the request if metadata update fails
+                    }
+                }
+            } catch (error) {
+                // Log error but don't fail case registration if police tagging fails
+                console.error('Error tagging case to police station:', error.message || error);
+            }
+        }
+
         // Prepare metadata for Pinecone
         const metadata = {
             caseId: savedCase._id.toString(),
@@ -225,6 +385,50 @@ export const registerCase = async (req, res) => {
             await Case.findByIdAndDelete(savedCase._id);
             throw pineconeError;
         }
+
+        // All downstream steps succeeded → increment homepage counter and invalidate cache
+        try {
+            await incrementImpactCounter();
+            try { await redis.set('homepage:cache:enabled', 'false') } catch {}
+        } catch (e) {
+            console.error('Increment Cases Registered failed (non-blocking):', e?.message || e)
+        }
+
+        // Fire-and-forget: generate concise English summary and save to description with retries
+        // Use the savedCase snapshot + originalDescription to avoid an extra DB read
+        ;(async () => {
+            const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+            const attempts = [0, 5000, 15000];
+            const baseCaseData = {
+                fullName: savedCase.fullName,
+                age: savedCase.age,
+                gender: savedCase.gender,
+                status: savedCase.status,
+                dateMissingFound: savedCase.dateMissingFound,
+                city: savedCase.city,
+                state: savedCase.state,
+                country: savedCase.country,
+                identificationMark: savedCase.identificationMark,
+                reward: savedCase.reward,
+                reportedBy: savedCase.reportedBy,
+                description: savedCase.description,
+            };
+            for (let i = 0; i < attempts.length; i++) {
+                try {
+                    if (attempts[i] > 0) await sleep(attempts[i]);
+                    const summary = await generateEnglishCaseSummary(baseCaseData);
+                    if (summary && typeof summary === 'string' && summary.trim().length > 0) {
+                        await Case.findByIdAndUpdate(savedCase._id, { aiDescription: summary.trim() });
+                        return; // success; stop retries
+                    }
+                } catch (e) {
+                    // On final failure, log and leave placeholder in place
+                    if (i === attempts.length - 1) {
+                        try { console.error('[registerCase] AI summary generation failed after retries:', e?.message || e); } catch {}
+                    }
+                }
+            }
+        })();
 
         return res.status(201).json({
             status: true,

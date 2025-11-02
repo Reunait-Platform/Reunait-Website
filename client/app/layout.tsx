@@ -8,6 +8,8 @@ import { ClientOnly } from "@/components/client-only";
 import { ToastProvider } from "@/contexts/toast-context";
 import { ClerkProvider } from "@clerk/nextjs";
 import { OnboardingGate } from "@/components/OnboardingGate";
+import { NotificationsStoreProvider } from "@/providers/notifications-store-provider";
+import { NotificationFetcher } from "@/components/notification-fetcher";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -46,19 +48,25 @@ export default function RootLayout({
             enableSystem
             disableTransitionOnChange
           >
-            <ToastProvider>
-              <div className="min-h-screen flex flex-col animate-in fade-in-0 duration-700">
+            <NotificationsStoreProvider>
+              <ToastProvider>
+                {/* SSE connection persists across all navigation - only one connection per session */}
                 <ClientOnly>
-                  <Navbar />
+                  <NotificationFetcher />
                 </ClientOnly>
-                <main className="flex-1 pt-24 animate-in fade-in-0 slide-in-from-bottom-4 duration-1000 delay-200">
-                  <OnboardingGate>
-                    {children}
-                  </OnboardingGate>
-                </main>
-                <Footer />
-              </div>
-            </ToastProvider>
+                <div className="min-h-screen flex flex-col">
+                  <ClientOnly>
+                    <Navbar />
+                  </ClientOnly>
+                  <main className="flex-1 pt-24">
+                    <OnboardingGate>
+                      {children}
+                    </OnboardingGate>
+                  </main>
+                  <Footer />
+                </div>
+              </ToastProvider>
+            </NotificationsStoreProvider>
           </ThemeProvider>
         </ClerkProvider>
       </body>

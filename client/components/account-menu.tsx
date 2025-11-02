@@ -3,7 +3,7 @@
 import * as React from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { useUser, useClerk, useReverification } from '@clerk/nextjs'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -13,6 +13,7 @@ import { useNavigationLoader } from '@/hooks/use-navigation-loader'
 
 export function AccountMenu() {
     const router = useRouter()
+    const pathname = usePathname()
     const { user, isSignedIn } = useUser()
     const { signOut, client, openUserProfile } = useClerk()
     const [isManageOpen, setIsManageOpen] = React.useState(false)
@@ -43,6 +44,9 @@ export function AccountMenu() {
     }, [])
 
     const handleProfileClick = () => {
+        if (pathname === '/profile') {
+            return
+        }
         startLoading()
         router.push('/profile')
     }
@@ -54,13 +58,41 @@ export function AccountMenu() {
     })
     
 
+    // Root-cause fix: freeze scroll without changing layout width
+    // We avoid toggling overflow on body (which removes the scrollbar gutter)
+    // and instead use position: fixed to lock the scroll and restore it on close
     React.useEffect(() => {
+        const body = document.body
+        let previousScrollY = 0
         if (isManageOpen) {
-            document.body.classList.add('overflow-hidden')
+            previousScrollY = window.scrollY
+            body.style.position = 'fixed'
+            body.style.top = `-${previousScrollY}px`
+            body.style.width = '100%'
         } else {
-            document.body.classList.remove('overflow-hidden')
+            const top = body.style.top
+            body.style.position = ''
+            body.style.top = ''
+            body.style.width = ''
+            if (top) {
+                const y = parseInt(top.replace('px', ''))
+                if (!Number.isNaN(y)) {
+                    window.scrollTo(0, -y)
+                }
+            }
         }
-        return () => document.body.classList.remove('overflow-hidden')
+        return () => {
+            const top = body.style.top
+            body.style.position = ''
+            body.style.top = ''
+            body.style.width = ''
+            if (top) {
+                const y = parseInt(top.replace('px', ''))
+                if (!Number.isNaN(y)) {
+                    window.scrollTo(0, -y)
+                }
+            }
+        }
     }, [isManageOpen])
 
     if (!isSignedIn) return null
@@ -68,6 +100,7 @@ export function AccountMenu() {
     const avatar = user?.imageUrl || ''
     const displayName = user?.fullName || user?.username || 'Account'
     const email = user?.primaryEmailAddress?.emailAddress || ''
+    const isVolunteer = (user?.publicMetadata as any)?.role === 'volunteer'
 
     const formatLastActive = (input: any) => {
         if (!input) return '—'
@@ -113,6 +146,19 @@ export function AccountMenu() {
                         {email ? <span className="text-xs text-muted-foreground truncate">{email}</span> : null}
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
+                    {isVolunteer ? (
+                        <DropdownMenuItem
+                            className="cursor-pointer"
+                            onClick={() => {
+                                if (pathname === '/volunteer') return
+                                startLoading()
+                                router.push('/volunteer')
+                            }}
+                        >
+                            Dashboard
+                        </DropdownMenuItem>
+                    ) : null}
+                    {isVolunteer ? <DropdownMenuSeparator /> : null}
                     <DropdownMenuItem className="cursor-pointer" onClick={handleProfileClick}>
                         Profile
                     </DropdownMenuItem>

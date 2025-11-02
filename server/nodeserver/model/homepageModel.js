@@ -61,27 +61,30 @@ homepageSectionSchema.statics.getHomepageData = async function() {
     try {
         const sections = await this.getActiveSections();
         
-        // Process sections to limit testimonials to 50 random ones
+        // Process sections to limit testimonials and format numeric stats with a trailing "+"
         const processedSections = sections.map(section => {
-            if (section.section === 'testimonials' && section.data && section.data.testimonials) {
-                const testimonials = section.data.testimonials;
-                
-                // If we have more than 50 testimonials, randomly select 50
+            const obj = section.toObject();
+
+            // Testimonials: cap to 50 random entries
+            if (obj.section === 'testimonials' && obj.data && Array.isArray(obj.data.testimonials)) {
+                const testimonials = obj.data.testimonials;
                 if (testimonials.length > 50) {
                     const shuffled = [...testimonials].sort(() => 0.5 - Math.random());
-                    const randomTestimonials = shuffled.slice(0, 50);
-                    
-                    return {
-                        ...section.toObject(),
-                        data: {
-                            ...section.data,
-                            testimonials: randomTestimonials
-                        }
-                    };
+                    obj.data.testimonials = shuffled.slice(0, 50);
                 }
             }
-            
-            return section.toObject();
+
+            // Format numeric stats: append "+" and locale-format numbers
+            if (obj.data && Array.isArray(obj.data.stats)) {
+                obj.data.stats = obj.data.stats.map((s) => {
+                    if (s && typeof s.value === 'number') {
+                        return { ...s, value: s.value.toLocaleString() + '+' };
+                    }
+                    return s;
+                });
+            }
+
+            return obj;
         });
         
         return {
@@ -91,6 +94,66 @@ homepageSectionSchema.statics.getHomepageData = async function() {
     } catch (error) {
         throw new Error(`Failed to fetch homepage data: ${error.message}`);
     }
+};
+
+// Increment "Successful Reunions" stat value on impact section (upsert if missing)
+homepageSectionSchema.statics.incrementReunionsCount = async function(delta = 1) {
+  // Try to increment the numeric value of the stat with label matching "Successful Reunions"
+  const result = await this.updateOne(
+    { section: 'impact' },
+    { $inc: { 'data.stats.$[elem].value': delta } },
+    { arrayFilters: [ { 'elem.label': { $regex: /^\s*Successful Reunions\s*$/i } } ] }
+  );
+
+  // If no document was updated, create impact with a default stats array including successful reunions
+  if (result.matchedCount === 0) {
+    await this.updateOne(
+      { section: 'impact' },
+      {
+        $setOnInsert: {
+          title: 'Our Impact',
+          subtitle: '',
+          order: 2,
+          isActive: true,
+          'data.stats': [
+            { label: 'Cases Registered', value: 0 },
+            { label: 'Successful Reunions', value: Math.max(0, delta) },
+            { label: 'Worldwide Coverage', value: 'Global' }
+          ]
+        }
+      },
+      { upsert: true }
+    );
+  }
+};
+
+// Increment "Cases Registered" stat value on impact section (upsert if missing)
+homepageSectionSchema.statics.incrementCasesRegistered = async function(delta = 1) {
+  const result = await this.updateOne(
+    { section: 'impact' },
+    { $inc: { 'data.stats.$[elem].value': delta } },
+    { arrayFilters: [ { 'elem.label': { $regex: /^\s*Cases Registered\s*$/i } } ] }
+  );
+
+  if (result.matchedCount === 0) {
+    await this.updateOne(
+      { section: 'impact' },
+      {
+        $setOnInsert: {
+          title: 'Our Impact',
+          subtitle: '',
+          order: 2,
+          isActive: true,
+          'data.stats': [
+            { label: 'Cases Registered', value: Math.max(0, delta) },
+            { label: 'Successful Reunions', value: 0 },
+            { label: 'Worldwide Coverage', value: 'Global' }
+          ]
+        }
+      },
+      { upsert: true }
+    );
+  }
 };
 
 

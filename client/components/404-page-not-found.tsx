@@ -2,11 +2,26 @@
 
 import React from "react";
 import Link from "next/link";
+import { createPortal } from "react-dom";
+import { usePathname } from "next/navigation";
+import { useNavigationLoader } from "@/hooks/use-navigation-loader";
+import { SimpleLoader } from "@/components/ui/simple-loader";
 
 export const Component = () => {
+  const pathname = usePathname()
+  const { isLoading, mounted, startLoading, stopLoading } = useNavigationLoader()
+  const stopAfterNextPaint = React.useCallback(() => {
+    requestAnimationFrame(() => requestAnimationFrame(() => stopLoading()))
+  }, [stopLoading])
 
   return (
-     <div className="w-full h-screen flex flex-col items-center justify-center">
+     <div className="w-full min-h-[60vh] flex flex-col items-center justify-center py-16 md:py-24">
+        {isLoading && mounted && createPortal(
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/70 backdrop-blur-md">
+            <SimpleLoader />
+          </div>,
+          document.body
+        )}
         <svg
           className="w-1/2 md:1/3 lg:w-1/4 text-primary"
           xmlns="http://www.w3.org/2000/svg"
@@ -169,6 +184,12 @@ export const Component = () => {
             href="/"
             className="flex items-center space-x-2 bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 mt-12 rounded transition duration-150 cursor-pointer"
             title="Return Home"
+            onClick={() => {
+              startLoading({ expectRouteChange: pathname !== '/' })
+              if (pathname === '/') {
+                stopAfterNextPaint()
+              }
+            }}
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"

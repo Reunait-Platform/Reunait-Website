@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://192.168.1.3:3001';
+const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL as string;
 
 export interface Case {
   _id: string;
@@ -22,10 +22,12 @@ export interface CaseDetail {
   age?: string | number;
   gender?: "male" | "female" | "other";
   status?: "missing" | "found" | "closed";
+  originalStatus?: "missing" | "found";
   city?: string;
   state?: string;
   country?: string;
   dateMissingFound?: string;
+  caseClosingDate?: string;
   description?: string;
   contactNumber?: string;
   reward?: number | string;
@@ -46,6 +48,9 @@ export interface CaseDetail {
   addedBy?: string;
   caseOwner?: string;
   lastSearched?: string;
+  canFlag?: boolean;
+  isCaseOwner?: boolean;
+  canCloseCase?: boolean;
   lastSearchedTime?: string;
   notifications?: Array<{
     message: string
@@ -126,6 +131,7 @@ export const fetchCases = async (params: CasesParams = {}): Promise<CasesRespons
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
+        'X-Include-Notifications': '1',
       },
     });
 
@@ -180,11 +186,20 @@ export const fetchCaseById = async (id: string, token?: string): Promise<CaseRes
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${API_BASE_URL}/cases/${id}`, {
+    const fetchOptions: any = {
       method: 'GET',
       headers,
-      // Invalidate caches to always get fresh data when navigating to detail
-      cache: 'no-store' as RequestCache,
+    }
+    // Use Next.js cache tags on the server; avoid stale client cache with no-store
+    if (typeof window === 'undefined') {
+      fetchOptions.next = { tags: [`case:${id}`] }
+    } else {
+      fetchOptions.cache = 'no-store' as RequestCache
+    }
+
+    const response = await fetch(`${API_BASE_URL}/cases/${id}`, {
+      ...fetchOptions,
+      headers: { ...(fetchOptions.headers || {}), 'X-Include-Notifications': '1' }
     });
 
     if (!response.ok) {
@@ -197,7 +212,7 @@ export const fetchCaseById = async (id: string, token?: string): Promise<CaseRes
     }
 
     const data = await response.json();
-      return data as CaseResponse;
+    return data as CaseResponse;
     })();
 
     cache.set(cacheKey, pending);

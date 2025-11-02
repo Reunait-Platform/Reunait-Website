@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from "react"
 import { useRouter } from "next/navigation"
+import { useTransition } from "react"
 import { useAuth, useUser } from "@clerk/nextjs"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
@@ -19,8 +20,10 @@ import { CountriesStatesService } from "@/lib/countries-states"
 import { useToast } from "@/contexts/toast-context"
 import { User, MapPin, Camera, FileText, Shield } from "lucide-react"
 import { ImageUploadDropzone } from "@/components/cases/image-upload-dropzone"
+import { PoliceStationAutocomplete } from "@/components/cases/police-station-autocomplete"
 import { countries } from "countries-list"
 import { MultiStepLoader as Loader } from "@/components/ui/multi-step-loader"
+import { SimpleLoader } from "@/components/ui/simple-loader"
 import { IconSquareRoundedX } from "@tabler/icons-react"
 
 // Loading states for multi-step loader
@@ -55,62 +58,97 @@ const loadingStates = [
 ];
 
 // Validation schema
+const normalize = (v?: string) => (v ?? "").replace(/\s+/g, " ").trim()
+
 const schema = z
   .object({
     // Personal Information
-    fullName: z.string().min(1, "Full name is required"),
-    age: z.string().min(1, "Age is required").regex(/^\d+$/, "Age must be a number"),
+    fullName: z.string()
+      .min(2, "Full name must be at least 2 characters")
+      .max(120, "Full name must be at most 120 characters")
+      .transform(normalize),
+    age: z.string()
+      .min(1, "Age is required")
+      .regex(/^\d+$/, "Age must be a number")
+      .refine((val) => {
+        const n = Number(val)
+        return Number.isFinite(n) && n >= 1 && n <= 150
+      }, "Age must be between 1 and 150"),
     gender: z.enum(["male", "female", "other"]),
-    contactNumber: z.string().min(8, "Enter a valid phone number"),
+    contactNumber: z.string().min(8, "Enter a valid phone number").max(20).transform(normalize),
     height: z.string().min(1, "Height is required"),
     complexion: z.string().min(1, "Complexion is required"),
     identificationMark: z.string().optional().refine((val) => {
       if (!val) return true
-      // Check character count (max 100 characters)
+      if (val.length < 3) return false
       if (val.length > 100) return false
-      // Allow only letters, numbers, spaces, commas, periods, and common punctuation
-      return /^[a-zA-Z0-9\s,.\-()]+$/.test(val)
-    }, "Maximum 100 characters allowed. Only letters, numbers, spaces, and basic punctuation"),
+      // Temporarily allow all characters to test
+      return true
+    }, "Must be 3–100 characters. Letters, numbers, punctuation, and spaces allowed"),
     
     // Case Details
     status: z.enum(["missing", "found"]),
     dateMissingFound: z.string().min(1, "Date is required"),
     description: z.string().optional().refine((val) => {
       if (!val) return true
-      // Check character count (max 250 characters)
+      if (val.length < 10) return false
       if (val.length > 250) return false
-      // Allow only letters, numbers, spaces, commas, periods, and common punctuation
-      return /^[a-zA-Z0-9\s,.\-()!?]+$/.test(val)
-    }, "Maximum 250 characters allowed. Only letters, numbers, spaces, and basic punctuation"),
+      // Temporarily allow all characters to test
+      return true
+    }, "Must be 10–250 characters. Letters, numbers, punctuation, and spaces allowed"),
     reward: z.string().optional().refine((val) => {
       if (!val) return true
-      // Only allow numbers (including decimals)
-      return /^\d+(\.\d{1,2})?$/.test(val)
-    }, "Reward amount must be a valid number"),
+      const v = (val || '').trim()
+      if (!/^\d+(?:\.\d+)?$/.test(v)) return false
+      const n = Number(v)
+      return Number.isFinite(n) && n >= 0 && n <= 999999999.99
+    }, "Reward must be a valid amount (numbers only, decimals allowed) up to 999,999,999.99"),
     
     // Location Information
-    address: z.string().min(1, "Address is required"),
-    country: z.string().min(1, "Country is required"),
-    state: z.string().optional(),
-    city: z.string().optional(),
-    pincode: z.string().min(1, "Pincode is required"),
+    address: z.string().min(8, "Address must be at least 8 characters").max(300, "Address must be at most 300 characters").transform(normalize),
+    country: z.string().min(1, "Country is required").max(64).transform(normalize),
+    state: z.string().max(64).transform(normalize).optional(),
+    city: z.string().max(64).transform(normalize).optional(),
+    postalCode: z.string()
+      .min(1, "Postal code is required")
+      .refine((val) => {
+        const v = (val || '').trim()
+        if (v.length < 3 || v.length > 12) return false
+        return /^[A-Za-z0-9 \-]+$/.test(v)
+      }, "Postal Code must be 3–12 characters (letters, numbers, spaces, hyphen)")
+      .transform(normalize),
     landMark: z.string().optional().refine((val) => {
       if (!val) return true
-      // Check character count (max 75 characters)
+      if (val.length < 3) return false
       if (val.length > 75) return false
       return true
-    }, "Maximum 75 characters allowed"),
+    }, "Must be 3–75 characters"),
     
     // Police Information
-    FIRNumber: z.string().min(1, "Case Reference Number is required"),
-    policeStationName: z.string().min(1, "Police Station Name is required"),
-    policeStationCountry: z.string().min(1, "Police station country is required"),
-    policeStationState: z.string().optional(),
-    policeStationCity: z.string().optional(),
-    policeStationPincode: z.string().min(1, "Police Station Postal Code is required"),
+    FIRNumber: z.string().optional().refine((val) => {
+      if (!val) return true
+      const v = (val || '').trim()
+      if (v.length < 2 || v.length > 50) return false
+      return /^[A-Za-z0-9 \-]+$/.test(v)
+    }, "Case Reference Number must contain only letters, numbers, dashes, and spaces (minimum 2 characters)"),
+    policeStationName: z.string().optional().refine((val) => {
+      if (!val) return true
+      const v = (val || '').trim()
+      return v.length >= 3 && v.length <= 120
+    }, "Police Station Name must be 3–120 characters"),
+    policeStationCountry: z.string().max(64).transform(normalize).optional(),
+    policeStationState: z.string().max(64).transform(normalize).optional(),
+    policeStationCity: z.string().max(64).transform(normalize).optional(),
+    policeStationPostalCode: z.string().optional().refine((val) => {
+      if (!val) return true
+      const v = (val || '').trim()
+      if (v.length < 3 || v.length > 12) return false
+      return /^[A-Za-z0-9 \-]+$/.test(v)
+    }, "Police Station Postal Code must be 3–12 characters (letters, numbers, spaces, hyphen)"),
+    policeStationId: z.string().optional(), // Selected station ID from autocomplete
     
     // Images
-    images: z.array(z.instanceof(File)).min(1, "At least 1 image is required").max(2, "Maximum 2 images allowed"),
+    images: z.array(z.instanceof(File)).min(2, "Exactly 2 images are required").max(2, "Exactly 2 images are required"),
     
     // Police bypass option
     bypassVerification: z.boolean().optional(),
@@ -134,7 +172,7 @@ const schema = z
     const selectedCity = (val.city || "").trim()
     
     // If any location field is filled, validate the cascading requirements
-    if (selectedCountry || selectedState || selectedCity || (val.pincode && val.pincode.trim())) {
+    if (selectedCountry || selectedState || selectedCity || (val.postalCode && val.postalCode.trim())) {
       // Country is always required for location
       if (!selectedCountry) {
         ctx.addIssue({ path: ["country"], code: z.ZodIssueCode.custom, message: "Country is required" })
@@ -157,29 +195,59 @@ const schema = z
       }
     }
 
-    // Police station location validation (same as onboarding)
+    // Police information rules based on status
+    const isMissing = val.status === 'missing'
     const selectedPoliceCountry = (val.policeStationCountry || "").trim()
     const selectedPoliceState = (val.policeStationState || "").trim()
     const selectedPoliceCity = (val.policeStationCity || "").trim()
-    
-    // If any police location field is filled, validate the cascading requirements
-    if (selectedPoliceCountry || selectedPoliceState || selectedPoliceCity || (val.policeStationPincode && val.policeStationPincode.trim())) {
-      // Police country is always required for police location
+
+    if (isMissing) {
+      // For missing cases: police info is mandatory (as before)
+      // FIR Number
+      const fir = (val.FIRNumber || '').trim()
+      if (!fir || fir.length < 2 || fir.length > 50 || !/^[A-Za-z0-9 \-]+$/.test(fir)) {
+        ctx.addIssue({ path: ["FIRNumber"], code: z.ZodIssueCode.custom, message: "Case reference number must contain only letters, numbers, dashes, and spaces (minimum 2 characters)" })
+      }
+      // Police Station Name
+      const psn = (val.policeStationName || '').trim()
+      if (!psn || psn.length < 3 || psn.length > 120) {
+        ctx.addIssue({ path: ["policeStationName"], code: z.ZodIssueCode.custom, message: "Police Station Name must be 3–120 characters" })
+      }
+      // Country/state/city cascading
       if (!selectedPoliceCountry) {
         ctx.addIssue({ path: ["policeStationCountry"], code: z.ZodIssueCode.custom, message: "Police station country is required" })
       } else {
-        // If police country is selected, check state requirement
         const availablePoliceStates = CountriesStatesService.getStates(selectedPoliceCountry)
         if (availablePoliceStates.length > 0) {
           if (!selectedPoliceState) {
             ctx.addIssue({ path: ["policeStationState"], code: z.ZodIssueCode.custom, message: "Police station state is required" })
           } else {
-            // If police state is selected, check city requirement
             const availablePoliceCities = CountriesStatesService.getCities(selectedPoliceCountry, selectedPoliceState)
-            if (availablePoliceCities.length > 0) {
-              if (!selectedPoliceCity) {
-                ctx.addIssue({ path: ["policeStationCity"], code: z.ZodIssueCode.custom, message: "Police station city is required" })
-              }
+            if (availablePoliceCities.length > 0 && !selectedPoliceCity) {
+              ctx.addIssue({ path: ["policeStationCity"], code: z.ZodIssueCode.custom, message: "Police station city is required" })
+            }
+          }
+        }
+      }
+      // Postal code
+      const pspc = (val.policeStationPostalCode || '').trim()
+      if (!pspc || pspc.length < 3 || pspc.length > 12 || !/^[A-Za-z0-9 \-]+$/.test(pspc)) {
+        ctx.addIssue({ path: ["policeStationPostalCode"], code: z.ZodIssueCode.custom, message: "Police Station Postal Code must be 3–12 characters (letters, numbers, spaces, hyphen)" })
+      }
+    } else {
+      // For found cases: police info optional, but if partially provided enforce cascading consistency
+      const anyPoliceProvided = selectedPoliceCountry || selectedPoliceState || selectedPoliceCity || (val.policeStationPostalCode && val.policeStationPostalCode.trim()) || val.FIRNumber || val.policeStationName
+      if (anyPoliceProvided) {
+        if (!selectedPoliceCountry) {
+          ctx.addIssue({ path: ["policeStationCountry"], code: z.ZodIssueCode.custom, message: "Police station country is required" })
+        } else {
+          const availablePoliceStates = CountriesStatesService.getStates(selectedPoliceCountry)
+          if (availablePoliceStates.length > 0 && !selectedPoliceState) {
+            ctx.addIssue({ path: ["policeStationState"], code: z.ZodIssueCode.custom, message: "Police station state is required" })
+          } else if (availablePoliceStates.length > 0) {
+            const availablePoliceCities = CountriesStatesService.getCities(selectedPoliceCountry, selectedPoliceState)
+            if (availablePoliceCities.length > 0 && !selectedPoliceCity) {
+              ctx.addIssue({ path: ["policeStationCity"], code: z.ZodIssueCode.custom, message: "Police station city is required" })
             }
           }
         }
@@ -214,9 +282,11 @@ export default function RegisterCasePage() {
   const { getToken } = useAuth()
   const { user } = useUser()
   const { showSuccess, showError } = useToast()
+  const [isPending, startTransition] = useTransition()
   const [submitting, setSubmitting] = useState(false)
   const [userProfile, setUserProfile] = useState<any>(null)
   const [loading, setLoading] = useState(false)
+  const [isNavigatingToCase, setIsNavigatingToCase] = useState(false)
 
   // Location state
   const [countries, setCountries] = useState<string[]>([])
@@ -230,6 +300,8 @@ export default function RegisterCasePage() {
   // Form setup
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
+    mode: "onChange",
+    reValidateMode: "onChange",
     defaultValues: {
       fullName: "",
       age: "",
@@ -246,19 +318,34 @@ export default function RegisterCasePage() {
       country: "",
       state: "",
       city: "",
-      pincode: "",
+      postalCode: "",
       landMark: "",
       FIRNumber: "",
       policeStationName: "",
       policeStationCountry: "",
       policeStationState: "",
       policeStationCity: "",
-      policeStationPincode: "",
+      policeStationPostalCode: "",
+      policeStationId: "",
       images: [],
       bypassVerification: false,
     },
-    mode: "onBlur",
   })
+
+  const shouldShowError = (name: keyof FormValues) => {
+    const errors: any = form.formState.errors
+    if (!errors?.[name]) return false
+    if (form.formState.isSubmitted) return true
+    const dirty: any = form.formState.dirtyFields
+    const touched: any = form.formState.touchedFields
+    // For police country and postal code, show only after touch or submit
+    if (name === 'policeStationCountry' || name === 'policeStationPostalCode') {
+      return !!touched?.[name]
+    }
+    if (dirty?.[name] || touched?.[name]) return true
+    const value: any = (form as any).getValues?.(name as any)
+    return value !== undefined && value !== null && String(value).length > 0
+  }
 
   // Set basic user data from Clerk
   useEffect(() => {
@@ -288,35 +375,131 @@ export default function RegisterCasePage() {
   // Police location watched values
   const watchedPoliceCountry = form.watch("policeStationCountry")
   const watchedPoliceState = form.watch("policeStationState")
+  const watchedPoliceCity = form.watch("policeStationCity")
+  
+  // Police station selection state
+  const [selectedPoliceStation, setSelectedPoliceStation] = useState<{
+    id: string
+    name: string
+    city: string
+    state: string
+    country: string
+  } | null>(null)
+  
+  // Memoize form state to prevent unnecessary re-renders
+  const formState = useMemo(() => form.formState, [form.formState.isValid, form.formState.errors, form.formState.isSubmitting])
+
+  // Ensure police section validity reflects in isValid when status is missing
+  useEffect(() => {
+    if (watchedStatus === 'missing') {
+      form.trigger([
+        'FIRNumber',
+        'policeStationName',
+        'policeStationCountry',
+        'policeStationState',
+        'policeStationCity',
+        'policeStationPostalCode',
+      ])
+    }
+  }, [watchedStatus, form])
+  
+  // Memoize event handlers to prevent unnecessary re-renders
+  const handleGenderChange = useCallback((value: string) => {
+    form.setValue("gender", value as FormValues["gender"], { shouldValidate: true, shouldTouch: true })
+  }, [form])
+  
+  const handleStatusChange = useCallback((value: string) => {
+    form.setValue("status", value as FormValues["status"], { shouldValidate: true, shouldTouch: true })
+  }, [form])
+  
+  const handleComplexionChange = useCallback((value: string) => {
+    form.setValue("complexion", value, { shouldValidate: true, shouldTouch: true })
+  }, [form])
+  
+  const handleCountryChange = useCallback((value: string) => {
+    form.setValue("country", value, { shouldValidate: true, shouldTouch: true })
+  }, [form])
+  
+  const handleStateChange = useCallback((value: string) => {
+    form.setValue("state", value, { shouldValidate: true, shouldTouch: true })
+  }, [form])
+  
+  const handleCityChange = useCallback((value: string) => {
+    form.setValue("city", value, { shouldValidate: true, shouldTouch: true })
+  }, [form])
+  
+  const handlePoliceCountryChange = useCallback((value: string) => {
+    form.setValue("policeStationCountry", value, { shouldValidate: true, shouldTouch: true })
+  }, [form])
+  
+  const handlePoliceStateChange = useCallback((value: string) => {
+    form.setValue("policeStationState", value, { shouldValidate: true, shouldTouch: true })
+  }, [form])
+  
+  const handlePoliceCityChange = useCallback((value: string) => {
+    form.setValue("policeStationCity", value, { shouldValidate: true, shouldTouch: true })
+  }, [form])
+  
+  const handleImagesChange = useCallback((images: File[]) => {
+    form.setValue("images", images, { shouldValidate: true, shouldTouch: true })
+  }, [form])
+  
+  const handleBypassChange = useCallback((checked: boolean) => {
+    form.setValue("bypassVerification", checked, { shouldValidate: true, shouldTouch: true })
+  }, [form])
   
   
+  // Reward inline hint replicating native step mismatch messaging
+  const [rewardHint, setRewardHint] = useState<string>("")
+  const computeRewardHint = useCallback((val: string) => {
+    const v = (val ?? "").trim()
+    if (!v) return ""
+    if (!/^\d+(?:\.\d+)?$/.test(v)) {
+      return "Please enter a valid value. Use numbers only (e.g., 100 or 100.50)."
+    }
+    const decimals = (v.split('.')[1] || '').length
+    if (decimals > 2) {
+      const n = Number(v)
+      const down = Math.floor(n * 100) / 100
+      const up = Math.ceil(n * 100) / 100
+      return `Please enter a valid value. The two nearest valid values are ${down.toFixed(2)} and ${up.toFixed(2)}.`
+    }
+    return ""
+  }, [])
+
 
   // Handle country change
   useEffect(() => {
     if (!watchedCountry) {
       setStates([])
       setCities([])
-      form.setValue("state", "", { shouldValidate: true })
-      form.setValue("city", "", { shouldValidate: true })
+      form.setValue("state", "", { shouldValidate: true, shouldTouch: true })
+      form.setValue("city", "", { shouldValidate: true, shouldTouch: true })
+      form.trigger(["state", "city"]) 
       return
     }
     const newStates = CountriesStatesService.getStates(watchedCountry)
     setStates(newStates)
     setCities([])
-    form.setValue("state", "", { shouldValidate: true })
-    form.setValue("city", "", { shouldValidate: true })
+    // Mark state/city as touched on cascade so required error surfaces inline
+    form.setValue("state", "", { shouldValidate: true, shouldTouch: true })
+    form.setValue("city", "", { shouldValidate: true, shouldTouch: true })
+    // Ensure resolver runs cross-field rules and surfaces errors immediately
+    form.trigger(["state", "city"]) 
   }, [watchedCountry, form])
 
   // Handle state change
   useEffect(() => {
     if (!watchedCountry || !watchedState) {
       setCities([])
-      form.setValue("city", "", { shouldValidate: true })
+      form.setValue("city", "", { shouldValidate: true, shouldTouch: true })
+      form.trigger("city")
       return
     }
     const newCities = CountriesStatesService.getCities(watchedCountry, watchedState)
     setCities(newCities)
-    form.setValue("city", "", { shouldValidate: true })
+    form.setValue("city", "", { shouldValidate: true, shouldTouch: true })
+    form.trigger("city")
   }, [watchedCountry, watchedState, form])
 
   // Handle police country change
@@ -324,27 +507,29 @@ export default function RegisterCasePage() {
     if (!watchedPoliceCountry) {
       setPoliceStates([])
       setPoliceCities([])
-      form.setValue("policeStationState", "", { shouldValidate: true })
-      form.setValue("policeStationCity", "", { shouldValidate: true })
+      form.setValue("policeStationState", "", { shouldValidate: true, shouldTouch: true })
+      form.setValue("policeStationCity", "", { shouldValidate: true, shouldTouch: true })
       return
     }
     const newPoliceStates = CountriesStatesService.getStates(watchedPoliceCountry)
     setPoliceStates(newPoliceStates)
     setPoliceCities([])
-    form.setValue("policeStationState", "", { shouldValidate: true })
-    form.setValue("policeStationCity", "", { shouldValidate: true })
+    form.setValue("policeStationState", "", { shouldValidate: true, shouldTouch: true })
+    form.setValue("policeStationCity", "", { shouldValidate: true, shouldTouch: true })
+    form.trigger(["policeStationState", "policeStationCity"]) 
   }, [watchedPoliceCountry, form])
 
   // Handle police state change
   useEffect(() => {
     if (!watchedPoliceCountry || !watchedPoliceState) {
       setPoliceCities([])
-      form.setValue("policeStationCity", "", { shouldValidate: true })
+      form.setValue("policeStationCity", "", { shouldValidate: true, shouldTouch: true })
       return
     }
     const newPoliceCities = CountriesStatesService.getCities(watchedPoliceCountry, watchedPoliceState)
     setPoliceCities(newPoliceCities)
-    form.setValue("policeStationCity", "", { shouldValidate: true })
+    form.setValue("policeStationCity", "", { shouldValidate: true, shouldTouch: true })
+    form.trigger("policeStationCity")
   }, [watchedPoliceCountry, watchedPoliceState, form])
 
 
@@ -352,7 +537,7 @@ export default function RegisterCasePage() {
   const calculateProgress = () => {
     const fields = [
       'fullName', 'age', 'gender', 'contactNumber', 'status', 'dateMissingFound',
-      'country', 'state', 'city', 'pincode', 'images'
+      'country', 'state', 'city', 'postalCode', 'images'
     ]
     const completedFields = fields.filter(field => {
       const value = form.watch(field as keyof FormValues)
@@ -384,16 +569,22 @@ export default function RegisterCasePage() {
             formData.append('images', file)
           })
         } else if (key === 'reward') {
-          // Handle reward specially - only send if user filled it, with currency suffix
+          // Send reward with currency code appended (e.g., "1000 INR")
           if (value !== undefined && value !== null && value !== "") {
             const currency = getCurrencyForCountry(values.country || "")
             formData.append(key, `${value} ${currency}`)
           }
-          // Don't send reward field if empty
         } else {
           // Send the value or default empty string for missing fields
           const fieldValue = (value !== undefined && value !== null && value !== "") ? value.toString() : ""
-          formData.append(key, fieldValue)
+          // Backward-compat key mapping (ensure correct backend keys)
+          if (key === 'postalCode') {
+            formData.append('postalCode', fieldValue)
+          } else if (key === 'policeStationPostalCode') {
+            formData.append('policeStationPostalCode', fieldValue)
+          } else {
+            formData.append(key, fieldValue)
+          }
         }
       })
 
@@ -403,7 +594,7 @@ export default function RegisterCasePage() {
       const userRole = userProfile?.role || 'general_user'
       formData.append('reportedBy', userRole)
 
-      const base = process.env.NEXT_PUBLIC_BACKEND_URL || "http://192.168.1.3:3001"
+      const base = process.env.NEXT_PUBLIC_BACKEND_URL as string
       const response = await fetch(`${base}/auth/registerCase`, {
         method: "POST",
         headers: {
@@ -415,12 +606,21 @@ export default function RegisterCasePage() {
       const data = await response.json()
       
       if (data.status === true) {
+        // Show success toast first
         showSuccess(data.message || "Case registered successfully!")
-        // Small delay to show the final loading state
-        setTimeout(() => {
-          setLoading(false)
+        
+        // Stop the multi-step loader immediately
+        setLoading(false)
+        
+        // Start our custom navigation state
+        setIsNavigatingToCase(true)
+        
+        // Use React 18+ startTransition for navigation
+        startTransition(() => {
           router.push(`/cases/${data.caseId}`)
-        }, 1000)
+        })
+        
+        return
       } else {
         setLoading(false)
         showError(data.message || "Failed to register case. Please try again.")
@@ -442,6 +642,13 @@ export default function RegisterCasePage() {
     <div className="container mx-auto px-4 sm:px-6 md:px-4 lg:px-8 py-10 lg:py-14 max-w-6xl">
       {/* Multi Step Loader */}
       <Loader loadingStates={loadingStates} loading={loading} duration={1500} />
+      
+      {/* Simple Navigation Loader - Next.js 15+ App Router */}
+      {(isPending || isNavigatingToCase) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 backdrop-blur-md">
+          <SimpleLoader />
+        </div>
+      )}
 
       <div className="w-full">
         {/* Form */}
@@ -455,7 +662,7 @@ export default function RegisterCasePage() {
               
             </div>
 
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8" style={{ pointerEvents: loading ? 'none' : 'auto', opacity: loading ? 0.5 : 1 }}>
+            <form noValidate onSubmit={form.handleSubmit(onSubmit)} className="space-y-8" style={{ pointerEvents: loading ? 'none' : 'auto', opacity: loading ? 0.5 : 1 }}>
               {/* Personal Information Section */}
               <Card>
                 <CardHeader>
@@ -474,10 +681,10 @@ export default function RegisterCasePage() {
                       id="fullName" 
                       placeholder="Enter full name" 
                       {...form.register("fullName")}
-                      aria-invalid={!!form.formState.errors.fullName}
+                      aria-invalid={shouldShowError("fullName")}
                     />
-                    {form.formState.errors.fullName && (
-                      <p className="text-xs text-destructive">{form.formState.errors.fullName.message}</p>
+                    {shouldShowError("fullName") && (
+                      <p className="text-xs text-destructive">{form.formState.errors.fullName?.message as any}</p>
                     )}
                   </div>
 
@@ -491,10 +698,10 @@ export default function RegisterCasePage() {
                         min="0"
                         max="150"
                         {...form.register("age")}
-                        aria-invalid={!!form.formState.errors.age}
+                        aria-invalid={shouldShowError("age")}
                       />
-                      {form.formState.errors.age && (
-                        <p className="text-xs text-destructive">{form.formState.errors.age.message}</p>
+                      {shouldShowError("age") && (
+                        <p className="text-xs text-destructive">{form.formState.errors.age?.message as any}</p>
                       )}
                     </div>
 
@@ -519,6 +726,9 @@ export default function RegisterCasePage() {
                           })}
                         </SelectContent>
                       </Select>
+                      {shouldShowError("height") && (
+                        <p className="text-xs text-destructive">{form.formState.errors.height?.message as any}</p>
+                      )}
                     </div>
                   </div>
 
@@ -528,7 +738,7 @@ export default function RegisterCasePage() {
                     <div className="block md:hidden">
                       <Select 
                         value={form.watch("gender")} 
-                        onValueChange={(v) => form.setValue("gender", v as FormValues["gender"], { shouldValidate: true })}
+                        onValueChange={handleGenderChange}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select gender" />
@@ -545,7 +755,7 @@ export default function RegisterCasePage() {
                     <div className="hidden md:block">
                       <RadioGroup
                         value={form.watch("gender")}
-                        onValueChange={(v) => form.setValue("gender", v as FormValues["gender"], { shouldValidate: true })}
+                        onValueChange={handleGenderChange}
                         className="flex flex-wrap gap-4"
                       >
                         {(() => {
@@ -581,15 +791,16 @@ export default function RegisterCasePage() {
                         onChange={(val: string) => form.setValue("contactNumber", val, { shouldValidate: true })}
                         defaultCountry="IN"
                         autoPrefixDialCode
+                        countryCallingCodeEditable={false}
                       />
-                      {form.formState.errors.contactNumber && (
-                        <p className="text-xs text-destructive">{form.formState.errors.contactNumber.message}</p>
+                      {shouldShowError("contactNumber") && (
+                        <p className="text-xs text-destructive">{form.formState.errors.contactNumber?.message as any}</p>
                       )}
                     </div>
 
                     <div className="space-y-2">
                       <Label htmlFor="complexion">Complexion *</Label>
-                      <Select value={form.watch("complexion") || ""} onValueChange={(v) => form.setValue("complexion", v, { shouldValidate: true })}>
+                      <Select value={form.watch("complexion") || ""} onValueChange={handleComplexionChange}>
                         <SelectTrigger>
                           <SelectValue placeholder="Select complexion" />
                         </SelectTrigger>
@@ -600,8 +811,8 @@ export default function RegisterCasePage() {
                           <SelectItem value="olive">Olive</SelectItem>
                         </SelectContent>
                       </Select>
-                      {form.formState.errors.complexion && (
-                        <p className="text-xs text-destructive">{form.formState.errors.complexion.message}</p>
+                      {shouldShowError("complexion") && (
+                        <p className="text-xs text-destructive">{form.formState.errors.complexion?.message as any}</p>
                       )}
                     </div>
                   </div>
@@ -615,6 +826,9 @@ export default function RegisterCasePage() {
                       {...form.register("identificationMark")}
                       rows={3}
                     />
+                    {shouldShowError("identificationMark") && (
+                      <p className="text-xs text-destructive">{form.formState.errors.identificationMark?.message as any}</p>
+                    )}
                     <p className="text-xs text-muted-foreground">
                       {form.watch("identificationMark")?.length || 0}/100 characters
                     </p>
@@ -641,7 +855,7 @@ export default function RegisterCasePage() {
                     <Label>Status *</Label>
                     <RadioGroup
                       value={form.watch("status")}
-                      onValueChange={(v) => form.setValue("status", v as FormValues["status"], { shouldValidate: true })}
+                      onValueChange={handleStatusChange}
                       className="flex flex-wrap gap-4"
                     >
                       {(() => {
@@ -686,8 +900,8 @@ export default function RegisterCasePage() {
                           />
                         )
                       })()}
-                      {form.formState.errors.dateMissingFound && (
-                        <p className="text-xs text-destructive">{form.formState.errors.dateMissingFound.message}</p>
+                      {shouldShowError("dateMissingFound") && (
+                        <p className="text-xs text-destructive">{form.formState.errors.dateMissingFound?.message as any}</p>
                       )}
                     </div>
 
@@ -696,15 +910,20 @@ export default function RegisterCasePage() {
                         <Label htmlFor="reward">Reward Amount</Label>
                         <Input 
                           id="reward" 
+                          inputMode="decimal"
                           type="number"
-                          min="0"
                           step="0.01"
+                          min="0"
                           placeholder="Enter reward amount (e.g., 1000)" 
                           {...form.register("reward")}
                           aria-invalid={!!form.formState.errors.reward}
+                          onChange={(e) => {
+                            form.setValue("reward", e.target.value, { shouldValidate: true })
+                            setRewardHint(computeRewardHint(e.target.value))
+                          }}
                         />
-                        {form.formState.errors.reward && (
-                          <p className="text-xs text-destructive">{form.formState.errors.reward.message}</p>
+                        {(shouldShowError("reward") || rewardHint) && (
+                          <p className="text-xs text-destructive">{(form.formState.errors.reward?.message as any) || rewardHint}</p>
                         )}
                       </div>
                     )}
@@ -719,6 +938,9 @@ export default function RegisterCasePage() {
                       {...form.register("description")}
                       rows={4}
                     />
+                    {shouldShowError("description") && (
+                      <p className="text-xs text-destructive">{form.formState.errors.description?.message as any}</p>
+                    )}
                     <p className="text-xs text-muted-foreground">
                       {form.watch("description")?.length || 0}/250 characters
                     </p>
@@ -750,18 +972,18 @@ export default function RegisterCasePage() {
                       id="address" 
                       placeholder="House No, Building, Street, Area" 
                       {...form.register("address")}
-                      aria-invalid={!!form.formState.errors.address}
+                      aria-invalid={shouldShowError("address")}
                     />
-                    {form.formState.errors.address && (
-                      <p className="text-xs text-destructive">{form.formState.errors.address.message}</p>
+                    {shouldShowError("address") && (
+                      <p className="text-xs text-destructive">{form.formState.errors.address?.message as any}</p>
                     )}
                   </div>
 
                   {/* Location grid matching onboarding layout */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-3">
-                      <Label>Country</Label>
-                      <Select value={form.watch("country") || ""} onValueChange={(v) => form.setValue("country", v, { shouldValidate: true })}>
+                      <Label>Country *</Label>
+                      <Select value={form.watch("country") || ""} onValueChange={handleCountryChange}>
                         <SelectTrigger className="h-10 w-full px-3 rounded-md border bg-background text-sm truncate cursor-pointer">
                           <SelectValue placeholder="Select country" />
                         </SelectTrigger>
@@ -773,13 +995,13 @@ export default function RegisterCasePage() {
                           ))}
                         </SelectContent>
                       </Select>
-                      {form.formState.errors.country && (
-                        <p className="text-xs text-destructive">{form.formState.errors.country.message}</p>
+                      {shouldShowError("country") && (
+                        <p className="text-xs text-destructive">{form.formState.errors.country?.message as any}</p>
                       )}
                     </div>
                     <div className="space-y-2">
                       <Label>State</Label>
-                      <Select value={form.watch("state") || ""} onValueChange={(v) => form.setValue("state", v, { shouldValidate: true })} disabled={!states.length}>
+                      <Select value={form.watch("state") || ""} onValueChange={handleStateChange} disabled={!states.length}>
                         <SelectTrigger className="h-10 w-full px-3 rounded-md border bg-background text-sm truncate cursor-pointer">
                           <SelectValue placeholder="Select state" />
                         </SelectTrigger>
@@ -791,13 +1013,13 @@ export default function RegisterCasePage() {
                           ))}
                         </SelectContent>
                       </Select>
-                      {form.formState.errors.state && (
-                        <p className="text-xs text-destructive">{form.formState.errors.state.message}</p>
+                      {shouldShowError("state") && (
+                        <p className="text-xs text-destructive">{form.formState.errors.state?.message as any}</p>
                       )}
                     </div>
                     <div className="space-y-3">
                       <Label>City</Label>
-                      <Select value={form.watch("city") || ""} onValueChange={(v) => form.setValue("city", v, { shouldValidate: true })} disabled={!cities.length}>
+                      <Select value={form.watch("city") || ""} onValueChange={handleCityChange} disabled={!cities.length}>
                         <SelectTrigger className="h-10 w-full px-3 rounded-md border bg-background text-sm truncate cursor-pointer">
                           <SelectValue placeholder="Select city" />
                         </SelectTrigger>
@@ -809,21 +1031,21 @@ export default function RegisterCasePage() {
                           ))}
                         </SelectContent>
                       </Select>
-                      {form.formState.errors.city && (
-                        <p className="text-xs text-destructive">{form.formState.errors.city.message}</p>
+                      {shouldShowError("city") && (
+                        <p className="text-xs text-destructive">{form.formState.errors.city?.message as any}</p>
                       )}
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="pincode">Postal code</Label>
+                    <Label htmlFor="postalCode">Postal code *</Label>
                       <Input 
-                        id="pincode" 
+                      id="postalCode" 
                         className="h-10 w-full"
                         placeholder="Enter postal code"
-                        {...form.register("pincode")}
-                        aria-invalid={!!form.formState.errors.pincode}
+                      {...form.register("postalCode")}
+                      aria-invalid={shouldShowError("postalCode")}
                       />
-                      {form.formState.errors.pincode && (
-                        <p className="text-xs text-destructive">{form.formState.errors.pincode.message}</p>
+                    {shouldShowError("postalCode") && (
+                      <p className="text-xs text-destructive">{form.formState.errors.postalCode?.message as any}</p>
                       )}
                     </div>
                   </div>
@@ -836,6 +1058,9 @@ export default function RegisterCasePage() {
                       maxLength={75}
                       {...form.register("landMark")}
                     />
+                    {shouldShowError("landMark") && (
+                      <p className="text-xs text-destructive">{form.formState.errors.landMark?.message as any}</p>
+                    )}
                     <p className="text-xs text-muted-foreground">
                       {form.watch("landMark")?.length || 0}/75 characters
                     </p>
@@ -855,9 +1080,9 @@ export default function RegisterCasePage() {
                   </p>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <ImageUploadDropzone
+                    <ImageUploadDropzone
                     images={form.watch("images")}
-                    onImagesChange={(images) => form.setValue("images", images, { shouldValidate: true })}
+                    onImagesChange={handleImagesChange}
                     error={form.formState.errors.images?.message}
                     maxImages={2}
                   />
@@ -868,7 +1093,7 @@ export default function RegisterCasePage() {
                         type="checkbox"
                         id="bypassVerification"
                         checked={form.watch("bypassVerification")}
-                        onChange={(e) => form.setValue("bypassVerification", e.target.checked)}
+                        onChange={(e) => handleBypassChange(e.target.checked)}
                         className="h-4 w-4 rounded border-primary text-primary focus:ring-primary"
                       />
                       <label
@@ -894,31 +1119,7 @@ export default function RegisterCasePage() {
                   </p>
                 </CardHeader>
                 <CardContent className="space-y-8">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label htmlFor="FIRNumber">Case Reference Number *</Label>
-                      <Input 
-                        id="FIRNumber" 
-                        placeholder="Enter case reference number" 
-                        {...form.register("FIRNumber")}
-                        aria-invalid={!!form.formState.errors.FIRNumber}
-                      />
-                      {form.formState.errors.FIRNumber && (
-                        <p className="text-xs text-destructive">{form.formState.errors.FIRNumber.message}</p>
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="policeStationName">Police Station Name *</Label>
-                      <Input 
-                        id="policeStationName" 
-                        placeholder="Enter police station name" 
-                        {...form.register("policeStationName")}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Police Station Location */}
+                  {/* Police Station Location (moved up) */}
                   <div className="space-y-4">
                     <h4 className="text-sm font-medium text-muted-foreground">Police Station Location</h4>
                     
@@ -927,7 +1128,7 @@ export default function RegisterCasePage() {
                         <Label htmlFor="policeStationCountry">Country *</Label>
                         <Select 
                           value={form.watch("policeStationCountry") || ""} 
-                          onValueChange={(v) => form.setValue("policeStationCountry", v, { shouldValidate: true })}
+                          onValueChange={handlePoliceCountryChange}
                         >
                           <SelectTrigger className="h-10 w-full px-3 rounded-md border bg-background text-sm truncate cursor-pointer">
                             <SelectValue placeholder="Select country" />
@@ -940,8 +1141,8 @@ export default function RegisterCasePage() {
                             ))}
                           </SelectContent>
                         </Select>
-                        {form.formState.errors.policeStationCountry && (
-                          <p className="text-xs text-destructive">{form.formState.errors.policeStationCountry.message}</p>
+                        {shouldShowError("policeStationCountry") && (
+                          <p className="text-xs text-destructive">{form.formState.errors.policeStationCountry?.message as any}</p>
                         )}
                       </div>
 
@@ -949,7 +1150,7 @@ export default function RegisterCasePage() {
                         <Label htmlFor="policeStationState">State</Label>
                         <Select 
                           value={form.watch("policeStationState") || ""} 
-                          onValueChange={(v) => form.setValue("policeStationState", v, { shouldValidate: true })}
+                          onValueChange={handlePoliceStateChange}
                           disabled={!watchedPoliceCountry || policeStates.length === 0}
                         >
                           <SelectTrigger className="h-10 w-full px-3 rounded-md border bg-background text-sm truncate cursor-pointer">
@@ -974,7 +1175,7 @@ export default function RegisterCasePage() {
                         <Label htmlFor="policeStationCity">City</Label>
                         <Select 
                           value={form.watch("policeStationCity") || ""} 
-                          onValueChange={(v) => form.setValue("policeStationCity", v, { shouldValidate: true })}
+                          onValueChange={handlePoliceCityChange}
                           disabled={!watchedPoliceCountry || !watchedPoliceState || policeCities.length === 0}
                         >
                           <SelectTrigger className="h-10 w-full px-3 rounded-md border bg-background text-sm truncate cursor-pointer">
@@ -994,17 +1195,69 @@ export default function RegisterCasePage() {
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="policeStationPincode">Postal Code *</Label>
+                        <Label htmlFor="policeStationPostalCode">Postal Code *</Label>
                         <Input 
-                          id="policeStationPincode" 
+                          id="policeStationPostalCode" 
                           placeholder="Enter postal code" 
-                          {...form.register("policeStationPincode")}
-                          aria-invalid={!!form.formState.errors.policeStationPincode}
+                          {...form.register("policeStationPostalCode")}
+                          aria-invalid={shouldShowError("policeStationPostalCode")}
+                          onChange={(e) => {
+                            form.setValue("policeStationPostalCode", e.target.value, { shouldValidate: true, shouldTouch: true })
+                            form.trigger("policeStationPostalCode")
+                          }}
                         />
-                        {form.formState.errors.policeStationPincode && (
-                          <p className="text-xs text-destructive">{form.formState.errors.policeStationPincode.message}</p>
+                        {shouldShowError("policeStationPostalCode") && (
+                          <p className="text-xs text-destructive">{form.formState.errors.policeStationPostalCode?.message as any}</p>
                         )}
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Reference details (moved below) */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="FIRNumber">Case Reference Number *</Label>
+                      <Input 
+                        id="FIRNumber" 
+                        placeholder="Enter case reference number" 
+                        {...form.register("FIRNumber")}
+                        aria-invalid={shouldShowError("FIRNumber")}
+                      />
+                      {shouldShowError("FIRNumber") && (
+                        <p className="text-xs text-destructive">{form.formState.errors.FIRNumber?.message as any}</p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="policeStationName">Police Station Name *</Label>
+                      <PoliceStationAutocomplete
+                        id="policeStationName" 
+                        value={form.watch("policeStationName") || ""}
+                        selectedStationId={form.watch("policeStationId") || null}
+                        onStationSelect={(station) => {
+                          if (station) {
+                            form.setValue("policeStationName", station.name, { shouldValidate: true })
+                            form.setValue("policeStationId", station.id, { shouldValidate: true })
+                            setSelectedPoliceStation(station)
+                          } else {
+                            form.setValue("policeStationId", "", { shouldValidate: true })
+                            setSelectedPoliceStation(null)
+                          }
+                        }}
+                        onInputChange={(value) => {
+                          form.setValue("policeStationName", value, { shouldValidate: true })
+                          if (selectedPoliceStation) {
+                            form.setValue("policeStationId", "", { shouldValidate: true })
+                            setSelectedPoliceStation(null)
+                          }
+                        }}
+                        country={watchedPoliceCountry || ""}
+                        state={watchedPoliceState || ""}
+                        city={watchedPoliceCity || ""}
+                        error={shouldShowError("policeStationName") ? (form.formState.errors.policeStationName?.message as string) : undefined}
+                        required={watchedStatus === "missing"}
+                        placeholder="Start typing to search police station..."
+                      />
                     </div>
                   </div>
                 </CardContent>
@@ -1015,7 +1268,7 @@ export default function RegisterCasePage() {
                 <Button 
                   type="submit" 
                   className="w-full h-12 text-base cursor-pointer" 
-                  disabled={submitting || loading || !form.formState.isValid}
+                  disabled={submitting || loading || !formState.isValid}
                 >
                   {submitting || loading ? "Registering Case..." : "Register Case"}
                 </Button>

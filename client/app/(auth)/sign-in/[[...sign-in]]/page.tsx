@@ -44,7 +44,9 @@ export default function SignInCatchAllPage() {
   })()
 
   // Check if user was redirected from register-case page
+  const origin = search?.get("origin") || ""
   const isFromRegisterCase = returnTo === "/register-case"
+  const isFromFlagCase = origin === "flag" && returnTo.startsWith("/cases/")
   const { isLoaded: isSignInLoaded, signIn, setActive } = useSignIn() as any
   const { getToken, sessionClaims, isSignedIn, isLoaded: isAuthLoaded } = useAuth()
 
@@ -95,6 +97,16 @@ export default function SignInCatchAllPage() {
 
   const routeBasedOnOnboarding = async () => {
     try {
+      // If user came from register-case, return there directly
+      if (isFromRegisterCase) {
+        router.replace(returnTo)
+        return
+      }
+      // If user came from flag flow on case detail, return directly to the case
+      if (isFromFlagCase) {
+        router.replace(returnTo)
+        return
+      }
       // Primary: Check Clerk metadata (use top-level sessionClaims to avoid hook misuse)
       const onboardingFromMetadata = getOnboardingStatus(sessionClaims)
       
@@ -108,24 +120,8 @@ export default function SignInCatchAllPage() {
         return
       }
       
-      // Fallback: API call if metadata missing
-      const token = await getToken()
-      if (!token) {
-        router.replace(`/onboarding?returnTo=${encodeURIComponent(returnTo)}`)
-        return
-      }
-      const base = process.env.NEXT_PUBLIC_BACKEND_URL || "http://192.168.1.3:3001"
-      const res = await fetch(`${base}/api/users/profile`, {
-        method: "GET",
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      const data = await res.json().catch(() => null)
-      const completed = res.ok && data?.data?.onboardingCompleted === true
-      if (completed) {
-        router.replace(returnTo)
-      } else {
-        router.replace(`/onboarding?returnTo=${encodeURIComponent(returnTo)}`)
-      }
+      // Fallback removed to avoid duplicate API calls; assume onboarding needed
+      router.replace(`/onboarding?returnTo=${encodeURIComponent(returnTo)}`)
     } catch (_) {
       router.replace(`/onboarding?returnTo=${encodeURIComponent(returnTo)}`)
     }
@@ -185,14 +181,16 @@ export default function SignInCatchAllPage() {
         document.body
       )}
       
-      <div className="container mx-auto px-4 sm:px-6 md:px-4 lg:px-8 py-16 flex justify-center">
+      <div className="container mx-auto px-4 sm:px-6 md:px-4 lg:px-8 py-8 sm:py-10 md:py-12 lg:py-14 flex justify-center">
       <div className="w-full max-w-md">
-        <div className="rounded-xl border border-border bg-card p-6 sm:p-7 shadow-sm">
-          <h1 className="text-2xl font-semibold tracking-tight text-center">Welcome back</h1>
-          <p className="text-sm text-muted-foreground mb-6 text-center">Sign in to continue</p>
+        <div className="rounded-xl border border-border bg-card p-6 sm:p-8 shadow-sm">
+          <div className="text-center mb-6">
+            <h1 className="text-2xl font-semibold tracking-tight">Welcome back</h1>
+            <p className="text-sm text-muted-foreground mt-2">Sign in to continue</p>
+          </div>
           
-          {isFromRegisterCase && (
-            <div className="mb-6 p-4 rounded-lg bg-blue-50 border border-blue-200 dark:bg-blue-950/20 dark:border-blue-800">
+          {(isFromRegisterCase || isFromFlagCase) && (
+            <div className="mb-8 p-5 rounded-lg bg-blue-50 border border-blue-200 dark:bg-blue-950/20 dark:border-blue-800">
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0">
                   <svg className="h-5 w-5 text-blue-600 dark:text-blue-400" fill="currentColor" viewBox="0 0 20 20">
@@ -200,66 +198,66 @@ export default function SignInCatchAllPage() {
                   </svg>
                 </div>
                 <div>
-                  <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200">Sign in to report a missing person</h3>
-                  <p className="mt-1 text-sm text-blue-700 dark:text-blue-300">Please sign in to access the missing person reporting form and help reunite families.</p>
+                  <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200">{isFromRegisterCase ? 'Sign in to report a missing person' : 'Sign in to flag a case'}</h3>
+                  <p className="mt-1 text-sm text-blue-700 dark:text-blue-300">{isFromRegisterCase ? 'Please sign in to access the missing person reporting form and help reunite families.' : 'Please sign in to report this case. Your report helps keep the platform safe.'}</p>
                 </div>
               </div>
             </div>
           )}
 
           {error && (
-            <div role="alert" aria-live="polite" className="mb-4 text-sm rounded-md border border-destructive/40 bg-destructive/10 text-destructive px-3 py-2">
+            <div role="alert" aria-live="polite" className="mb-6 text-sm rounded-md border border-destructive/40 bg-destructive/10 text-destructive px-4 py-3">
               {error}
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <div className="space-y-3">
+              <Label htmlFor="email" className="text-sm font-medium">Email</Label>
+              <Input id="email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required className="h-11" />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+            <div className="space-y-3">
+              <Label htmlFor="password" className="text-sm font-medium">Password</Label>
               <div className="relative">
-                <Input id="password" type={showPassword ? "text" : "password"} autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required className="pr-10" />
-                <button type="button" aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword((v) => !v)} className="absolute inset-y-0 right-2 flex items-center text-muted-foreground hover:text-foreground cursor-pointer">
+                <Input id="password" type={showPassword ? "text" : "password"} autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required className="pr-10 h-11" />
+                <button type="button" aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword((v) => !v)} className="absolute inset-y-0 right-3 flex items-center text-muted-foreground hover:text-foreground cursor-pointer">
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
-              <div className="flex justify-end">
+              <div className="flex justify-end pt-1">
                 <button 
                   onClick={handleForgotPasswordClick}
                   disabled={isNavigatingToReset}
-                  className="text-xs text-primary hover:underline cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
+                  className="text-sm text-primary hover:underline cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
                 >
                   Forgot password?
                 </button>
               </div>
             </div>
-            <Button type="submit" className="w-full h-10 cursor-pointer" disabled={loading || isAuthenticating} aria-busy={loading || isAuthenticating}>
+            <Button type="submit" className="w-full h-12 cursor-pointer text-base font-medium" disabled={loading || isAuthenticating} aria-busy={loading || isAuthenticating}>
               Sign In
             </Button>
           </form>
 
-          <CaptchaRegion className="mt-4 mb-2" />
+          <CaptchaRegion className="mt-4 mb-3" />
 
           <div className="my-4 flex items-center gap-3">
             <div className="h-px w-full bg-border" />
-            <span className="text-xs uppercase text-muted-foreground">or</span>
+            <span className="text-sm uppercase text-muted-foreground font-medium">or</span>
             <div className="h-px w-full bg-border" />
           </div>
 
-          <Button variant="outline" className="w-full h-10 gap-2 cursor-pointer" onClick={handleGoogle} disabled={isAuthenticating}>
+          <Button variant="outline" className="w-full h-12 gap-3 cursor-pointer text-base font-medium" onClick={handleGoogle} disabled={isAuthenticating}>
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" className="h-4 w-4"><path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12 s5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C33.64,6.053,29.084,4,24,4C12.955,4,4,12.955,4,24 s8.955,20,20,20s20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"/><path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,16.108,18.961,14,24,14c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657 C33.64,6.053,29.084,4,24,4C16.318,4,9.656,8.347,6.306,14.691z"/><path fill="#4CAF50" d="M24,44c5.136,0,9.747-1.971,13.261-5.188l-6.106-5.162C29.066,35.091,26.671,36,24,36 c-5.202,0-9.619-3.317-11.283-7.941l-6.49,5.002C9.627,39.556,16.315,44,24,44z"/><path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.236-2.231,4.166-4.106,5.65c0,0,0.001,0,0.001,0 l6.106,5.162C35.91,40.188,44,35,44,24C44,22.659,43.862,21.35,43.611,20.083z"/></svg>
             Continue with Google
           </Button>
 
-          <p className="mt-4 text-sm text-muted-foreground">
+          <p className="mt-6 text-center text-sm text-muted-foreground">
             Don&apos;t have an account? {" "}
             <button 
               onClick={handleSignUpClick}
               disabled={isNavigating}
-              className="text-primary hover:underline cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
+              className="text-primary hover:underline cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed font-medium"
             >
               Sign up
             </button>

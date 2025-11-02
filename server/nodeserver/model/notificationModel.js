@@ -4,21 +4,23 @@ const notificationSchema = new mongoose.Schema(
     {
         message: {
             type: String,
-            required: true
+            required: false
          },
          isRead: {
             type: Boolean,
             default: false
          },
+         isClickable: {
+            type: Boolean,
+            default: true
+         },
+         navigateTo: {
+            type: String,
+            default: null
+         },
          time: {
             type: Date,
             default: Date.now
-        },
-        ipAddress: {
-            type: String
-        },
-        phoneNumber: {
-            type: String
         }
     }
 );

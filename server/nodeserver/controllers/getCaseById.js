@@ -1,11 +1,21 @@
 import Case from "../model/caseModel.js";
 import { clerkClient } from "@clerk/express";
 import { getPresignedGetUrl } from "../services/s3Service.js";
+import User from "../model/userModel.js";
 import { config } from "../config/config.js";
+import mongoose from "mongoose";
 
 export const getCaseById = async (req, res) => {
   try {
     const { id } = req.params;
+
+    // Validate ObjectId format before querying database
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Case not found" 
+      });
+    }
 
     // Extract user role from Clerk public metadata (if authenticated)
     let userRole = 'general_user';
@@ -27,25 +37,101 @@ export const getCaseById = async (req, res) => {
       return res.status(404).json({ success: false, message: "Case not found" });
     }
 
-    // Filter notifications based on user role and case ownership
+    // Check if case should be shown (not closed or hidden)
+    // Allow police and case owners to see closed cases
+    
+    if (caseData.showCase === false && (userRole === 'general_user' || userRole === 'NGO')) {
+      return res.status(404).json({ success: false, message: "Case not found" });
+    }
+
+    // Check if case is flagged and should be hidden from public
+    if (caseData.isFlagged && (userRole === 'general_user' || userRole === 'NGO')) {
+      return res.status(404).json({ success: false, message: "Case not found" });
+    }
+
+    // Check if case is closed - only police and volunteers can see closed cases
+    if (caseData.status === 'closed' && userRole !== 'police' && userRole !== 'volunteer') {
+      return res.status(404).json({ success: false, message: "Case not found" });
+    }
+
+    // Build notifications from timelines for response compatibility
     let filteredNotifications = [];
-    if (caseData.notifications && caseData.notifications.length > 0) {
-      if (userRole === 'police') {
-        // Police users get full notifications with IP addresses and phone numbers
-        filteredNotifications = caseData.notifications.map(notification => ({
-          message: notification.message,
-          time: notification.time,
-          ipAddress: notification.ipAddress,
-          phoneNumber: notification.phoneNumber,
-          isRead: notification.isRead
-        }));
-      } else if (auth?.userId && caseData.addedBy?.clerkId === auth.userId) {
-        // Case owner gets notifications with phone number but no IP
-        filteredNotifications = caseData.notifications.map(notification => ({
-          message: "An update has been made to your case",
-          time: notification.time,
-          isRead: notification.isRead
-        }));
+    const sourceTimeline = Array.isArray(caseData.timelines) ? caseData.timelines : [];
+    if (sourceTimeline.length > 0) {
+      const viewerIsOwner = Boolean(auth?.userId) && String(caseData.caseOwner) === String(auth.userId);
+      if (userRole === 'police' || (userRole === 'volunteer' && !viewerIsOwner)) {
+        // Police and non-owner volunteers get full details (IP and phone)
+        filteredNotifications = sourceTimeline.map(notification => {
+          // Handle flag entries - check flagData first
+          let message = null;
+          if (notification.flagData) {
+            message = `Case flagged for ${notification.flagData.reason} by ${notification.flagData.userRole}`;
+          } else if (notification.message) {
+            message = notification.message;
+          }
+          
+          // Skip notifications without proper message
+          if (!message) {
+            return null;
+          }
+          
+          return {
+            message: message || "An update has been made to your case",
+            time: notification.time,
+            ipAddress: notification.ipAddress,
+            phoneNumber: notification.phoneNumber,
+            isRead: notification.isRead
+          };
+        }).filter(Boolean);
+      } else if (viewerIsOwner) {
+        // Case owner: no IP; phone only if owner is police or volunteer
+        const allowPhone = (userRole === 'police' || userRole === 'volunteer');
+        filteredNotifications = sourceTimeline.map(notification => {
+          // Handle flag entries - check flagData
+          let message = null;
+          if (notification.flagData) {
+            message = `Case flagged for ${notification.flagData.reason}`;
+          } else if (notification.message) {
+            message = notification.message;
+          }
+          
+          // Skip notifications without proper message
+          if (!message) {
+            return null;
+          }
+          
+          const shaped = {
+            message: message,
+            time: notification.time,
+            isRead: notification.isRead
+          };
+          if (allowPhone && notification.phoneNumber) {
+            shaped.phoneNumber = notification.phoneNumber;
+          }
+          return shaped;
+        }).filter(Boolean);
+      } else {
+        // General users get basic notifications without sensitive details
+        filteredNotifications = sourceTimeline.map(notification => {
+          // Handle flag entries - check flagData first since flag entries don't have message field
+          let message = null;
+          if (notification.flagData) {
+            message = `Case flagged for ${notification.flagData.reason}`;
+          } else if (notification.message) {
+            message = notification.message;
+          }
+          
+          // Skip notifications without proper message
+          if (!message) {
+            return null;
+          }
+          
+          return {
+            message: message,
+            time: notification.time,
+            isRead: notification.isRead
+          };
+        }).filter(Boolean);
       }
       // Other users get no notifications (privacy protection)
     }
@@ -57,7 +143,7 @@ export const getCaseById = async (req, res) => {
       for (let i = 1; i <= 2; i++) {
         const key = `${countryPath}/${caseData._id}_${i}.jpg`;
         try {
-          const imageUrl = await getPresignedGetUrl(config.awsBucketName, key, 180);
+          const imageUrl = await getPresignedGetUrl(config.awsBucketName, key, 300);
           imageUrls.push(imageUrl);
         } catch (error) {
           // Ignore failures for missing images
@@ -83,7 +169,7 @@ export const getCaseById = async (req, res) => {
           for (let i = 1; i <= 2; i++) {
             const key = `${countryPath}/${similarCase._id}_${i}.jpg`;
             try {
-              const imageUrl = await getPresignedGetUrl(config.awsBucketName, key, 180);
+              const imageUrl = await getPresignedGetUrl(config.awsBucketName, key, 3600);
               similarImageUrls.push(imageUrl);
             } catch (error) {
               // Ignore missing images
@@ -117,12 +203,37 @@ export const getCaseById = async (req, res) => {
       : null;
     
 
+    const isAuthenticated = !!(auth?.userId)
+    const alreadyFlaggedByUser = isAuthenticated && Array.isArray(caseData.flags) && caseData.flags.some(f => f.userId === auth.userId)
+    
+    // Updated isCaseOwner logic: police users OR actual case owners
+    const isCaseOwner = isAuthenticated && (
+      userRole === 'police' || 
+      String(caseData.caseOwner) === String(auth.userId)
+    )
+    
+    // canCloseCase logic: user must be authenticated and case ID must be in user's cases array
+    let canCloseCase = false
+    if (isAuthenticated) {
+      try {
+        const userDoc = await User.findOne({ clerkUserId: auth.userId }).select('cases').lean()
+        canCloseCase = Array.isArray(userDoc?.cases) && userDoc.cases.some((cId) => String(cId) === String(caseData._id))
+      } catch (e) {
+        canCloseCase = false
+      }
+    }
+    
+    const isFlaggableState = caseData.showCase !== false && caseData.status !== 'closed'
+    const canFlag = Boolean(isAuthenticated) && !alreadyFlaggedByUser && isFlaggableState
+
     const transformed = {
       _id: caseData._id,
       fullName: caseData.fullName,
       status: caseData.status,
+      originalStatus: caseData.originalStatus,
       dateMissingFound: caseData.dateMissingFound,
-      description: caseData.description,
+      caseClosingDate: caseData.caseClosingDate,
+      description: caseData.aiDescription,
       reward: caseData.reward,
       imageUrls,
       lastSearchedTime: modifiedLastSearchedTime,
@@ -136,6 +247,9 @@ export const getCaseById = async (req, res) => {
       caseOwner: caseData.caseOwner,
       similarCases,
       notifications: filteredNotifications.reverse(),
+      canFlag,
+      isCaseOwner,
+      canCloseCase,
       // Precomputed sections for direct rendering on the client
       sections: (() => {
         const sections = [];
@@ -167,19 +281,29 @@ export const getCaseById = async (req, res) => {
         if (caseData.gender) personalItems.push({ label: 'Gender', value: toStr(caseData.gender) });
         if (caseData.height) personalItems.push({ label: 'Height', value: toStr(caseData.height) });
         if (caseData.complexion) personalItems.push({ label: 'Complexion', value: toStr(caseData.complexion) });
-        if (caseData.identificationMark) personalItems.push({ label: 'Identification Mark', value: toStr(caseData.identificationMark) });
-        if (caseData.contactNumber) personalItems.push({ label: 'Contact Number', value: toStr(caseData.contactNumber) });
+        if (caseData.identificationMark) personalItems.push({ label: 'Identification Mark', value: toStr(caseData.identificationMark), fullWidth: true });
+        // Contact number will be shown in the Description section only
         if (personalItems.length) sections.push({ title: 'Personal Information', items: personalItems });
 
         // Case Details
         const caseDetailItems = [];
         if (caseData.status) caseDetailItems.push({ label: 'Status', value: String(caseData.status).charAt(0).toUpperCase() + String(caseData.status).slice(1) });
         if (caseData.dateMissingFound) {
-          const statusDateLabel = caseData.status === 'missing' ? 'Last Seen On' : (caseData.status === 'found' ? 'Found On' : 'Status Date');
-          caseDetailItems.push({ label: statusDateLabel, value: formatDate(caseData.dateMissingFound) });
+          // Always show the original date with appropriate label
+          const originalDateLabel = caseData.status === 'missing' ? 'Last Seen On' : (caseData.status === 'found' ? 'Found On' : 'Last Seen On');
+          caseDetailItems.push({ label: originalDateLabel, value: formatDate(caseData.dateMissingFound) });
+        }
+        
+        // Add closed date if case is closed
+        if (caseData.status === 'closed' && caseData.caseClosingDate) {
+          caseDetailItems.push({ label: 'Case Closed On', value: formatDate(caseData.caseClosingDate) });
         }
         if (caseData.reward) caseDetailItems.push({ label: 'Reward', value: toStr(caseData.reward) });
-        if (caseData.reportedBy) caseDetailItems.push({ label: 'Reported By', value: String(caseData.reportedBy).charAt(0).toUpperCase() + String(caseData.reportedBy).slice(1) });
+  
+        if (caseData.reportedBy) {
+          caseDetailItems.push({ label: 'Reported By', value: toStr(caseData.reportedBy) });
+        }
+
         if (typeof caseData.isAssigned === 'boolean') caseDetailItems.push({ label: 'Assigned', value: caseData.isAssigned ? 'Yes' : 'No' });
         if (caseData.addedBy) {
           const item = { 
@@ -199,10 +323,10 @@ export const getCaseById = async (req, res) => {
         // Location
         const locationItems = [];
         if (caseData.city) locationItems.push({ label: 'City', value: toStr(caseData.city) });
-        if (caseData.pincode) locationItems.push({ label: 'Pincode', value: toStr(caseData.pincode) });
+        if (caseData.postalCode) locationItems.push({ label: 'Postal code', value: toStr(caseData.postalCode) });
         if (caseData.state) locationItems.push({ label: 'State', value: toStr(caseData.state) });
         if (caseData.country) locationItems.push({ label: 'Country', value: toStr(caseData.country) });
-        if (caseData.landMark) locationItems.push({ label: 'Landmark', value: toStr(caseData.landMark) });
+        if (caseData.landMark) locationItems.push({ label: 'Landmark', value: toStr(caseData.landMark), fullWidth: true });
         if (locationItems.length) sections.push({ title: 'Location', items: locationItems });
 
         // Police Station
@@ -213,6 +337,7 @@ export const getCaseById = async (req, res) => {
         if (caseData.policeStationCity) policeStationItems.push({ label: 'Police Station City', value: toStr(caseData.policeStationCity) });
         if (caseData.policeStationState) policeStationItems.push({ label: 'Police Station State', value: toStr(caseData.policeStationState) });
         if (caseData.policeStationCountry) policeStationItems.push({ label: 'Police Station Country', value: toStr(caseData.policeStationCountry) });
+        if (caseData.policeStationPostalCode) policeStationItems.push({ label: 'Police Station Postal code', value: toStr(caseData.policeStationPostalCode) });
         if (policeStationItems.length) sections.push({ title: 'Police Station', items: policeStationItems });
 
         return sections;

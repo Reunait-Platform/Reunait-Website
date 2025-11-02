@@ -19,6 +19,7 @@ import { Shield, Clock, CheckCircle2 } from "lucide-react"
 import { DatePicker } from "@/components/ui/date-picker"
 import { SimpleLoader } from "@/components/ui/simple-loader"
 import { createPortal } from "react-dom"
+import { useNavigationLoader } from "@/hooks/use-navigation-loader"
 
 const schema = z
   .object({
@@ -102,6 +103,7 @@ export default function OnboardingPage() {
   const [reduceMotion, setReduceMotion] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [isPageLoading, setIsPageLoading] = useState(true)
+  const { isLoading: isNavigating, mounted: loaderMounted, startLoading } = useNavigationLoader()
 
   // Check if user was redirected from register-case page
   const isFromRegisterCase = returnTo === "/register-case"
@@ -258,7 +260,7 @@ export default function OnboardingPage() {
       // Debug logging to see what we're sending
       console.log("Sending onboarding payload:", payload)
 
-      const base = process.env.NEXT_PUBLIC_BACKEND_URL || "http://192.168.1.3:3001"
+      const base = process.env.NEXT_PUBLIC_BACKEND_URL as string
       const res = await fetch(`${base}/api/users/profile`, {
         method: "POST",
         headers: {
@@ -273,6 +275,8 @@ export default function OnboardingPage() {
         return
       }
       showSuccess("Profile completed. Welcome!")
+      // Start navigation loader and navigate
+      startLoading({ expectRouteChange: true })
       router.push(returnTo)
     } catch (e: any) {
       showError("Unable to save profile. Check your connection and try again.")
@@ -289,6 +293,14 @@ export default function OnboardingPage() {
     <>
       {/* Full Screen Loader with Background Blur (Portal to body) */}
       {mounted && isPageLoading && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 backdrop-blur-md">
+          <SimpleLoader />
+        </div>,
+        document.body
+      )}
+      
+      {/* Navigation Loader (Portal to body) */}
+      {loaderMounted && isNavigating && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 backdrop-blur-md">
           <SimpleLoader />
         </div>,

@@ -38,7 +38,7 @@ export default function TestimonialDialog() {
     setErrorMessage('')
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://192.168.1.3:3001'}/api/testimonials`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL as string}/api/testimonials`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -200,9 +200,9 @@ export default function TestimonialDialog() {
 
             {/* Info */}
             <div className="p-4 rounded-lg bg-muted/30 border border-border/30">
-              <Typography variant="small" className="text-muted-foreground">
-                💡 <strong>Tip:</strong> Click on the text areas above to start typing. Your testimonial will be reviewed before being published.
-              </Typography>
+            <Typography variant="small" className="text-muted-foreground">
+              💡 <strong>Tip:</strong> Click on the text areas above to start typing. Your testimonial helps us improve our platform.
+            </Typography>
             </div>
           </div>
         )}

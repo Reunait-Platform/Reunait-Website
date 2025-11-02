@@ -1,31 +1,5 @@
-import Redis from 'ioredis';
 import {config} from '../config/config.js';
-
-// Create Redis client with Redis Cloud credentials
-const redis = new Redis({
-    host: config.redis.host,
-    port: config.redis.port,
-    username: config.redis.username,
-    password: config.redis.password
-});
-
-// Handle Redis connection events
-redis.on('connect', () => {
-    console.log('Successfully connected to Redis Cloud');
-});
-
-redis.on('ready', () => {
-    console.log('Redis client is ready to use');
-});
-
-redis.on('error', (error) => {
-    console.error('Redis connection error:', error.message);
-    console.error('Redis connection details:', {
-        host: config.redis.host,
-        port: config.redis.port,
-        username: config.redis.username
-    });
-});
+import redis from '../services/redisClient.js';
 
 export const rateLimiter = async (req, res, next) => {
     try {

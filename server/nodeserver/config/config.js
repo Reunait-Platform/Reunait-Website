@@ -58,4 +58,8 @@ export const config = {
     
     // Logging
     logLevel: process.env.LOG_LEVEL || 'info',
+
+    // Google Gemini
+    geminiApiKey: process.env.GEMINI_API_KEY,
+    geminiModel: process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite',
 }; 

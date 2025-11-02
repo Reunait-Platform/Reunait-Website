@@ -24,7 +24,9 @@
     "@radix-ui/react-select": "^2.2.5",
     "@radix-ui/react-separator": "^1.1.7",
     "@radix-ui/react-slot": "^1.2.3",
+    "@radix-ui/react-tooltip": "^1.2.8",
     "@tabler/icons-react": "^3.34.1",
+    "@tanstack/react-table": "^8.21.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
@@ -32,6 +34,7 @@
     "countrycitystatejson": "^25.8.101",
     "date-fns": "^4.1.0",
     "dotenv": "^17.2.1",
+    "event-source-polyfill": "^1.0.31",
     "framer-motion": "^12.23.12",
     "input-otp": "^1.4.2",
     "lottie-react": "^2.4.1",
@@ -48,9 +51,11 @@
     "react-hook-form": "^7.62.0",
     "react-phone-number-input": "^3.4.12",
     "react-use-measure": "^2.1.7",
+    "react-virtuoso": "4.14.1",
     "simplex-noise": "^4.0.3",
     "tailwind-merge": "^3.3.1",
-    "zod": "^4.1.1"
+    "zod": "^4.1.1",
+    "zustand": "^5.0.8"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

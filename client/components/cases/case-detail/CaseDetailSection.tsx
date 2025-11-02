@@ -6,6 +6,7 @@ interface CaseDetailItem {
   label: string
   value?: string | null
   link?: string
+  fullWidth?: boolean
 }
 
 interface CaseDetailSection {
@@ -69,11 +70,11 @@ export function CaseDetailSection({ sections, status = 'success', onRetry }: Cas
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                 {validItems.map((item, index) => (
-                  <div key={index} className="space-y-1.5">
+                  <div key={index} className={`space-y-1.5 min-w-0 ${item.fullWidth ? 'sm:col-span-2' : ''}`}>
                     <div className="font-semibold">{item.label}</div>
-                    <div className="text-muted-foreground">
+                    <div className="text-muted-foreground break-words whitespace-pre-wrap leading-relaxed">
                       {item.link ? (
-                        <a href={item.link} className="text-primary hover:underline">
+                        <a href={item.link} className="text-primary hover:underline break-words">
                           {item.value}
                         </a>
                       ) : (

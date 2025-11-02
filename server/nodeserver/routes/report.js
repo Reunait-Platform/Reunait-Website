@@ -1,6 +1,8 @@
 import express from 'express';
+import { clerkClient } from '@clerk/express';
 import Case from '../model/caseModel.js';
 import User from '../model/userModel.js';
+import { broadcastNotification } from '../services/notificationBroadcast.js';
 
 const router = express.Router();
 
@@ -44,31 +46,67 @@ router.post('/report', async (req, res) => {
       });
     }
 
-    // Create notification object
-    const notification = {
-      message: message.trim(),
-      time: new Date(),
-      ipAddress: (req.headers["x-forwarded-for"]?.split(",")[0]?.trim()) || req.ip || req.connection.remoteAddress || 'Unknown',
-      phoneNumber: phoneNumber || null,
-      isRead: false
-    };
-
-    // Add notification to the case
+    // Append timeline event to the case (embedded)
+    const clientIp = (req.headers["x-forwarded-for"]?.split(",")[0]?.trim()) || req.ip || req.connection?.remoteAddress || 'Unknown'
     await Case.findByIdAndUpdate(caseId, {
-      $push: { notifications: notification }
+      $push: { timelines: { message: message.trim(), time: new Date(), ipAddress: clientIp, phoneNumber: phoneNumber || null } }
     });
 
     // Add notification to the case owner's user document
-    await User.findOneAndUpdate(
+    const notificationData = {
+      message: `New tip received for ${caseData.fullName}`,
+      time: new Date(),
+      isRead: false,
+      isClickable: true,
+      navigateTo: `/cases/${String(caseData._id)}`
+    };
+
+    const updatedUser = await User.findOneAndUpdate(
       { clerkUserId: caseData.caseOwner },
-      { $push: { notifications: notification } }
-    );
+      { $push: { notifications: notificationData } },
+      { new: true }
+    ).select('notifications').lean();
+
+    // Broadcast notification via SSE
+    if (updatedUser && updatedUser.notifications && updatedUser.notifications.length > 0) {
+      const newNotification = updatedUser.notifications[updatedUser.notifications.length - 1];
+      const unreadCount = (updatedUser.notifications || []).filter(n => !n.isRead).length;
+      try {
+        broadcastNotification(caseData.caseOwner, {
+          id: String(newNotification._id),
+          message: newNotification.message || '',
+          isRead: Boolean(newNotification.isRead),
+          isClickable: newNotification.isClickable !== false,
+          navigateTo: newNotification.navigateTo || null,
+          time: newNotification.time || null,
+          unreadCount,
+        });
+      } catch (error) {
+        console.error('Error broadcasting report notification:', error);
+        // Don't fail the request if broadcast fails
+      }
+    }
+
+    // Update Clerk metadata to increment unread count
+    try {
+      const user = await clerkClient.users.getUser(caseData.caseOwner);
+      const currentCount = user.publicMetadata?.unreadNotificationCount || 0;
+      
+      await clerkClient.users.updateUserMetadata(caseData.caseOwner, {
+        publicMetadata: {
+          ...user.publicMetadata,
+          unreadNotificationCount: currentCount + 1
+        }
+      });
+    } catch (error) {
+      console.error('Error updating Clerk metadata for notification:', error);
+      // Don't fail the request if metadata update fails
+    }
 
     // Return success response
     res.status(200).json({
       success: true,
-      message: 'Report submitted successfully',
-      reportId: `REP-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      message: 'Report submitted successfully'
     });
 
   } catch (error) {

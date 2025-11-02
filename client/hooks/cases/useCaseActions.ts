@@ -6,15 +6,17 @@ import { useAuth } from '@clerk/nextjs'
 
 interface UseCaseActionsProps {
   data: CaseDetail | null
+  initialNow?: number
 }
 
-export const useCaseActions = ({ data }: UseCaseActionsProps) => {
+export const useCaseActions = ({ data, initialNow }: UseCaseActionsProps) => {
   const [isReportInfoOpen, setIsReportInfoOpen] = useState(false)
   const [isAiSearchLoading, setIsAiSearchLoading] = useState(false)
-  const [currentTime, setCurrentTime] = useState(Date.now())
+  const [currentTime, setCurrentTime] = useState(initialNow ?? Date.now())
   const [lastSearchedTime, setLastSearchedTime] = useState<string | null>(data?.lastSearchedTime || null)
   const [similarCases, setSimilarCases] = useState<Case[]>(data?.similarCases || [])
   const [isSimilarDialogOpen, setIsSimilarDialogOpen] = useState(false)
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false)
   const { showSuccess, showError, showShare, showSearch, showRateLimit } = useToast()
   const { getToken, isLoaded, isSignedIn } = useAuth()
 
@@ -34,30 +36,80 @@ export const useCaseActions = ({ data }: UseCaseActionsProps) => {
 
   // Update current time every second for real-time countdown
   useEffect(() => {
+    // Align client time after mount to avoid hydration text mismatch
+    const start = setTimeout(() => setCurrentTime(Date.now()), 0)
     const timer = setInterval(() => {
       setCurrentTime(Date.now())
     }, 1000)
-
-    return () => clearInterval(timer)
+    return () => { clearTimeout(start); clearInterval(timer) }
   }, [])
 
   const handleShare = async () => {
     try {
-      const shareData = {
-        title: data?.fullName ? `${data.fullName} - Case details` : 'Case details',
-        text: data?.description || 'Please review this case.',
-        url: typeof window !== 'undefined' ? window.location.href : ''
+      const publicBase = process.env.NEXT_PUBLIC_SITE_URL || ''
+      const urlFromEnv = (publicBase && data?._id) ? `${publicBase.replace(/\/$/, '')}/cases/${data._id}` : ''
+      const url = urlFromEnv || (typeof window !== 'undefined' ? window.location.href : '')
+      const name = data?.fullName || 'Unknown person'
+      const status = data?.status ? String(data.status).toUpperCase() : 'UNKNOWN'
+      const gender = data?.gender ? String(data.gender).toUpperCase() : undefined
+      const age = data?.age ? String(data.age) : undefined
+      const date = data?.dateMissingFound ? new Date(data.dateMissingFound).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Unknown date'
+      const locationParts = [data?.city, data?.state, data?.country].filter(Boolean)
+      const location = locationParts.length ? locationParts.join(', ') : undefined
+      const reward = (data?.reward ? String(data.reward) : undefined)
+      const description = (data?.description || '').trim()
+      const descriptionShort = description ? (description.length > 200 ? description.slice(0, 197) + '…' : description) : undefined
+
+      const urlWithScheme = url
+        ? (url.startsWith('http://') || url.startsWith('https://') ? url : `http://${url}`)
+        : ''
+      const siteNameEnv = process.env.NEXT_PUBLIC_SITE_NAME || ''
+      let siteName = siteNameEnv
+      if (!siteName && urlWithScheme) {
+        try {
+          const host = new URL(urlWithScheme).hostname
+          siteName = host.replace(/^www\./, '')
+        } catch {}
       }
+      const lines: string[] = []
+      lines.push(`Case: ${name}`)
+      lines.push(`Status: ${status}`)
+      if (gender) lines.push(`Gender: ${gender}`)
+      if (age) lines.push(`Age: ${age}`)
+      lines.push(`Date: ${date}`)
+      if (location) lines.push(`Location: ${location}`)
+      if (reward) lines.push(`Reward: ${reward}`)
+      if (descriptionShort) {
+        lines.push('')
+        lines.push(descriptionShort)
+      }
+      if (urlWithScheme) {
+        lines.push('')
+        lines.push(`*View this case on ${siteName || 'our website'}:*`)
+        lines.push(urlWithScheme)
+      }
+      // (URL already added at the top)
+
+      const composedText = lines.join('\n')
+
+      const shareData = {
+        title: data?.fullName ? `Missing Person: ${data.fullName}` : 'Missing Person Case',
+        text: composedText,
+        url: urlWithScheme,
+      } as ShareData
       
+      // Try Web Share API first (Mobile native bottom sheet)
       if (navigator.share) {
         await navigator.share(shareData)
         showShare('Case shared successfully!')
-      } else if (navigator.clipboard) {
-        await navigator.clipboard.writeText(shareData.url)
-        showShare('Link copied to clipboard')
+        return
       }
+
+      // Desktop fallback - show custom share modal
+      setIsShareModalOpen(true)
     } catch (error) {
-      console.error('Share failed:', error)
+      // User cancelled or error - show fallback modal
+      setIsShareModalOpen(true)
     }
   }
 
@@ -189,6 +241,8 @@ export const useCaseActions = ({ data }: UseCaseActionsProps) => {
     isSimilarDialogOpen,
     setIsSimilarDialogOpen,
     openSimilarDialog,
+    isShareModalOpen,
+    setIsShareModalOpen,
   }
 }
 

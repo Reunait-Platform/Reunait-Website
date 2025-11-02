@@ -1,6 +1,6 @@
 import { HomepageResponse } from './homepage-types'
 
-const API_BASE_URL = process.env.BACKEND_URL || 'http://localhost:3001'
+const API_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL as string
 
 export class HomepageService {
   /**
@@ -13,8 +13,8 @@ export class HomepageService {
       headers: {
         'Content-Type': 'application/json',
       },
-        // ISR Configuration - Cache for 1 minute, then revalidate
-        next: { revalidate: 60 }
+        // Always fetch fresh homepage data
+        cache: 'no-store'
     })
 
     if (!response.ok) {

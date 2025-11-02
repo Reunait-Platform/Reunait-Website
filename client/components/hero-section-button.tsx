@@ -22,12 +22,37 @@ export default function HeroSectionButton({ casesRoute = '/cases' }: HeroSection
 
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault()
+    // Build destination with location query params from localStorage to avoid extra fetches
+    let destination = casesRoute
+    try {
+      if (typeof window !== 'undefined') {
+        const stored = window.localStorage.getItem('userLocation')
+        if (stored) {
+          const loc = JSON.parse(stored)
+          const country = loc?.country || 'India'
+          const state = loc?.state && loc.state !== 'Unknown' ? loc.state : null
+          const city = loc?.city && loc.city !== 'Unknown' ? loc.city : null
+          const sp = new URLSearchParams()
+          sp.set('page', '1')
+          sp.set('country', country)
+          if (state) sp.set('state', state)
+          if (city) sp.set('city', city)
+          destination = `${casesRoute}?${sp.toString()}`
+        } else {
+          const sp = new URLSearchParams()
+          sp.set('page', '1')
+          sp.set('country', 'India')
+          destination = `${casesRoute}?${sp.toString()}`
+        }
+      }
+    } catch {}
+
     startLoading({ expectRouteChange: pathname !== casesRoute })
     if (pathname === casesRoute) {
       // Same-route click: show loader briefly, then clear after next paint
       stopAfterNextPaint()
     } else {
-      router.push(casesRoute)
+      router.push(destination)
     }
   }
 

@@ -20,6 +20,9 @@ import {
 } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+// Context to propagate behavior flags to the input component
+const PhoneInputContext = React.createContext<{ countryCallingCodeEditable: boolean }>({ countryCallingCodeEditable: true });
+
 
 type PhoneInputProps = Omit<
   React.ComponentProps<"input">,
@@ -28,6 +31,7 @@ type PhoneInputProps = Omit<
   Omit<RPNInput.Props<typeof RPNInput.default>, "onChange"> & {
     onChange?: (value: RPNInput.Value) => void;
     autoPrefixDialCode?: boolean;
+    countryCallingCodeEditable?: boolean;
   };
 
 const PhoneInput: React.ForwardRefExoticComponent<PhoneInputProps> =
@@ -38,6 +42,7 @@ const PhoneInput: React.ForwardRefExoticComponent<PhoneInputProps> =
         onChange,
         value,
         autoPrefixDialCode = true,
+        countryCallingCodeEditable = false,
         defaultCountry = "IN",
         onCountryChange: userOnCountryChange,
         ...props
@@ -45,38 +50,36 @@ const PhoneInput: React.ForwardRefExoticComponent<PhoneInputProps> =
       ref,
     ) => {
       return (
-        <RPNInput.default
-          ref={ref}
-          className={cn("flex", className)}
-          flagComponent={FlagComponent}
-          countrySelectComponent={CountrySelect}
-          inputComponent={InputComponent}
-          smartCaret={false}
-          value={value || undefined}
-          defaultCountry={defaultCountry as RPNInput.Country}
-          international
-          onCountryChange={(country) => {
-            userOnCountryChange?.(country as RPNInput.Country);
-            if (autoPrefixDialCode && onChange && country) {
-              const code = `+${RPNInput.getCountryCallingCode(country as RPNInput.Country)}`;
-              const current = (value || "") as string;
-              if (!current || !current.startsWith("+")) {
-                onChange(code as RPNInput.Value);
+        <PhoneInputContext.Provider value={{ countryCallingCodeEditable }}>
+          <RPNInput.default
+            ref={ref}
+            className={cn("flex", className)}
+            flagComponent={FlagComponent}
+            countrySelectComponent={CountrySelect}
+            inputComponent={InputComponent}
+            smartCaret={true}
+            value={value || undefined}
+            defaultCountry={defaultCountry as RPNInput.Country}
+            international
+            countryCallingCodeEditable={countryCallingCodeEditable}
+            onCountryChange={(country) => {
+              userOnCountryChange?.(country as RPNInput.Country);
+              if (autoPrefixDialCode && onChange && country) {
+                const code = `+${RPNInput.getCountryCallingCode(country as RPNInput.Country)}`;
+                const current = (value || "") as string;
+                if (!current || !current.startsWith("+")) {
+                  onChange(code as RPNInput.Value);
+                }
               }
-            }
-          }}
-          /**
-           * Handles the onChange event.
-           *
-           * react-phone-number-input might trigger the onChange event as undefined
-           * when a valid phone number is not entered. To prevent this,
-           * the value is coerced to an empty string.
-           *
-           * @param {E164Number | undefined} value - The entered value
-           */
-          onChange={(value) => onChange?.(value || ("" as RPNInput.Value))}
-          {...props}
-        />
+            }}
+            /**
+             * Handles the onChange event.
+             * Coerce undefined to empty string for controlled input.
+             */
+            onChange={(value) => onChange?.(value || ("" as RPNInput.Value))}
+            {...props}
+          />
+        </PhoneInputContext.Provider>
       );
     },
   );
@@ -85,13 +88,146 @@ PhoneInput.displayName = "PhoneInput";
 const InputComponent = React.forwardRef<
   HTMLInputElement,
   React.ComponentProps<"input">
->(({ className, ...props }, ref) => (
-  <Input
-    className={cn("rounded-e-lg rounded-s-none h-10", className)}
-    {...props}
-    ref={ref}
-  />
-));
+>(({ className, onKeyDown, onBeforeInput, onPaste, value, ...props }, ref) => {
+  const { countryCallingCodeEditable } = React.useContext(PhoneInputContext);
+
+  // Determine the protected prefix length (e.g., "+91")
+  const getPrefixLength = (): number => {
+    const s = typeof value === "string" ? value : "";
+    const m = s.match(/^\+\d+/);
+    return m ? m[0].length : 0;
+  };
+
+  const handleKeyDown: React.KeyboardEventHandler<HTMLInputElement> = (e) => {
+    onKeyDown?.(e);
+    if (e.defaultPrevented) return;
+    if (countryCallingCodeEditable) return;
+    const input = e.currentTarget;
+    const prefixLen = getPrefixLength();
+    // Capture selection to restore accurately after library processing
+    const selStart = input.selectionStart ?? 0;
+    const selEnd = input.selectionEnd ?? selStart;
+    // Block typing/editing inside protected prefix
+    const isNavKey = ["ArrowLeft","ArrowRight","ArrowUp","ArrowDown","Home","End","Tab"].includes(e.key);
+    if (isNavKey) return;
+    // Prevent Backspace/Delete in prefix region
+    if (
+      (e.key === "Backspace" && selStart <= prefixLen) ||
+      (e.key === "Delete" && selStart < prefixLen) ||
+      // If selection overlaps prefix, prevent deleting prefix
+      (selStart < prefixLen && selEnd > selStart)
+    ) {
+      e.preventDefault();
+      // Move caret to immediately after prefix
+      input.setSelectionRange(prefixLen, prefixLen);
+      return;
+    }
+    // Block any character insertion inside prefix
+    if ((selStart < prefixLen || (selStart < prefixLen && selEnd > selStart)) && e.key.length === 1) {
+      e.preventDefault();
+      // Redirect insertion to immediately after prefix
+      const start = prefixLen;
+      input.setSelectionRange(start, start);
+      // Use modern API to insert text and move caret
+      try {
+        input.setRangeText(e.key, start, start, 'end');
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        // Keep caret after the inserted character
+        const newPos = start + e.key.length;
+        requestAnimationFrame(() => input.setSelectionRange(newPos, newPos));
+      } catch {
+        document.execCommand('insertText', false, e.key);
+      }
+      return;
+    }
+  };
+
+  const handleFocus: React.FocusEventHandler<HTMLInputElement> = (e) => {
+    if (countryCallingCodeEditable) return;
+    const input = e.currentTarget;
+    const prefixLen = getPrefixLength();
+    // Place caret at end of current value, but never before the prefix
+    setTimeout(() => {
+      const currentValue = typeof value === "string" ? value : input.value || "";
+      const desired = Math.max(prefixLen, currentValue.length);
+      input.setSelectionRange(desired, desired);
+    }, 0);
+  };
+
+  const handleBeforeInput: React.FormEventHandler<HTMLInputElement> = (e) => {
+    onBeforeInput?.(e as any);
+    if ((e as any).defaultPrevented) return;
+    if (countryCallingCodeEditable) return;
+    const input = e.currentTarget as HTMLInputElement;
+    const prefixLen = getPrefixLength();
+    const selStart = input.selectionStart ?? 0;
+    const selEnd = (input as any).selectionEnd ?? selStart;
+    if (selStart < prefixLen || (selStart < prefixLen && selEnd > selStart)) {
+      (e as any).preventDefault();
+      const data = (e as any).nativeEvent?.data ?? (e as any).data ?? '';
+      const start = prefixLen;
+      input.setSelectionRange(start, start);
+      try {
+        input.setRangeText(data, start, start, 'end');
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        const newPos = start + String(data).length;
+        requestAnimationFrame(() => input.setSelectionRange(newPos, newPos));
+      } catch {
+        document.execCommand('insertText', false, data);
+      }
+    }
+  };
+
+  const handlePaste: React.ClipboardEventHandler<HTMLInputElement> = (e) => {
+    onPaste?.(e);
+    if (e.defaultPrevented) return;
+    if (countryCallingCodeEditable) return;
+    const input = e.currentTarget;
+    const prefixLen = getPrefixLength();
+    const selStart = input.selectionStart ?? 0;
+    const selEnd = input.selectionEnd ?? selStart;
+    if (selStart < prefixLen || (selStart < prefixLen && selEnd > selStart)) {
+      e.preventDefault();
+      // Redirect paste immediately after prefix
+      const text = e.clipboardData.getData('text');
+      const start = prefixLen;
+      input.setSelectionRange(start, start);
+      try {
+        input.setRangeText(text, start, start, 'end');
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        const newPos = start + text.length;
+        requestAnimationFrame(() => input.setSelectionRange(newPos, newPos));
+      } catch {
+        document.execCommand('insertText', false, text);
+      }
+    }
+  };
+
+  const handleClick: React.MouseEventHandler<HTMLInputElement> = (e) => {
+    if (countryCallingCodeEditable) return;
+    const input = e.currentTarget;
+    const prefixLen = getPrefixLength();
+    const selStart = input.selectionStart ?? 0;
+    if (selStart < prefixLen) {
+      // Push caret to after the prefix for any clicks inside prefix
+      input.setSelectionRange(prefixLen, prefixLen);
+    }
+  };
+
+  return (
+    <Input
+      className={cn("rounded-e-lg rounded-s-none h-10", className)}
+      {...props}
+      value={value as any}
+      onKeyDown={handleKeyDown}
+      onBeforeInput={handleBeforeInput as any}
+      onPaste={handlePaste}
+      onFocus={handleFocus}
+      onClick={handleClick}
+      ref={ref}
+    />
+  );
+});
 InputComponent.displayName = "InputComponent";
 
 type CountryEntry = { label: string; value: RPNInput.Country | undefined };

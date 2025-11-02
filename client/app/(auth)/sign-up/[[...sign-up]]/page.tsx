@@ -221,19 +221,19 @@ export default function SignUpCatchAllPage() {
         document.body
       )}
       
-      <div className="container mx-auto px-4 sm:px-6 md:px-4 lg:px-8 py-16 flex justify-center">
+      <div className="container mx-auto px-4 sm:px-6 md:px-4 lg:px-8 py-8 sm:py-10 md:py-12 lg:py-14 flex justify-center">
       <div className="w-full max-w-md">
-        <div className="rounded-xl border border-border bg-card p-6 sm:p-7 shadow-sm">
+        <div className="rounded-xl border border-border bg-card p-6 sm:p-8 shadow-sm">
           {!pendingVerification ? (
-            <>
-              <h1 className="text-2xl font-semibold tracking-tight text-center">Create your free account</h1>
-              <p className="text-sm text-muted-foreground mb-6 text-center">Sign up to get started</p>
-            </>
+            <div className="text-center mb-6">
+              <h1 className="text-2xl font-semibold tracking-tight">Create your free account</h1>
+              <p className="text-sm text-muted-foreground mt-2">Sign up to get started</p>
+            </div>
           ) : (
-            <>
-              <h1 className="text-2xl font-semibold tracking-tight text-center">Verify your email</h1>
-              <p className="text-sm text-muted-foreground mb-6 text-center">Enter the 6‑digit code sent to {email || "your email"}</p>
-            </>
+            <div className="text-center mb-6">
+              <h1 className="text-2xl font-semibold tracking-tight">Verify your email</h1>
+              <p className="text-sm text-muted-foreground mt-2">Enter the 6‑digit code sent to {email || "your email"}</p>
+            </div>
           )}
 
           {/* Using toasts for feedback; inline error removed for consistency */}
@@ -242,28 +242,28 @@ export default function SignUpCatchAllPage() {
 
           {!pendingVerification ? (
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <div className="space-y-3">
+                <Label htmlFor="email" className="text-sm font-medium">Email</Label>
+                <Input id="email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required className="h-11" />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+              <div className="space-y-3">
+                <Label htmlFor="password" className="text-sm font-medium">Password</Label>
                 <div className="relative">
-                  <Input id="password" type={showPassword ? "text" : "password"} autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} required className="pr-10" />
-                  <button type="button" aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword((v) => !v)} className="absolute inset-y-0 right-2 flex items-center text-muted-foreground hover:text-foreground">
+                  <Input id="password" type={showPassword ? "text" : "password"} autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} required className="pr-10 h-11" />
+                  <button type="button" aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword((v) => !v)} className="absolute inset-y-0 right-3 flex items-center text-muted-foreground hover:text-foreground">
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
               </div>
               {/* CAPTCHA will mount in the dedicated region below */}
-              <Button type="submit" className="w-full h-10 cursor-pointer" disabled={loading || isAuthenticating} aria-busy={loading || isAuthenticating}>
+              <Button type="submit" className="w-full h-12 cursor-pointer text-base font-medium" disabled={loading || isAuthenticating} aria-busy={loading || isAuthenticating}>
                 Sign Up
               </Button>
             </form>
           ) : (
             <form onSubmit={handleVerify} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="code" className="block text-center">Verification code</Label>
+              <div className="space-y-4">
+                <Label htmlFor="code" className="block text-center text-sm font-medium">Verification code</Label>
                 <div className="flex justify-center">
                   <InputOTP maxLength={6} pattern="[0-9]*" value={code} onChange={setCode}>
                     <InputOTPGroup>
@@ -280,11 +280,11 @@ export default function SignUpCatchAllPage() {
                   </InputOTP>
                 </div>
               </div>
-              <div className="flex items-center justify-center gap-2">
+              <div className="flex items-center justify-center gap-2 pt-2">
                 {resendCooldown > 0 ? (
-                  <span className="text-xs text-muted-foreground">Resend code in {String(Math.floor(resendCooldown / 60)).padStart(1,'0')}:{String(resendCooldown % 60).padStart(2,'0')}</span>
+                  <span className="text-sm text-muted-foreground">Resend code in {String(Math.floor(resendCooldown / 60)).padStart(1,'0')}:{String(resendCooldown % 60).padStart(2,'0')}</span>
                 ) : (
-                  <Button type="button" variant="ghost" className="h-auto p-0 text-sm text-primary cursor-pointer" onClick={handleResend} disabled={resendLoading || isVerifying}>
+                  <Button type="button" variant="ghost" className="h-auto p-0 text-sm text-primary cursor-pointer font-medium" onClick={handleResend} disabled={resendLoading || isVerifying}>
                     {resendLoading ? "Resending..." : "Resend code"}
                   </Button>
                 )}
@@ -292,29 +292,29 @@ export default function SignUpCatchAllPage() {
             </form>
           )}
 
-          {!pendingVerification && <CaptchaRegion className="mt-4 mb-2" />}
+          {!pendingVerification && <CaptchaRegion className="mt-4 mb-3" />}
 
           {!pendingVerification && (
             <div className="my-4 flex items-center gap-3">
               <div className="h-px w-full bg-border" />
-              <span className="text-xs uppercase text-muted-foreground">or</span>
+              <span className="text-sm uppercase text-muted-foreground font-medium">or</span>
               <div className="h-px w-full bg-border" />
             </div>
           )}
 
           {!pendingVerification && (
-            <Button variant="outline" className="w-full h-10 gap-2 cursor-pointer" onClick={handleGoogle} disabled={isAuthenticating}>
+            <Button variant="outline" className="w-full h-12 gap-3 cursor-pointer text-base font-medium" onClick={handleGoogle} disabled={isAuthenticating}>
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" className="h-4 w-4"><path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12 s5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C33.64,6.053,29.084,4,24,4C12.955,4,4,12.955,4,24 s8.955,20,20,20s20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"/><path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,16.108,18.961,14,24,14c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657 C33.64,6.053,29.084,4,24,4C16.318,4,9.656,8.347,6.306,14.691z"/><path fill="#4CAF50" d="M24,44c5.136,0,9.747-1.971,13.261-5.188l-6.106-5.162C29.066,35.091,26.671,36,24,36 c-5.202,0-9.619-3.317-11.283-7.941l-6.49,5.002C9.627,39.556,16.315,44,24,44z"/><path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.236-2.231,4.166-4.106,5.65c0,0,0.001,0,0.001,0 l6.106,5.162C35.91,40.188,44,35,44,24C44,22.659,43.862,21.35,43.611,20.083z"/></svg>
               Continue with Google
             </Button>
           )}
 
-          <p className="mt-4 text-sm text-muted-foreground">
+          <p className="mt-6 text-center text-sm text-muted-foreground">
             Already have an account? {" "}
             <button 
               onClick={handleSignInClick}
               disabled={isNavigating}
-              className="text-primary hover:underline cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
+              className="text-primary hover:underline cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed font-medium"
             >
               Sign in
             </button>

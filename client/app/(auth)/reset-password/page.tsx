@@ -6,6 +6,7 @@ import { useRouter, useSearchParams, usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Eye, EyeOff } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/contexts/toast-context"
 import { InputOTP, InputOTPGroup, InputOTPSlot, InputOTPSeparator } from "@/components/ui/input-otp"
@@ -36,6 +37,22 @@ export default function ResetPasswordPage() {
   const [resendCooldown, setResendCooldown] = useState(0)
   const [isProcessing, setIsProcessing] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+
+  const getPasswordStrength = (value: string): { score: 0 | 1 | 2 | 3, label: string } => {
+    const hasLength = value.length >= 7
+    const hasCase = /[a-z]/.test(value) && /[A-Z]/.test(value)
+    const hasNumber = /\d/.test(value)
+    const hasSpecial = /[^A-Za-z0-9]/.test(value)
+    let s = 0
+    if (hasLength) s += 1
+    if (hasNumber || hasSpecial) s += 1
+    if (hasCase) s += 1
+    const score = Math.min(s, 3) as 0 | 1 | 2 | 3
+    const label = score === 0 ? "Very weak" : score === 1 ? "Weak" : score === 2 ? "Medium" : "Strong"
+    return { score, label }
+  }
 
   useEffect(() => {
     setMounted(true)
@@ -168,28 +185,39 @@ export default function ResetPasswordPage() {
         document.body
       )}
       
-      <div className="container mx-auto px-4 sm:px-6 md:px-4 lg:px-8 py-16 flex justify-center">
+      <div className="container mx-auto px-4 sm:px-6 md:px-4 lg:px-8 py-8 sm:py-10 md:py-12 lg:py-14 flex justify-center">
       <div className="w-full max-w-md">
-        <div className="rounded-xl border border-border bg-card p-6 sm:p-7 shadow-sm">
-          <h1 className="text-2xl font-semibold tracking-tight text-center">Reset your password</h1>
-          <p className="text-sm text-muted-foreground mb-6 text-center">We will send a verification code to your email</p>
+        <div className="rounded-2xl border border-border bg-card p-6 sm:p-8 shadow-lg">
+          <div className="text-center mb-6">
+            <h1 className="text-2xl font-semibold tracking-tight">Reset your password</h1>
+            <p className="text-sm text-muted-foreground mt-2">Enter your email to receive a verification code.</p>
+          </div>
+
+          <div className="mb-6">
+            <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+              <div className={`h-1 w-16 rounded-full ${step === "request" ? "bg-primary" : "bg-border"}`} />
+              <span>{step === "request" ? "Step 1 of 2" : "Step 2 of 2"}</span>
+              <div className={`h-1 w-16 rounded-full ${step === "verify" ? "bg-primary" : "bg-border"}`} />
+            </div>
+          </div>
 
           {/* Feedback provided via toasts for consistency */}
 
           {step === "request" ? (
-            <form onSubmit={requestCode} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <form onSubmit={requestCode} className="space-y-5">
+              <div className="space-y-3">
+                <Label htmlFor="email" className="text-sm font-medium">Email</Label>
+                <Input id="email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required className="h-11" />
+                <p className="text-xs text-muted-foreground">We’ll send a 6‑digit code to this email.</p>
               </div>
-              <Button type="submit" className="w-full h-10 cursor-pointer" disabled={loading || isProcessing || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !isLoaded}>
-                Send code
+              <Button type="submit" className="w-full h-11 cursor-pointer text-base font-medium" disabled={loading || isProcessing || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !isLoaded}>
+                Send verification code
               </Button>
             </form>
           ) : (
-            <form onSubmit={verifyAndReset} className="space-y-5">
-              <div className="space-y-2">
-                <Label htmlFor="code">Verification code</Label>
+            <form onSubmit={verifyAndReset} className="space-y-6">
+              <div className="space-y-3">
+                <Label htmlFor="code" className="text-sm font-medium">Verification code</Label>
                 <div className="flex justify-center">
                   <InputOTP maxLength={6} pattern="[0-9]*" value={code} onChange={setCode}>
                     <InputOTPGroup>
@@ -208,51 +236,75 @@ export default function ResetPasswordPage() {
               </div>
               {code.replace(/\D/g, "").length === 6 && (
                 <>
-                  <div className="space-y-2">
-                    <Label htmlFor="password">New password</Label>
-                    <Input
-                      id="password"
-                      type={showPassword ? "text" : "password"}
-                      autoComplete="new-password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      aria-invalid={password.length > 0 && password.length < 7}
-                      aria-describedby="password-help"
-                      className={(password.length > 0 && password.length < 7) ? "border-destructive focus-visible:ring-destructive/30" : undefined}
-                    />
+                  <div className="space-y-3">
+                    <Label htmlFor="password" className="text-sm font-medium">New password</Label>
+                    <div className="relative">
+                      <Input
+                        id="password"
+                        type={showNewPassword ? "text" : "password"}
+                        autoComplete="new-password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        aria-invalid={password.length > 0 && password.length < 7}
+                        aria-describedby="password-help"
+                        className={(password.length > 0 && password.length < 7) ? "border-destructive focus-visible:ring-destructive/30 h-11 pr-10" : "h-11 pr-10"}
+                      />
+                      <button type="button" aria-label={showNewPassword ? "Hide password" : "Show password"} onClick={() => setShowNewPassword(v => !v)} className="absolute inset-y-0 right-3 flex items-center text-muted-foreground hover:text-foreground cursor-pointer">
+                        {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
                     {password.length > 0 && password.length < 7 && (
                       <p id="password-help" className="text-xs text-destructive mt-1">Minimum 7 characters.</p>
                     )}
+                    {password.length > 0 && (
+                      <div className="mt-1 flex items-center gap-2">
+                        {(() => { const s = getPasswordStrength(password); return (
+                          <>
+                            <div className="flex items-center gap-1">
+                              <span className={`h-1.5 w-8 rounded ${s.score >= 1 ? 'bg-green-500' : 'bg-border'}`} />
+                              <span className={`h-1.5 w-8 rounded ${s.score >= 2 ? 'bg-green-500' : 'bg-border'}`} />
+                              <span className={`h-1.5 w-8 rounded ${s.score >= 3 ? 'bg-green-500' : 'bg-border'}`} />
+                            </div>
+                            <span className="text-xs text-muted-foreground">{s.label}</span>
+                          </>
+                        )})()}
+                      </div>
+                    )}
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="confirmPassword">Confirm password</Label>
-                    <Input
-                      id="confirmPassword"
-                      type={showPassword ? "text" : "password"}
-                      autoComplete="new-password"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      aria-invalid={confirmPassword.length > 0 && confirmPassword !== password}
-                      aria-describedby="confirm-help"
-                      className={(confirmPassword.length > 0 && confirmPassword !== password) ? "border-destructive focus-visible:ring-destructive/30" : undefined}
-                    />
+                  <div className="space-y-3">
+                    <Label htmlFor="confirmPassword" className="text-sm font-medium">Confirm password</Label>
+                    <div className="relative">
+                      <Input
+                        id="confirmPassword"
+                        type={showConfirmPassword ? "text" : "password"}
+                        autoComplete="new-password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        aria-invalid={confirmPassword.length > 0 && confirmPassword !== password}
+                        aria-describedby="confirm-help"
+                        className={(confirmPassword.length > 0 && confirmPassword !== password) ? "border-destructive focus-visible:ring-destructive/30 h-11 pr-10" : "h-11 pr-10"}
+                      />
+                      <button type="button" aria-label={showConfirmPassword ? "Hide password" : "Show password"} onClick={() => setShowConfirmPassword(v => !v)} className="absolute inset-y-0 right-3 flex items-center text-muted-foreground hover:text-foreground cursor-pointer">
+                        {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
                     {confirmPassword.length > 0 && confirmPassword !== password && (
                       <p id="confirm-help" className="text-xs text-destructive mt-1">Passwords do not match.</p>
                     )}
                   </div>
                 </>
               )}
-              <div className="flex items-center justify-between">
-                <Link href="/sign-in" className="text-xs text-muted-foreground hover:text-foreground cursor-pointer">Back to sign in</Link>
-                <Button type="submit" className="h-10 cursor-pointer" disabled={loading || isProcessing || code.replace(/\D/g, "").length !== 6 || password.length < 7 || password !== confirmPassword || !isLoaded}>
+              <div className="flex items-center justify-between pt-1">
+                <Link href="/sign-in" className="text-sm text-muted-foreground hover:text-foreground cursor-pointer">Back to sign in</Link>
+                <Button type="submit" className="h-11 cursor-pointer text-base font-medium" disabled={loading || isProcessing || code.replace(/\D/g, "").length !== 6 || password.length < 7 || password !== confirmPassword || !isLoaded}>
                   Reset password
                 </Button>
               </div>
               <div className="flex items-center justify-center">
                 {resendCooldown > 0 ? (
-                  <span className="text-xs text-muted-foreground text-center">Resend code in {String(Math.floor(resendCooldown / 60)).padStart(1, '0')}:{String(resendCooldown % 60).padStart(2, '0')}</span>
+                  <span className="text-sm text-muted-foreground text-center">Resend code in {String(Math.floor(resendCooldown / 60)).padStart(1, '0')}:{String(resendCooldown % 60).padStart(2, '0')}</span>
                 ) : (
-                  <Button type="button" variant="ghost" className="h-auto p-0 text-sm text-primary cursor-pointer" onClick={resendCode} disabled={resendLoading || isProcessing}>
+                  <Button type="button" variant="ghost" className="h-auto p-0 text-sm text-primary cursor-pointer font-medium" onClick={resendCode} disabled={resendLoading || isProcessing}>
                     {resendLoading ? "Resending..." : "Resend code"}
                   </Button>
                 )}

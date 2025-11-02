@@ -2,15 +2,42 @@
 // This endpoint is public and doesn't require authentication
 
 import HomepageSection from '../model/homepageModel.js';
+import redis from '../services/redisClient.js';
 
 export const getHomepageData = async (req, res) => {
     try {
-        // Fetch homepage data from MongoDB
+        // Redis keys
+        const CACHE_KEY = 'homepage:cache';
+        const ENABLED_KEY = 'homepage:cache:enabled';
+
+        // Check if cache is enabled and present
+        try {
+            const enabled = await redis.get(ENABLED_KEY);
+            if (enabled === 'true') {
+                const cached = await redis.get(CACHE_KEY);
+                if (cached) {
+                    const json = JSON.parse(cached);
+                    return res.status(200).json(json);
+                }
+            }
+        } catch (e) {
+            // On Redis error, fall back to DB fetch
+            console.error('Homepage cache read error:', e?.message || e);
+        }
+
+        // Fetch homepage data from MongoDB (fresh)
         const homepageData = await HomepageSection.getHomepageData();
 
-        // Set cache headers for better performance
+        // Write to Redis (best-effort)
+        try {
+            await redis.set(CACHE_KEY, JSON.stringify(homepageData));
+            await redis.set(ENABLED_KEY, 'true');
+        } catch (e) {
+            console.error('Homepage cache write error:', e?.message || e);
+        }
+
+        // CORS headers (no HTTP cache headers to keep response always fresh via Redis policy)
         res.set({
-            'Cache-Control': 'public, max-age=300, s-maxage=600', // Cache for 5 minutes
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Methods': 'GET',
             'Access-Control-Allow-Headers': 'Content-Type',

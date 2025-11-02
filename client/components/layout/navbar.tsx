@@ -1,58 +1,57 @@
 'use client'
 import Link from 'next/link'
 import { Logo } from '@/components/logo'
-import { Menu, X, Plus, Bell, CupSoda, MapPin } from 'lucide-react'
+import { Menu, X, Plus, CupSoda, Bell } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/theme-toggle'
-import { SignedIn, SignedOut } from '@clerk/nextjs'
+import { SignedIn, SignedOut, useAuth } from '@clerk/nextjs'
 import { AccountMenu } from '@/components/account-menu'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { LocationService } from '@/lib/location'
+import NotificationsPopover from '@/components/notifications/NotificationsPopover'
 import React, { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { useNavigationLoader } from '@/hooks/use-navigation-loader'
 import { createPortal } from 'react-dom'
 import { SimpleLoader } from '@/components/ui/simple-loader'
-import { useNavigationLoader } from '@/hooks/use-navigation-loader'
+import { useNotificationsStore } from '@/providers/notifications-store-provider'
 
 export function Navbar() {
     const [menuState, setMenuState] = React.useState(false)
     const [isScrolled, setIsScrolled] = React.useState(false)
-    const [savedLocation, setSavedLocation] = React.useState<{ city: string; state: string } | null>(null)
-    const router = useRouter()
-    const pathname = usePathname()
-    const searchParams = useSearchParams()
-    const { isLoading, mounted, startLoading, stopLoading } = useNavigationLoader()
+    const expandedContainerRef = React.useRef<HTMLDivElement | null>(null)
+	const [expandedHeight, setExpandedHeight] = React.useState(0)
+	const EXPANDED_MARGIN_COMP = 20 // px to compensate internal margins (divider my-2 + row mb-3)
+const router = useRouter()
+const pathname = usePathname()
+const searchParams = useSearchParams()
+const { isLoading, mounted, startLoading, stopLoading } = useNavigationLoader()
 
-    const stopAfterNextPaint = React.useCallback(() => {
-        // Ensure the loader is visible for at least one paint, then hide
-        requestAnimationFrame(() => requestAnimationFrame(() => stopLoading()))
-    }, [stopLoading])
+const stopAfterNextPaint = React.useCallback(() => {
+    requestAnimationFrame(() => requestAnimationFrame(() => stopLoading()))
+}, [stopLoading])
 
-	const handleButtonClick = (href: string) => {
-		const isSameRoute = pathname === href
-		const isAuthPage = pathname?.startsWith('/sign-in') || pathname?.startsWith('/sign-up')
-		const goingToRegisterCase = href === '/register-case'
-		const goingToSignIn = href === '/sign-in'
-		const currentReturnTo = searchParams?.get('returnTo') || searchParams?.get('returnBackUrl') || searchParams?.get('redirect_url')
-		const hasReturnParam = Boolean(currentReturnTo)
-		const alreadyOnAuthWithReturnToRegister = isAuthPage && goingToRegisterCase && currentReturnTo === '/register-case'
+const handleButtonClick = React.useCallback((href: string) => {
+    const isSameRoute = pathname === href
+    const isAuthPage = pathname?.startsWith('/sign-in') || pathname?.startsWith('/sign-up')
+    const goingToRegisterCase = href === '/register-case'
+    const goingToSignIn = href === '/sign-in'
+    const currentReturnTo = searchParams?.get('returnTo') || searchParams?.get('returnBackUrl') || searchParams?.get('redirect_url')
+    const hasReturnParam = Boolean(currentReturnTo)
+    const alreadyOnAuthWithReturnToRegister = isAuthPage && goingToRegisterCase && currentReturnTo === '/register-case'
 
-		// Treat as same-route in normal same-path cases and the auth→register-case loop case
-		let treatAsSameRoute = isSameRoute || alreadyOnAuthWithReturnToRegister
-		// But if we're on sign-in with return params and the user explicitly clicks Sign in,
-		// we should navigate to clean /sign-in (no params) to show generic sign-in.
-		if (pathname === '/sign-in' && goingToSignIn && hasReturnParam) {
-			treatAsSameRoute = false
-		}
+    let treatAsSameRoute = isSameRoute || alreadyOnAuthWithReturnToRegister
+    if (pathname === '/sign-in' && goingToSignIn && hasReturnParam) {
+        treatAsSameRoute = false
+    }
 
-		startLoading({ expectRouteChange: !treatAsSameRoute })
-		if (treatAsSameRoute) {
-			stopAfterNextPaint()
-			return
-		}
-		router.push(href)
-	}
+    startLoading({ expectRouteChange: !treatAsSameRoute })
+    if (treatAsSameRoute) {
+        stopAfterNextPaint()
+        return
+    }
+    router.push(href)
+}, [pathname, router, searchParams, startLoading, stopAfterNextPaint])
 
     React.useEffect(() => {
         const handleScroll = () => {
@@ -62,26 +61,45 @@ export function Navbar() {
         return () => window.removeEventListener('scroll', handleScroll)
     }, [])
 
+    // Popover handles its own open state
+    const notifications = useNotificationsStore(s => s.notifications)
+    const unreadCount = useNotificationsStore(s => s.unreadCount)
+    const enqueueRead = useNotificationsStore(s => s.enqueueRead)
+    const flushPendingReads = useNotificationsStore(s => s.flushPendingReads)
+    const markAllReadOptimistic = useNotificationsStore(s => s.markAllReadOptimistic)
+    const setLastSeenAt = useNotificationsStore(s => s.setLastSeenAt)
+    const { getToken } = useAuth()
+
     React.useEffect(() => {
-        const loc = LocationService.getSavedLocation?.()
-        if (loc) setSavedLocation(loc)
-    }, [])
+        const measure = () => {
+            if (menuState && expandedContainerRef.current) {
+                setExpandedHeight(expandedContainerRef.current.offsetHeight)
+            } else {
+                setExpandedHeight(0)
+            }
+        }
+        // Measure after DOM updates
+        requestAnimationFrame(measure)
+        window.addEventListener('resize', measure)
+        return () => window.removeEventListener('resize', measure)
+    }, [menuState])
 
     return (
-        <>
+        <header>
             {/* Full Screen Loader with Background Blur (Portal to body) */}
             {isLoading && mounted && createPortal(
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 backdrop-blur-md">
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/70">
                     <SimpleLoader />
                 </div>,
                 document.body
             )}
-            
-            <header>
             <nav
                 data-state={menuState && 'active'}
                 className={cn("fixed z-50 w-full px-2", !isScrolled && "border-b border-border/100")}>
-                <div className={cn('mx-auto mt-2 w-full md:max-w-none lg:max-w-screen-2xl px-3 sm:px-4 md:px-2 lg:px-3 xl:px-4 transition-all duration-300 bg-background/50 backdrop-blur-lg', isScrolled && 'max-w-4xl rounded-2xl border lg:px-5')}>
+                <div className={cn(
+                    'mx-auto mt-2 w-full md:max-w-none lg:max-w-screen-2xl px-3 sm:px-4 md:px-2 lg:px-3 xl:px-4 border',
+                    isScrolled ? 'bg-background/50 rounded-2xl backdrop-blur-lg' : 'border-transparent'
+                )}>
                     {/* Main navbar content */}
                     <div className="relative flex items-center justify-between gap-6 py-3 lg:gap-0 lg:py-4">
                         <div className="flex items-center">
@@ -90,10 +108,8 @@ export function Navbar() {
                                 aria-label="home"
                                 className="flex items-center space-x-2"
                                 onClick={(e) => {
-                                    // Start loader on every click; if already on '/', clear after next paint
                                     startLoading({ expectRouteChange: pathname !== '/' })
                                     if (pathname === '/') {
-                                        // Let default click occur (no navigation), and clear shortly
                                         stopAfterNextPaint()
                                     }
                                 }}>
@@ -104,16 +120,16 @@ export function Navbar() {
                         <div className="flex items-center gap-2">
                             {/* Mobile actions */}
                             <div className="lg:hidden flex items-center gap-3">
-                                {/* Primary action - always visible */}
-                                <Button 
-                                    onClick={() => handleButtonClick('/register-case')}
-                                    disabled={isLoading}
-                                    className="flex items-center gap-1.5 hover:scale-105 transition-all duration-300 font-semibold shadow-md hover:shadow-lg bg-gradient-to-r from-primary to-primary/90 text-primary-foreground border-0 rounded-lg px-3 py-2 h-9 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
-                                >
-                                    <Plus className="h-4 w-4" />
-                                    <span className="text-sm">Report</span>
-                                </Button>
-                                
+                            {/* Primary action - always visible */}
+                            <Button 
+                                onClick={() => handleButtonClick('/register-case')}
+                                disabled={isLoading}
+                                className="flex items-center gap-1.5 hover:scale-105 transition-all duration-300 font-semibold shadow-md hover:shadow-lg bg-gradient-to-r from-primary to-primary/90 text-primary-foreground border-0 rounded-lg px-3 py-2 h-9 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
+                            >
+                                <Plus className="h-4 w-4" />
+                                <span className="text-sm">Report</span>
+                            </Button>
+
                                 {/* Essential actions - always visible */}
                                 <div className="flex items-center gap-3">
                                     <SignedIn>
@@ -150,38 +166,19 @@ export function Navbar() {
                                 className="flex items-center gap-2 font-semibold shadow-md hover:shadow-lg bg-gradient-to-r from-primary to-primary/90 text-primary-foreground border-0 rounded-lg px-4 py-2 h-10 cursor-pointer hover:scale-110 transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed"
                             >
                                 <Plus className="h-4 w-4" />
-                                <span className="hidden lg:inline">Report Case</span>
-                                <span className="lg:hidden">Report</span>
+                                <span className="hidden md:inline">Report Case</span>
+                                <span className="md:hidden">Report</span>
                             </Button>
                             {/* Mobile buttons - always visible */}
-                            <Link href="/donate" className="cursor-pointer">
+						<Link href="/donate" className="cursor-pointer" onClick={() => startLoading({ expectRouteChange: pathname !== '/donate' })}>
                                 <Button variant="outline" size="icon" className="h-9 w-9 cursor-pointer hover:scale-110 hover:shadow-lg transition-all duration-300 ease-in-out group" aria-label="Buy me a coffee">
                                     <CupSoda className="h-5 w-5 transition-transform duration-300 group-hover:rotate-12" />
                                 </Button>
                             </Link>
 
-                            {/* Location display */}
-                            {savedLocation && savedLocation.city !== 'Unknown' && (
-                                <div className="hidden lg:flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-all duration-300 p-1.5 rounded-lg hover:bg-accent/50 hover:scale-105">
-                                    <MapPin className="h-3.5 w-3.5" />
-                                    <span className="font-medium">{savedLocation.city}, {savedLocation.state}</span>
-                                </div>
-                            )}
-
                             <SignedIn>
-                                {/* Notifications */}
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button variant="outline" size="icon" className="h-9 w-9 cursor-pointer hover:scale-110 transition-all duration-300" aria-label="Notifications">
-                                            <Bell className="h-4 w-4" />
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="w-64">
-                                        <DropdownMenuLabel>Notifications</DropdownMenuLabel>
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuItem className="text-muted-foreground">No new notifications</DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
+                                {/* Notifications Drawer trigger */}
+                                <NotificationsPopover />
 
                                 {/* Profile */}
                                 <AccountMenu />
@@ -203,51 +200,29 @@ export function Navbar() {
 
                     </div>
 
-                    {/* Mobile expandable menu - inside main container */}
-                    {menuState && (
-                        <div className="lg:hidden animate-in fade-in-0 slide-in-from-top-2 duration-300">
-                            <div className="px-4 py-3">
-                                <div className="flex items-center justify-center gap-4">
-                                    {/* Secondary actions */}
-                                    <Link href="/donate" className="cursor-pointer" onClick={() => setMenuState(false)}>
-                                        <Button variant="outline" size="icon" className="h-10 w-10 cursor-pointer hover:scale-110 hover:shadow-lg transition-all duration-300 ease-in-out group" aria-label="Buy me a coffee">
-                                            <CupSoda className="h-5 w-5 transition-transform duration-300 group-hover:rotate-12" />
-                                        </Button>
-                                    </Link>
+					{/* Mobile expanded content wrapper inside nav for measurement */}
+					<div ref={expandedContainerRef} className="in-data-[state=active]:block hidden lg:hidden">
+						{/* Subtle divider */}
+						<div className="h-px w-full bg-border/60 my-2" />
+						{/* Centered actions */}
+						<div className="w-full items-center justify-center gap-4 mb-3 flex">
+                        <Link href="/donate" className="cursor-pointer" onClick={() => { setMenuState(false); startLoading({ expectRouteChange: pathname !== '/donate' }) }}>
+								<Button variant="outline" size="icon" className="h-10 w-10 cursor-pointer hover:scale-110 hover:shadow-lg transition-all duration-300 ease-in-out group" aria-label="Buy me a coffee">
+									<CupSoda className="h-5 w-5 transition-transform duration-300 group-hover:rotate-12" />
+								</Button>
+							</Link>
 
-                                    <SignedIn>
-                                        {/* Notifications */}
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button variant="outline" size="icon" className="h-10 w-10 cursor-pointer hover:scale-110 transition-all duration-300" aria-label="Notifications">
-                                                    <Bell className="h-4 w-4" />
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end" className="w-64">
-                                                <DropdownMenuLabel>Notifications</DropdownMenuLabel>
-                                                <DropdownMenuSeparator />
-                                                <DropdownMenuItem className="text-muted-foreground">No new notifications</DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
-                                    </SignedIn>
+                            <SignedIn>
+                                <NotificationsPopover />
+                            </SignedIn>
 
-                                    <ThemeToggle />
-                                </div>
-
-                                {/* Location display for mobile */}
-                                {savedLocation && savedLocation.city !== 'Unknown' && (
-                                    <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground mt-3 pt-3 border-t border-border/50">
-                                        <MapPin className="h-3.5 w-3.5" />
-                                        <span className="font-medium">{savedLocation.city}, {savedLocation.state}</span>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
-
-                </div>
-            </nav>
-        </header>
-        </>
+							<ThemeToggle />
+						</div>
+					</div>
+				</div>
+			</nav>
+			{/* Spacer to push page content when expanded, without altering navbar design */}
+			<div className="lg:hidden" style={{ height: menuState ? expandedHeight + EXPANDED_MARGIN_COMP : 0 }} />
+		</header>
     )
 }

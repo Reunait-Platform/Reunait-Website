@@ -15,15 +15,10 @@ export function CaseInformation({ data }: CaseInformationProps) {
           {data.status && (
             <div className="space-y-1.5">
               <div className="font-semibold">Status</div>
-              <div className="text-muted-foreground capitalize">{data.status}</div>
+              <div className="text-muted-foreground capitalize break-words">{data.status}</div>
             </div>
           )}
-          {data.reportedBy && (
-            <div className="space-y-1.5">
-              <div className="font-semibold">Reported By</div>
-              <div className="text-muted-foreground capitalize">{data.reportedBy}</div>
-            </div>
-          )}
+          {/* Reported By removed per design */}
           <div className="space-y-1.5">
             <div className="font-semibold">Case Officer</div>
             <div className="text-muted-foreground">Detective Sharma</div>
@@ -31,7 +26,7 @@ export function CaseInformation({ data }: CaseInformationProps) {
           {data.dateMissingFound && (
             <div className="space-y-1.5">
               <div className="font-semibold">Date Last Seen</div>
-              <div className="text-muted-foreground">
+              <div className="text-muted-foreground break-words">
                 {formatCaseStatus(data.dateMissingFound, 'missing')}
               </div>
             </div>
@@ -39,25 +34,25 @@ export function CaseInformation({ data }: CaseInformationProps) {
           {data.city && (
             <div className="space-y-1.5">
               <div className="font-semibold">City</div>
-              <div className="text-muted-foreground">{data.city}</div>
+              <div className="text-muted-foreground break-words">{data.city}</div>
             </div>
           )}
           {data.state && (
             <div className="space-y-1.5">
               <div className="font-semibold">State</div>
-              <div className="text-muted-foreground">{data.state}</div>
+              <div className="text-muted-foreground break-words">{data.state}</div>
             </div>
           )}
           {data.country && (
             <div className="space-y-1.5">
               <div className="font-semibold">Country</div>
-              <div className="text-muted-foreground">{data.country}</div>
+              <div className="text-muted-foreground break-words">{data.country}</div>
             </div>
           )}
           {data.pincode && (
             <div className="space-y-1.5">
               <div className="font-semibold">Pincode</div>
-              <div className="text-muted-foreground">{data.pincode}</div>
+              <div className="text-muted-foreground break-words">{data.pincode}</div>
             </div>
           )}
         </div>

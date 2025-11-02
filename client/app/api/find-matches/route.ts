@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Call backend API to find similar cases
-    const backendUrl = process.env.BACKEND_URL
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL as string
     
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',

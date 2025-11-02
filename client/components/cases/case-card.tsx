@@ -9,6 +9,10 @@ import Image from "next/image"
 import Link from "next/link"
 import { Typography } from "@/components/ui/typography"
 import { formatLocation } from "@/lib/cases/case-formatters"
+import { useRouter } from "next/navigation"
+import { useNavigationLoader } from "@/hooks/use-navigation-loader"
+import { createPortal } from "react-dom"
+import { SimpleLoader } from "@/components/ui/simple-loader"
 
 // Optimized constants
 const CAROUSEL_INTERVAL = 800
@@ -33,6 +37,8 @@ interface CaseCardProps {
   }
   index?: number
   highlightQuery?: string
+  muted?: boolean
+  showMutedHint?: boolean
 }
 
 // Using shadcn's default theming
@@ -44,7 +50,7 @@ const STATUS_INFO = {
   default: { icon: Clock, colorLight: "text-slate-700", colorDark: "dark:text-slate-300", bg: "bg-slate-500/10 dark:bg-slate-400/10", ring: "ring-slate-500/20" }
 } as const
 
-export const CaseCard = memo(({ case: caseData, index = 0, highlightQuery = "" }: CaseCardProps) => {
+export const CaseCard = memo(({ case: caseData, index = 0, highlightQuery = "", muted = false, showMutedHint = false }: CaseCardProps) => {
   const [imageError, setImageError] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
@@ -74,15 +80,17 @@ export const CaseCard = memo(({ case: caseData, index = 0, highlightQuery = "" }
   }, [caseData.imageUrls])
 
   const statusInfo = useMemo(() => {
-    const date = new Date(caseData.dateMissingFound)
-    const formattedFullDate = format(date, "dd MMMM yyyy")
+    const rawDate = caseData.dateMissingFound
+    const date = rawDate ? new Date(rawDate) : null
+    const hasValidDate = !!(date && !isNaN((date as Date).getTime()))
+    const formattedFullDate = hasValidDate ? format(date as Date, "dd MMMM yyyy") : null
     const statusConfig = STATUS_INFO[caseData.status] || STATUS_INFO.default
     
     const statusTexts = {
-      missing: `Missing since ${formattedFullDate}`,
-      found: `Found on ${formattedFullDate}`,
-      closed: `Case closed ${formattedFullDate}`,
-      default: `Updated ${formattedFullDate}`
+      missing: formattedFullDate ? `Missing since ${formattedFullDate}` : `Missing`,
+      found: formattedFullDate ? `Found on ${formattedFullDate}` : `Found`,
+      closed: formattedFullDate ? `Case closed ${formattedFullDate}` : `Case closed`,
+      default: formattedFullDate ? `Updated ${formattedFullDate}` : `Updated`
     }
     
     return {
@@ -120,7 +128,7 @@ export const CaseCard = memo(({ case: caseData, index = 0, highlightQuery = "" }
 
   // Reporter chip (text-only) - only for police/NGO
   const showReporterChip = caseData.reportedBy === "police" || caseData.reportedBy === "NGO"
-  const reporterLabel = useMemo(() => caseData.reportedBy.toUpperCase(), [caseData.reportedBy])
+  const reporterLabel = useMemo(() => (caseData.reportedBy ? (caseData.reportedBy as string).toUpperCase() : ""), [caseData.reportedBy])
   const reporterClassName = useMemo(() => {
     if (caseData.reportedBy === "police") return "bg-blue-600/90 text-white"
     if (caseData.reportedBy === "NGO") return "bg-purple-600/90 text-white"
@@ -129,9 +137,11 @@ export const CaseCard = memo(({ case: caseData, index = 0, highlightQuery = "" }
 
   // Card base classes
   const cardClassName = useMemo(() => {
-    return `group relative overflow-hidden rounded-2xl border transition-all duration-300 cursor-pointer
+    const base = `group relative overflow-hidden rounded-2xl border transition-all duration-300 cursor-pointer
       hover:-translate-y-[2px] hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 !py-0`
-  }, [])
+    const disabled = muted ? 'opacity-60 grayscale' : ''
+    return `${base} ${disabled}`.trim()
+  }, [muted])
 
   // Carousel styles with drag offset
   const carouselStyle = useMemo(() => ({
@@ -241,6 +251,15 @@ export const CaseCard = memo(({ case: caseData, index = 0, highlightQuery = "" }
     setCurrentImageIndex(i) 
   }, [])
 
+  // Navigation loader integration for consistent UX
+  const router = useRouter()
+  const { isLoading: navLoading, mounted: loaderMounted, startLoading } = useNavigationLoader()
+  const onNavigateToDetail = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    startLoading({ expectRouteChange: true })
+    router.push(`/cases/${caseData._id}`)
+  }, [router, caseData._id, startLoading])
+
   // Loading skeleton
   if (!isMounted || isLoading) {
     return (
@@ -275,11 +294,13 @@ export const CaseCard = memo(({ case: caseData, index = 0, highlightQuery = "" }
   const StatusIcon = statusInfo.icon
 
   return (
+    <>
     <Link 
       href={`/cases/${caseData._id}`}
       prefetch={false}
       aria-label={`Open case: ${caseData.fullName}`}
-      className="block"
+      className="block relative"
+      onClick={onNavigateToDetail}
     >
       <Card 
         className={cardClassName}
@@ -292,6 +313,13 @@ export const CaseCard = memo(({ case: caseData, index = 0, highlightQuery = "" }
       
       {/* Hero Image Section - moved outside CardContent to align with top border */}
       <div className="relative h-80 bg-gradient-to-br from-slate-100 to-slate-50 dark:from-slate-800 dark:to-slate-900 overflow-hidden">
+          {muted && showMutedHint && (
+            <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
+              <div className="px-3 py-1.5 rounded-full bg-background/80 backdrop-blur-sm text-foreground text-sm font-semibold shadow-sm ring-1 ring-border/60">
+                Under review
+              </div>
+            </div>
+          )}
           {availableImages.length > 0 && !imageError ? (
             <div 
               ref={carouselRef}
@@ -344,16 +372,22 @@ export const CaseCard = memo(({ case: caseData, index = 0, highlightQuery = "" }
 
               {/* Reporter chip removed as per design */}
 
-              {/* Reward - solid pill, value only */}
+              {/* Reward - original badge with overflow fix */}
               {((typeof caseData.reward === "number" && caseData.reward > 0) ||
                 (typeof caseData.reward === "string" && caseData.reward.trim() !== "" && caseData.reward.trim() !== "0")) && (
-                <div className="absolute bottom-1 left-1 z-10">
+                <div className="absolute bottom-1 left-1 z-10 max-w-[75%]">
                   <Badge 
                     variant="secondary"
                     aria-label={`Reward: ${typeof caseData.reward === 'string' ? caseData.reward : caseData.reward}`}
-                    className="relative px-2.5 py-1.5 text-xs sm:text-sm leading-none font-semibold bg-amber-400 text-slate-900 dark:bg-amber-300 dark:text-amber-950 rounded-full shadow-sm"
+                    className="relative px-2.5 py-1.5 text-xs sm:text-sm leading-none font-semibold bg-amber-400 text-slate-900 dark:bg-amber-300 dark:text-amber-950 rounded-full shadow-sm max-w-full"
                   >
-                    {typeof caseData.reward === 'string' ? caseData.reward : String(caseData.reward)}
+                    <span className="block truncate">
+                      {(() => {
+                        const raw = typeof caseData.reward === 'string' ? caseData.reward : String(caseData.reward)
+                        // Ensure currency code suffix is visible; if missing, render as-is
+                        return raw
+                      })()}
+                    </span>
                   </Badge>
                 </div>
               )}
@@ -393,18 +427,25 @@ export const CaseCard = memo(({ case: caseData, index = 0, highlightQuery = "" }
            </span>
          </div>
 
-         {/* Status */}
-         <div className="flex items-center gap-3 text-sm">
-           <div className={`p-1.5 rounded-lg ${statusInfo.bg}`}>
-             <StatusIcon className={`w-4 h-4 ${statusInfo.colorLight} ${statusInfo.colorDark} shrink-0`} aria-hidden="true" />
-           </div>
-           <div className={`font-semibold ${statusInfo.colorLight} ${statusInfo.colorDark} truncate leading-relaxed`}>
-             {statusInfo.text}
-           </div>
-         </div>
+        {/* Status */}
+        <div className="flex items-center gap-3 text-sm">
+          <div className={`p-1.5 rounded-lg ${statusInfo.bg}`}>
+            <StatusIcon className={`w-4 h-4 ${statusInfo.colorLight} ${statusInfo.colorDark} shrink-0`} aria-hidden="true" />
+          </div>
+          <div className={`font-semibold ${statusInfo.colorLight} ${statusInfo.colorDark} truncate leading-relaxed`}>
+            {statusInfo.text}
+          </div>
+        </div>
        </CardContent>
       </Card>
     </Link>
+    {navLoading && loaderMounted && createPortal(
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/70 backdrop-blur-md">
+        <SimpleLoader />
+      </div>,
+      typeof document !== 'undefined' ? document.body : (null as any)
+    )}
+    </>
    )
  })
 

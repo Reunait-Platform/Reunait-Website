@@ -32,7 +32,10 @@ router.post("/users/profile", requireAuth(), async (req, res) => {
             ...(fullName !== undefined ? { fullName } : {}),
             ...(phoneNumber !== undefined ? { phoneNumber } : {}),
             ...(governmentIdNumber !== undefined ? { governmentIdNumber } : {}),
-            ...(role !== undefined ? { role } : {}),
+            ...(role !== undefined ? { 
+                // For police users, save as general_user in MongoDB until verified
+                role: role === 'police' ? 'general_user' : role 
+            } : {}),
             ...(gender !== undefined ? { gender } : {}),
             ...(dateOfBirth ? { dateOfBirth: new Date(dateOfBirth) } : {}),
             ...(address !== undefined ? { address } : {}),
@@ -74,12 +77,23 @@ router.post("/users/profile", requireAuth(), async (req, res) => {
 
         // Update Clerk public metadata with onboarding status and role
         try {
+            const clerkMetadata = {
+                onboardingCompleted: true,
+                lastUpdated: new Date().toISOString()
+            };
+
+            // Handle police role verification
+            if (role === 'police') {
+                // Set role as general_user and add verification status
+                clerkMetadata.role = 'general_user';
+                clerkMetadata.isVerified = false;
+            } else {
+                // Normal flow for general_user and NGO
+                clerkMetadata.role = user.role || 'general_user';
+            }
+
             await clerkClient.users.updateUserMetadata(userId, {
-                publicMetadata: {
-                    onboardingCompleted: true,
-                    role: user.role || 'general_user',
-                    lastUpdated: new Date().toISOString()
-                }
+                publicMetadata: clerkMetadata
             });
         } catch (error) {
             console.error('Failed to update Clerk metadata:', error);
@@ -105,6 +119,71 @@ router.post("/users/profile", requireAuth(), async (req, res) => {
             onboardingCompleted: userOnboarding,
         } = user;
 
+        // Populate cases and pagination to match GET /users/profile response
+        const page = parseInt(req.query.page) || 1;
+        const limit = 6;
+        const skip = (page - 1) * limit;
+
+        let cases = [];
+        let totalCases = 0;
+        let hasMoreCases = false;
+
+        if (userCases && userCases.length > 0) {
+            // First, get all visible case IDs (where showCase is true)
+            const visibleCaseIds = await Case.find({
+                _id: { $in: userCases },
+                showCase: true
+            }).select('_id').lean();
+
+            const visibleIds = visibleCaseIds.map(c => c._id);
+            totalCases = visibleIds.length;
+            hasMoreCases = totalCases > skip + limit;
+
+            // Get paginated case IDs from visible cases only
+            const paginatedCaseIds = visibleIds.slice(skip, skip + limit);
+
+            // Fetch only the fields needed for case cards
+            const casesData = await Case.find({ _id: { $in: paginatedCaseIds } })
+                .select('_id fullName age gender status city state country dateMissingFound reward reportedBy createdAt isFlagged')
+                .sort({ createdAt: -1 })
+                .lean();
+
+            // Transform cases to include dynamically generated image URLs
+            cases = await Promise.all(casesData.map(async (caseData) => {
+                const imageUrls = [];
+                try {
+                    const countryPath = (caseData.country || "India").replace(/\s+/g, '_').toLowerCase();
+                    for (let i = 1; i <= 2; i++) {
+                        const key = `${countryPath}/${caseData._id}_${i}.jpg`;
+                        try {
+                            const imageUrl = await getPresignedGetUrl(config.awsBucketName, key, 180);
+                            imageUrls.push(imageUrl);
+                        } catch (error) {
+                            // Ignore failures for missing images
+                        }
+                    }
+                } catch (error) {
+                    // Ignore image URL generation errors
+                }
+
+                return {
+                    _id: caseData._id,
+                    fullName: caseData.fullName,
+                    age: caseData.age,
+                    gender: caseData.gender,
+                    status: caseData.status,
+                    city: caseData.city,
+                    state: caseData.state,
+                    country: caseData.country,
+                    dateMissingFound: caseData.dateMissingFound,
+                    reward: caseData.reward,
+                    reportedBy: caseData.reportedBy,
+                    imageUrls: imageUrls,
+                    isFlagged: caseData.isFlagged || false
+                };
+            }));
+        }
+
         return res.json({
             success: true,
             data: {
@@ -120,9 +199,15 @@ router.post("/users/profile", requireAuth(), async (req, res) => {
                 country: userCountry,
                 pincode: userPincode,
                 role: userRole,
-                cases: userCases,
+                cases,
                 notifications: userNotifications,
                 onboardingCompleted: !!userOnboarding,
+                casesPagination: {
+                    currentPage: page,
+                    totalCases,
+                    hasMoreCases,
+                    casesPerPage: limit
+                }
             },
         });
     } catch (err) {
@@ -211,7 +296,7 @@ router.get("/users/profile", requireAuth(), async (req, res) => {
             
             // Fetch only the fields needed for case cards
             const casesData = await Case.find({ _id: { $in: paginatedCaseIds } })
-                .select('_id fullName age gender status city state country dateMissingFound reward reportedBy createdAt')
+                .select('_id fullName age gender status city state country dateMissingFound reward reportedBy createdAt isFlagged')
                 .sort({ createdAt: -1 }) // Most recent first
                 .lean();
 
@@ -246,7 +331,8 @@ router.get("/users/profile", requireAuth(), async (req, res) => {
                     dateMissingFound: caseData.dateMissingFound,
                     reward: caseData.reward,
                     reportedBy: caseData.reportedBy,
-                    imageUrls: imageUrls // Dynamically generated S3 URLs
+                    imageUrls: imageUrls, // Dynamically generated S3 URLs
+                    isFlagged: caseData.isFlagged || false
                 };
             }));
         }
@@ -280,6 +366,80 @@ router.get("/users/profile", requireAuth(), async (req, res) => {
         });
     } catch (err) {
         return res.status(500).json({ success: false, message: "Server error" });
+    }
+});
+
+// GET /api/users/search
+// Search users by name, email, or phone number (for police users)
+router.get("/users/search", requireAuth(), async (req, res) => {
+    try {
+        const { query } = req.query;
+
+        if (!query || typeof query !== 'string' || query.trim().length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Search query is required"
+            });
+        }
+
+        // Validate input length
+        if (query.trim().length > 100) {
+            return res.status(400).json({
+                success: false,
+                message: "Search query is too long. Maximum 100 characters allowed."
+            });
+        }
+
+        // Security: Sanitize regex special characters to prevent regex injection
+        const searchTerm = query.trim();
+        const escapedSearchTerm = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+        // Build search query - search across fullName, email, and phoneNumber
+        const searchFilter = {
+            $or: [
+                { fullName: { $regex: escapedSearchTerm, $options: 'i' } },
+                { email: { $regex: escapedSearchTerm, $options: 'i' } },
+                { phoneNumber: { $regex: escapedSearchTerm, $options: 'i' } }
+            ]
+        };
+
+        // Limit results for autocomplete (20 users max)
+        const users = await User.find(searchFilter)
+            .select("clerkUserId fullName email phoneNumber gender dateOfBirth")
+            .limit(20)
+            .lean();
+
+        // Helper function to calculate age from dateOfBirth
+        const calculateAge = (dateOfBirth) => {
+            if (!dateOfBirth) return null;
+            const today = new Date();
+            const birthDate = new Date(dateOfBirth);
+            let age = today.getFullYear() - birthDate.getFullYear();
+            const monthDiff = today.getMonth() - birthDate.getMonth();
+            if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+                age--;
+            }
+            return age >= 0 ? age : null;
+        };
+
+        return res.json({
+            success: true,
+            data: users.map(user => ({
+                clerkUserId: user.clerkUserId || "",
+                fullName: user.fullName || "",
+                email: user.email || "",
+                phoneNumber: user.phoneNumber || "",
+                gender: user.gender || null,
+                age: calculateAge(user.dateOfBirth),
+                url: user.clerkUserId ? `/caseOwnerProfile?caseOwner=${encodeURIComponent(user.clerkUserId)}` : null
+            }))
+        });
+    } catch (error) {
+        console.error("[GET /api/users/search]", error);
+        return res.status(500).json({
+            success: false,
+            message: "Server error while searching users"
+        });
     }
 });
 
@@ -338,7 +498,8 @@ router.post("/webhooks/clerk", express.raw({ type: "application/json" }), async 
             publicMetadata: {
               onboardingCompleted: false,
               role: 'general_user',
-              lastUpdated: new Date().toISOString()
+              lastUpdated: new Date().toISOString(),
+              unreadNotificationCount: 0
             }
           });
         } catch (error) {

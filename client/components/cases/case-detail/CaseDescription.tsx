@@ -24,7 +24,9 @@ export function CaseDescription({ data }: CaseDescriptionProps) {
         
         {data.description && (
           <div className="text-sm pb-3">
-            <p className="text-muted-foreground text-sm font-serif italic">{data.description}</p>
+            <p className="text-muted-foreground text-sm font-serif italic break-words whitespace-pre-wrap leading-relaxed">
+              {data.description}
+            </p>
           </div>
         )}
 
@@ -36,7 +38,7 @@ export function CaseDescription({ data }: CaseDescriptionProps) {
               </div>
               <div>
                 <div className="font-semibold mb-0.5">Location</div>
-                <div className="text-muted-foreground truncate" title={[data.city, data.state, data.country].filter(Boolean).join(', ')}>
+                <div className="text-muted-foreground break-words" title={[data.city, data.state, data.country].filter(Boolean).join(', ')}>
                   {formatLocation(data.city, data.state, data.country)}
                 </div>
               </div>
@@ -49,7 +51,7 @@ export function CaseDescription({ data }: CaseDescriptionProps) {
                 <Phone className="w-4 h-4 text-primary" />
               </div>
               <div>
-                <div className="font-semibold mb-0.5">Contact</div>
+                <div className="font-semibold mb-0.5">Contact Number</div>
                 <a href={`tel:${data.contactNumber}`} className="text-primary hover:underline">
                   {data.contactNumber}
                 </a>

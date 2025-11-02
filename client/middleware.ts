@@ -45,28 +45,8 @@ export default clerkMiddleware(async (auth, req) => {
         onboardingCompleted = user.publicMetadata?.onboardingCompleted === true
       } catch (error) {
         console.error('Failed to fetch user metadata in middleware:', error)
-        
-        // Final fallback: check MongoDB via existing profile endpoint
-        try {
-          const base = process.env.NEXT_PUBLIC_BACKEND_URL || "http://192.168.1.3:3001"
-          const response = await fetch(`${base}/users/profile`, {
-            method: "GET",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${sessionClaims?.__raw || ''}`,
-            },
-          })
-          
-          if (response.ok) {
-            const data = await response.json()
-            onboardingCompleted = data?.data?.onboardingCompleted === true
-          } else {
-            onboardingCompleted = false
-          }
-        } catch (mongoError) {
-          console.error('Failed to fetch from MongoDB in middleware:', mongoError)
-          onboardingCompleted = false
-        }
+        // Avoid extra backend calls from middleware; page-level SSR will handle fetching
+        onboardingCompleted = false
       }
     }
 
