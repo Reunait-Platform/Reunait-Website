@@ -15,7 +15,7 @@ export function Header({ location }: HeaderProps) {
       <div className="container mx-auto px-4 py-4 flex justify-between items-center">
         <div className="flex items-center gap-2">
           <Heart className="h-8 w-8 text-red-500" />
-          <h1 className="text-2xl font-bold">FindMe</h1>
+          <h1 className="text-2xl font-bold">Reunait</h1>
         </div>
         
         <div className="flex items-center gap-4">

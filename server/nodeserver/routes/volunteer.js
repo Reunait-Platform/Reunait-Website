@@ -295,7 +295,7 @@ router.post("/flagged/:caseId/unflag", requireAuth(), requireVolunteer, async (r
         { clerkUserId: c.caseOwner },
         { $push: { notifications: notificationData } },
         { new: true }
-      ).select('notifications').lean().catch(() => null);
+      ).select('notifications email').lean().catch(() => null);
 
       // Broadcast notification via SSE
       if (updatedUser && updatedUser.notifications && updatedUser.notifications.length > 0) {
@@ -313,6 +313,27 @@ router.post("/flagged/:caseId/unflag", requireAuth(), requireVolunteer, async (r
           });
         } catch (error) {
           console.error('Error broadcasting unflag notification:', error);
+        }
+      }
+
+      // Send email notification (non-blocking)
+      if (updatedUser && updatedUser.email) {
+        try {
+          const { sendEmailNotificationAsync } = await import('../services/emailService.js');
+          await sendEmailNotificationAsync(
+            updatedUser.email,
+            'Case No Longer Under Review',
+            `Your case '${c.fullName || ""}' is no longer under review and has been made visible again on the platform.`,
+            {
+              notificationType: 'case_unflagged',
+              userId: c.caseOwner,
+              caseId: String(caseId),
+              caseData: c, // Pass case data for metadata
+            }
+          );
+        } catch (error) {
+          console.error('Error sending email notification (non-blocking):', error);
+          // Don't fail the request if email fails
         }
       }
     }

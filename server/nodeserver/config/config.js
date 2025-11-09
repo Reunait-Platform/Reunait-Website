@@ -70,7 +70,7 @@ export const config = {
     resend: {
         apiKey: process.env.RESEND_API_KEY,
         fromAddress: process.env.RESEND_FROM_EMAIL || 'notifications@resend.dev',
-        fromName: process.env.RESEND_FROM_NAME || 'FindMe',
+        fromName: process.env.RESEND_FROM_NAME || 'Reunait',
     },
     // Resend Template IDs (dashboard-managed templates)
     // Template variants: green (success), blue (info), red (alert), welcome (special)
@@ -83,4 +83,39 @@ export const config = {
     
     // Frontend URL for email links (without /api suffix)
     frontendUrl: process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL?.replace('/api', '') || 'https://yourdomain.com',
+    
+    // Razorpay Configuration
+    // Official Documentation: https://razorpay.com/docs/payments/international-payments/#supported-currencies
+    razorpay: {
+        // Supported currencies (ISO 4217 codes)
+        // Razorpay supports 130+ currencies. Configure via environment variable as comma-separated list
+        // Example: SUPPORTED_CURRENCIES=INR,USD,EUR,GBP,JPY,BHD
+        // Full list: https://razorpay.com/docs/payments/international-payments/#supported-currencies
+        supportedCurrencies: process.env.SUPPORTED_CURRENCIES 
+            ? process.env.SUPPORTED_CURRENCIES.split(',').map(c => c.trim().toUpperCase())
+            : [], // No restriction by default; accepts any valid ISO code Razorpay supports
+        
+        // UI display (symbols/names) should be handled on the client using Intl APIs.
+        
+        // Currency exponents (decimal places)
+        // Source: https://razorpay.com/docs/payments/international-payments/#supported-currencies
+        // Exponent 0 = Zero-decimal currencies (1 unit = 1 subunit)
+        // Exponent 2 = Two-decimal currencies (1 unit = 100 subunits, e.g., ₹1 = 100 paise)
+        // Exponent 3 = Three-decimal currencies (1 unit = 1000 subunits, e.g., 1 BHD = 1000 fils)
+        currencyExponents: {
+            // Zero-decimal currencies (Exponent 0)
+            'BIF': 0, 'CLP': 0, 'DJF': 0, 'GNF': 0, 'ISK': 0, 'JPY': 0, 'KMF': 0, 'KRW': 0,
+            'PYG': 0, 'RWF': 0, 'UGX': 0, 'VND': 0, 'VUV': 0, 'XAF': 0, 'XOF': 0, 'XPF': 0,
+            // Three-decimal currencies (Exponent 3)
+            'BHD': 3, 'IQD': 3, 'JOD': 3, 'KWD': 3, 'OMR': 3, 'TND': 3,
+            // Two-decimal currencies (Exponent 2) - All others default to 2
+            // This includes: AED, ALL, AMD, AUD, AWG, AZN, BAM, BBD, BDT, BGN, BMD, BND, BOB,
+            // BRL, BSD, BTN, BWP, BZD, CAD, CHF, CNY, COP, CRC, CUP, CVE, CZK, DKK, DOP, DZD,
+            // EGP, ETB, EUR, FJD, GBP, GHS, GIP, GMD, GTQ, GYD, HKD, HNL, HRK, HTG, HUF, IDR,
+            // ILS, INR, JMD, KES, KGS, KHR, KYD, KZT, LAK, LKR, LRD, LSL, MAD, MDL, MGA, MKD,
+            // MMK, MNT, MOP, MUR, MVR, MWK, MXN, MYR, MZN, NAD, NGN, NIO, NOK, NPR, NZD, PEN,
+            // PGK, PHP, PKR, PLN, QAR, RON, RSD, RUB, SAR, SCR, SEK, SGD, SLL, SOS, SVC, SZL,
+            // THB, TRY, TTD, TWD, TZS, UAH, USD, UYU, UZS, YER, ZAR, ZMW, XCD
+        },
+    },
 }; 

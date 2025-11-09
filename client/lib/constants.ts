@@ -36,5 +36,5 @@ export const APP_STATS = [
   { value: "50+", label: "Cities Covered" }
 ]
 
-export const APP_NAME = "FindMe"
+export const APP_NAME = "Reunait"
 export const APP_DESCRIPTION = "Find Missing Persons with AI Technology" 

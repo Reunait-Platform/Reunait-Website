@@ -178,6 +178,23 @@ export async function getTemplateProps(notificationType, data = {}) {
       secondaryUrl: null,
     },
 
+    case_unflagged: {
+      variant: 'success',
+      preheader: 'Case review complete',
+      title: 'Case No Longer Under Review',
+      subtitle: 'Your case is now visible again',
+      message: `Your case '${caseData?.fullName || ""}' is no longer under review and has been made visible again on the platform.`,
+      caseName: caseData?.fullName,
+      age: caseData?.age,
+      gender: caseData?.gender,
+      location: formatLocation(caseData?.city, caseData?.state, caseData?.country) || null,
+      date: formatDate(caseData?.dateMissingFound || new Date()),
+      ctaText: 'View Case',
+      ctaUrl: buildUrl(`/cases/${data.caseId || caseData?._id}`),
+      secondaryText: null,
+      secondaryUrl: null,
+    },
+
     welcome: {
       variant: 'success',
       preheader: 'Welcome to Reunait!',

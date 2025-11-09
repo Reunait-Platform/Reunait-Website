@@ -1,57 +1,18 @@
 import { cn } from '@/lib/utils'
+import { Network } from 'lucide-react'
 
 export const Logo = ({ className, uniColor }: { className?: string; uniColor?: boolean }) => {
     return (
         <div className={cn('flex items-center space-x-2', className)}>
-            <div className="relative">
-        <svg
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-                    className="text-red-500">
-            <path
-                        d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
-                fill="currentColor"
-                    />
-        </svg>
-                <div className="absolute inset-0 bg-red-500/20 rounded-full blur-sm"></div>
-            </div>
-            <span className="text-xl font-bold text-foreground">FindMe</span>
+            <LogoIcon className={className} uniColor={uniColor} />
+            <span className="text-xl sm:text-2xl font-semibold text-foreground">Reunait</span>
         </div>
     )
 }
 
 export const LogoIcon = ({ className, uniColor }: { className?: string; uniColor?: boolean }) => {
     return (
-        <svg
-            width="18"
-            height="18"
-            viewBox="0 0 18 18"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            className={cn('size-5', className)}>
-            <path
-                d="M3 0H5V18H3V0ZM13 0H15V18H13V0ZM18 3V5H0V3H18ZM0 15V13H18V15H0Z"
-                fill={uniColor ? 'currentColor' : 'url(#logo-gradient)'}
-            />
-            <defs>
-                <linearGradient
-                    id="logo-gradient"
-                    x1="10"
-                    y1="0"
-                    x2="10"
-                    y2="20"
-                    gradientUnits="userSpaceOnUse">
-                    <stop stopColor="#9B99FE" />
-                    <stop
-                        offset="1"
-                        stopColor="#2BC8B7"
-                    />
-                </linearGradient>
-            </defs>
-        </svg>
+        <Network className={cn('size-6 text-primary', className)} />
     )
 }
 

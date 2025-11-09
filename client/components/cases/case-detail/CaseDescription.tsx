@@ -52,9 +52,13 @@ export function CaseDescription({ data }: CaseDescriptionProps) {
               </div>
               <div>
                 <div className="font-semibold mb-0.5">Contact Number</div>
-                <a href={`tel:${data.contactNumber}`} className="text-primary hover:underline">
-                  {data.contactNumber}
-                </a>
+                {data.contactNumber && data.contactNumber.startsWith('x') && data.contactNumber.length > 0 && !data.contactNumber.match(/[0-9]/) ? (
+                  <span className="text-muted-foreground">{data.contactNumber}</span>
+                ) : (
+                  <a href={`tel:${data.contactNumber}`} className="text-primary hover:underline">
+                    {data.contactNumber}
+                  </a>
+                )}
               </div>
             </div>
           )}

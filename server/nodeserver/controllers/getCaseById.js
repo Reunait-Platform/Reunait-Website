@@ -60,8 +60,8 @@ export const getCaseById = async (req, res) => {
     
     // Only process timelines if user is authenticated (frontend only shows progress to case owners)
     if (sourceTimeline.length > 0 && auth?.userId) {
-      const viewerIsOwner = Boolean(auth?.userId) && String(caseData.caseOwner) === String(auth.userId);
-      if (userRole === 'police' || (userRole === 'volunteer' && !viewerIsOwner)) {
+      const timelineViewerIsOwner = Boolean(auth?.userId) && String(caseData.caseOwner) === String(auth.userId);
+      if (userRole === 'police' || (userRole === 'volunteer' && !timelineViewerIsOwner)) {
         // Police and non-owner volunteers get full details (IP and phone)
         filteredNotifications = sourceTimeline.map(notification => {
           // Handle flag entries - check flagData first
@@ -85,7 +85,7 @@ export const getCaseById = async (req, res) => {
             isRead: notification.isRead
           };
         }).filter(Boolean);
-      } else if (viewerIsOwner) {
+      } else if (timelineViewerIsOwner) {
         // Case owner: include sensitive details if owner is police or volunteer
         const allowSensitive = (userRole === 'police' || userRole === 'volunteer');
         filteredNotifications = sourceTimeline.map(notification => {
@@ -215,13 +215,21 @@ export const getCaseById = async (req, res) => {
     
 
     const isAuthenticated = !!(auth?.userId)
+    const viewerIsOwner = isAuthenticated && String(caseData.caseOwner) === String(auth.userId)
     const alreadyFlaggedByUser = isAuthenticated && Array.isArray(caseData.flags) && caseData.flags.some(f => f.userId === auth.userId)
     
     // Updated isCaseOwner logic: police/volunteer users OR actual case owners
     const isCaseOwner = isAuthenticated && (
       userRole === 'police' || userRole === 'volunteer' ||
-      String(caseData.caseOwner) === String(auth.userId)
+      viewerIsOwner
     )
+    
+    // Mask contact number for privacy: only show to police, volunteers, and case owner
+    // For others, show same length but all digits as 'x'
+    const shouldShowContactNumber = userRole === 'police' || userRole === 'volunteer' || viewerIsOwner
+    const maskedContactNumber = caseData.contactNumber 
+      ? (shouldShowContactNumber ? caseData.contactNumber : 'x'.repeat(caseData.contactNumber.length))
+      : caseData.contactNumber
     
     // canCloseCase logic: user must be authenticated and case ID must be in user's cases array
     let canCloseCase = false
@@ -258,7 +266,7 @@ export const getCaseById = async (req, res) => {
       city: caseData.city,
       state: caseData.state,
       country: caseData.country,
-      contactNumber: caseData.contactNumber,
+      contactNumber: maskedContactNumber,
       addedBy: caseData.addedBy,
       caseOwner: caseData.caseOwner,
       isAssigned: caseData.isAssigned || false,

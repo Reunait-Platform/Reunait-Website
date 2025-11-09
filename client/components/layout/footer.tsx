@@ -1,6 +1,7 @@
 "use client"
 
-import { Heart, Facebook, Twitter, Instagram, Linkedin } from "lucide-react"
+import { Facebook, Twitter, Instagram, Linkedin } from "lucide-react"
+import { Logo } from "@/components/logo"
 import Link from "next/link"
 
 export function Footer() {
@@ -14,21 +15,12 @@ export function Footer() {
           <div className="flex flex-col items-center gap-6 sm:flex-row sm:justify-between sm:items-center sm:gap-4">
             {/* Brand - Left */}
             <div className="flex items-center gap-2">
-              <span className="relative inline-flex items-center justify-center">
-                <Heart className="h-6 w-6 text-destructive" />
-                <span 
-                  className="pointer-events-none absolute inset-0 -z-10 rounded-full bg-destructive/10 blur-sm" 
-                  aria-hidden="true" 
-                />
-              </span>
-              <span className="text-xl font-bold tracking-tight text-foreground">
-                FindMe
-              </span>
+              <Logo />
             </div>
 
             {/* Copyright - Center */}
             <p className="text-xs text-muted-foreground/80 font-medium order-3 sm:order-2">
-              © {new Date().getFullYear()} FindMe. All rights reserved.
+              © {new Date().getFullYear()} Reunait. All rights reserved.
             </p>
 
             {/* Social - Right */}

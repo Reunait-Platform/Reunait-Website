@@ -29,7 +29,7 @@ const accent = Rock_Salt({
 });
 
 export const metadata: Metadata = {
-  title: "FindMe - Missing Person Platform",
+  title: "Reunait - Missing Person Platform",
   description: "Find missing persons using AI technology and community support",
 };
 
