@@ -10,6 +10,13 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { OnboardingGate } from "@/components/OnboardingGate";
 import { NotificationsStoreProvider } from "@/providers/notifications-store-provider";
 import { NotificationFetcher } from "@/components/notification-fetcher";
+import { 
+  SITE_CONFIG, 
+  BASE_KEYWORDS, 
+  OPEN_GRAPH_DEFAULTS, 
+  TWITTER_DEFAULTS,
+  METADATA_TEMPLATES
+} from "@/lib/seo-config";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -28,9 +35,55 @@ const accent = Rock_Salt({
   subsets: ["latin"],
 });
 
+// SEO-optimized metadata for maximum search engine visibility
 export const metadata: Metadata = {
-  title: "Reunait - Missing Person Platform",
-  description: "Find missing persons using AI technology and community support",
+  metadataBase: new URL(SITE_CONFIG.url),
+  title: {
+    default: METADATA_TEMPLATES.home.title,
+    template: "%s | Reunait - Missing Person Platform"
+  },
+  description: METADATA_TEMPLATES.home.description,
+  keywords: [...BASE_KEYWORDS],
+  authors: [{ name: "Reunait Team" }],
+  creator: SITE_CONFIG.name,
+  publisher: SITE_CONFIG.name,
+  formatDetection: {
+    email: false,
+    address: false,
+    telephone: false,
+  },
+  openGraph: {
+    ...OPEN_GRAPH_DEFAULTS,
+    url: SITE_CONFIG.url,
+    title: METADATA_TEMPLATES.home.title,
+    description: METADATA_TEMPLATES.home.description,
+    images: [...OPEN_GRAPH_DEFAULTS.images],
+  },
+  twitter: {
+    ...TWITTER_DEFAULTS,
+    title: METADATA_TEMPLATES.home.title,
+    description: METADATA_TEMPLATES.home.description,
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
+  verification: {
+    google: process.env.NEXT_PUBLIC_GOOGLE_VERIFICATION,
+    yandex: process.env.NEXT_PUBLIC_YANDEX_VERIFICATION,
+    yahoo: process.env.NEXT_PUBLIC_YAHOO_VERIFICATION,
+  },
+  alternates: {
+    canonical: SITE_CONFIG.url,
+  },
+  category: "Missing Person Search Platform",
 };
 
 export default function RootLayout({

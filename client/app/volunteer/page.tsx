@@ -2,6 +2,19 @@ import { currentUser } from '@clerk/nextjs/server'
 import { redirect, notFound } from 'next/navigation'
 import VortexDemoSecond from '@/components/ui/vortex-demo-2'
 import { VolunteerActions } from '@/components/volunteer/VolunteerActions'
+import type { Metadata } from "next"
+import { PAGE_KEYWORDS, METADATA_TEMPLATES, getPageKeywords } from "@/lib/seo-config"
+
+// SEO-optimized metadata for volunteer page
+export const metadata: Metadata = {
+  title: METADATA_TEMPLATES.volunteer.title,
+  description: METADATA_TEMPLATES.volunteer.description,
+  keywords: getPageKeywords("volunteer"),
+  robots: {
+    index: false, // Private page, don't index
+    follow: false,
+  },
+}
 
 export default async function VolunteerPage() {
   const user = await currentUser()

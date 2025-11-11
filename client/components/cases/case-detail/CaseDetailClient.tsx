@@ -51,12 +51,15 @@ export function CaseDetailClient({ id, initialData, initialMeta, initialNow }: P
     const list = Array.isArray(data.imageUrls) && data.imageUrls.length > 0 ? data.imageUrls : []
     
     // Use getUrl to check expiration and get cached valid URLs (industry best practice)
+    // getUrl is stable (useCallback), so this won't cause infinite loops
     return list.map((url, idx) => {
       const imageIndex = idx + 1 // 1-based for API
       // getUrl checks expiration and returns cached valid URL or triggers refresh
       return getUrl(id, imageIndex, url)
     })
-  }, [data, id, getUrl, version])
+    // Include 'version' so that when refreshed URLs are cached, we recompute and use them.
+    // getUrl is pure and uses a module-level cache, so this does not trigger extra API calls.
+  }, [data?.imageUrls, id, getUrl, version])
 
   // After a router.refresh (SSR re-run), Next.js will send new props.
   // Sync any updated initialData back into local state so all child components reflect updates.
@@ -426,9 +429,11 @@ export function CaseDetailClient({ id, initialData, initialMeta, initialNow }: P
                           return (
                             <button
                               key={i}
-                              onClick={() => {
-                                // Proactive refresh is handled automatically by useImageUrlRefresh hook
-                                // URLs are refreshed at 80% of expiration time in background
+                              onClick={async () => {
+                                // Ensure fresh URL before switching to avoid rendering an expired URL
+                                try {
+                                  await refreshUrl(id, imageIndex)
+                                } catch {}
                                 setSelectedIndex(i)
                               }}
                               className={`relative h-16 w-14 sm:h-20 sm:w-16 rounded-lg overflow-hidden border ${i === selectedIndex ? 'border-primary' : 'border-border'} shrink-0`}

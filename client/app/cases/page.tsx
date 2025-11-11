@@ -1,9 +1,33 @@
 import { CasesSection } from "@/components/cases/cases-section"
 import { fetchCases, type CasesParams } from "@/lib/api"
 import { cookies } from "next/headers"
+import type { Metadata } from "next"
+import { SITE_CONFIG, PAGE_KEYWORDS, METADATA_TEMPLATES, OPEN_GRAPH_DEFAULTS, TWITTER_DEFAULTS, getPageKeywords } from "@/lib/seo-config"
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
+
+// SEO-optimized metadata for cases page
+export const metadata: Metadata = {
+  title: METADATA_TEMPLATES.cases.title,
+  description: METADATA_TEMPLATES.cases.description,
+  keywords: getPageKeywords("cases"),
+  openGraph: {
+    ...OPEN_GRAPH_DEFAULTS,
+    title: METADATA_TEMPLATES.cases.title,
+    description: METADATA_TEMPLATES.cases.description,
+    url: `${SITE_CONFIG.url}/cases`,
+    images: [...OPEN_GRAPH_DEFAULTS.images],
+  },
+  twitter: {
+    ...TWITTER_DEFAULTS,
+    title: METADATA_TEMPLATES.cases.title,
+    description: METADATA_TEMPLATES.cases.description,
+  },
+  alternates: {
+    canonical: `${SITE_CONFIG.url}/cases`,
+  },
+}
 
 interface PageProps {
   searchParams?: Promise<{ [key: string]: string | string[] | undefined }>

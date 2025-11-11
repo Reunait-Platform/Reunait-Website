@@ -9,6 +9,17 @@ import { InfiniteSlider } from "@/components/ui/infinite-slider"
 import { ProgressiveBlur } from "@/components/ui/progressive-blur"
 import TestimonialDialog from "@/components/testimonial-dialog"
 import { LocationDetector } from "@/components/location-detector"
+import { StructuredData } from "@/components/seo/structured-data"
+import type { Metadata } from "next"
+import { 
+  SITE_CONFIG, 
+  PAGE_KEYWORDS, 
+  METADATA_TEMPLATES,
+  OPEN_GRAPH_DEFAULTS,
+  TWITTER_DEFAULTS,
+  STRUCTURED_DATA,
+  getPageKeywords
+} from "@/lib/seo-config"
 
 
 const iconMap: Record<string, any> = {
@@ -20,6 +31,28 @@ const iconMap: Record<string, any> = {
 
 // ISR Configuration - Regenerate page every 1 minute (60 seconds)
 export const revalidate = 60
+
+// SEO-optimized metadata for homepage
+export const metadata: Metadata = {
+  title: METADATA_TEMPLATES.home.title,
+  description: METADATA_TEMPLATES.home.description,
+  keywords: getPageKeywords("home"),
+  openGraph: {
+    ...OPEN_GRAPH_DEFAULTS,
+    title: METADATA_TEMPLATES.home.title,
+    description: METADATA_TEMPLATES.home.description,
+    url: SITE_CONFIG.url,
+    images: [...OPEN_GRAPH_DEFAULTS.images],
+  },
+  twitter: {
+    ...TWITTER_DEFAULTS,
+    title: METADATA_TEMPLATES.home.title,
+    description: METADATA_TEMPLATES.home.description,
+  },
+  alternates: {
+    canonical: SITE_CONFIG.url,
+  },
+}
 
 export default async function Home() {
   // Fetch homepage data from API (public endpoint, no auth required)
@@ -393,13 +426,43 @@ export default async function Home() {
     }
   }
 
+  // Structured data for SEO (JSON-LD) - using centralized config
+  const websiteData = {
+    ...STRUCTURED_DATA.website,
+    publisher: {
+      ...STRUCTURED_DATA.organization,
+      sameAs: [
+        process.env.NEXT_PUBLIC_SOCIAL_FACEBOOK_URL,
+        process.env.NEXT_PUBLIC_SOCIAL_TWITTER_URL,
+        process.env.NEXT_PUBLIC_SOCIAL_INSTAGRAM_URL,
+        process.env.NEXT_PUBLIC_SOCIAL_LINKEDIN_URL
+      ].filter(Boolean)
+    }
+  }
+
+  const organizationData = {
+    ...STRUCTURED_DATA.organization,
+    sameAs: [
+      process.env.NEXT_PUBLIC_SOCIAL_FACEBOOK_URL,
+      process.env.NEXT_PUBLIC_SOCIAL_TWITTER_URL,
+      process.env.NEXT_PUBLIC_SOCIAL_INSTAGRAM_URL,
+      process.env.NEXT_PUBLIC_SOCIAL_LINKEDIN_URL
+    ].filter(Boolean)
+  }
+
   return (
-    <div className="min-h-screen bg-white dark:bg-black relative">
-      {/* Location Detector - requests permission automatically */}
-      <LocationDetector />
+    <>
+      {/* Structured Data for SEO */}
+      <StructuredData data={websiteData} />
+      <StructuredData data={organizationData} />
       
-      {/* Render sections in order */}
-      {orderedSections.map(renderSection)}
-    </div>
+      <div className="min-h-screen bg-white dark:bg-black relative">
+        {/* Location Detector - requests permission automatically */}
+        <LocationDetector />
+        
+        {/* Render sections in order */}
+        {orderedSections.map(renderSection)}
+      </div>
+    </>
   )
 }

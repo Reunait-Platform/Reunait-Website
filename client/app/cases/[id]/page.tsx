@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import { auth } from "@clerk/nextjs/server"
 import { fetchCaseById, type CaseDetail } from "@/lib/api"
 import { CaseDetailClient } from "@/components/cases/case-detail/CaseDetailClient"
+import { SITE_CONFIG, METADATA_TEMPLATES, OPEN_GRAPH_DEFAULTS, TWITTER_DEFAULTS, getLocationKeywords, BASE_KEYWORDS } from "@/lib/seo-config"
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -46,21 +47,27 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     const url = siteUrl ? `${siteUrl}/cases/${id}` : undefined
     const images = Array.isArray(data?.imageUrls) && data.imageUrls.length > 0 ? [data.imageUrls[0]] : undefined
 
+    const caseTitle = METADATA_TEMPLATES.caseDetail.title(name)
+    const caseDescription = METADATA_TEMPLATES.caseDetail.description(name, data?.description)
+    const keywords = getLocationKeywords(BASE_KEYWORDS, data?.city, data?.state, data?.country)
+
     return {
-      title,
-      description,
+      title: caseTitle,
+      description: caseDescription,
+      keywords,
       alternates: url ? { canonical: url } : undefined,
       openGraph: {
-        title,
-        description,
+        ...OPEN_GRAPH_DEFAULTS,
+        title: caseTitle,
+        description: caseDescription,
         url,
         type: 'article',
         images,
       },
       twitter: {
-        card: 'summary_large_image',
-        title,
-        description,
+        ...TWITTER_DEFAULTS,
+        title: caseTitle,
+        description: caseDescription,
         images,
       },
     }
