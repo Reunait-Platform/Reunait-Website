@@ -51,8 +51,7 @@ const caseModel = new mongoose.Schema(
       type: String 
     },
     aiDescription: {
-      type: String,
-      default: "Generating description... it will be available shortly."
+      type: String
     },
     addedBy: {
       type: String,

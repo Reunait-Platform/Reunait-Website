@@ -164,6 +164,10 @@ export const registerCase = async (req, res) => {
         }
 
         // Create new case in MongoDB with default values for missing fields
+        // Set aiDescription to user's original description initially
+        // If AI generation succeeds, it will be updated; if it fails, user's description remains visible
+        const userDescription = req.body.description || "";
+        
         const newCase = new Case({
             fullName: req.body.fullName,
             age: req.body.age,
@@ -177,7 +181,8 @@ export const registerCase = async (req, res) => {
             state: req.body.state || "",
             postalCode: req.body.postalCode,
             country: req.body.country,
-            description: req.body.description || "",
+            description: userDescription,
+            aiDescription: userDescription, // Set to user's description initially (will be updated if AI succeeds)
             addedBy: req.body.reportedBy || 'general_user',
             caseOwner: req.auth?.userId || null,
             landMark: req.body.landMark || "",
