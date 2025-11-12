@@ -159,7 +159,7 @@ app.use("/api", donationsRoutes);
 /*  MONGOOSE SETUP  */
 const PORT = process.env.PORT || 6001;
 mongoose.connect(process.env.MONGO_URL, {
-    dbName: process.env.DB_NAME || "missing_found_db"
+    dbName: process.env.DB_NAME || "Reunite"
 }).then(() => {
     app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT} and accessible from network`));
 }).catch((error) => console.log(`${error} did not connect`))

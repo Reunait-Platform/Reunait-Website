@@ -58,7 +58,8 @@ export const registerCase = async (req, res) => {
         req.body.state = normalize(req.body.state)
         req.body.city = normalize(req.body.city)
         req.body.postalCode = normalize(req.body.postalCode)
-        req.body.FIRNumber = normalize(req.body.FIRNumber)
+        // Normalize FIRNumber to uppercase for consistency and to prevent case-sensitive duplicates
+        req.body.FIRNumber = req.body.FIRNumber ? normalize(req.body.FIRNumber).toUpperCase() : undefined
         req.body.policeStationName = normalize(req.body.policeStationName)
         req.body.policeStationCountry = normalize(req.body.policeStationCountry)
         req.body.policeStationState = normalize(req.body.policeStationState)
@@ -99,9 +100,10 @@ export const registerCase = async (req, res) => {
         }
 
         // Check FIR number uniqueness within the same country if provided
+        // Note: FIRNumber is already normalized to uppercase above
         if (req.body.FIRNumber && req.body.policeStationCountry) {
             const existingCase = await Case.findOne({ 
-                FIRNumber: req.body.FIRNumber,
+                FIRNumber: req.body.FIRNumber, // Already uppercase from normalization above
                 policeStationCountry: req.body.policeStationCountry 
             });
             if (existingCase) {
