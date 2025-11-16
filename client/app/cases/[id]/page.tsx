@@ -30,7 +30,7 @@ export default async function CaseDetailPage({ params }: PageProps) {
   }
 
   return (
-    <CaseDetailClient id={id} initialData={initialData} initialMeta={initialMeta} initialNow={serverNow} />
+    <CaseDetailClient id={id} initialData={initialData} initialMeta={initialMeta ?? undefined} initialNow={serverNow} />
   )
 }
 
