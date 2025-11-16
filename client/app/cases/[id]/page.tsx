@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation"
 import type { Metadata } from "next"
 import { auth } from "@clerk/nextjs/server"
-import { fetchCaseById, type CaseDetail } from "@/lib/api"
+import { fetchCaseById, type CaseDetail, type CaseResponse } from "@/lib/api"
 import { CaseDetailClient } from "@/components/cases/case-detail/CaseDetailClient"
 import { METADATA_TEMPLATES, OPEN_GRAPH_DEFAULTS, TWITTER_DEFAULTS, getLocationKeywords, BASE_KEYWORDS } from "@/lib/seo-config"
 
