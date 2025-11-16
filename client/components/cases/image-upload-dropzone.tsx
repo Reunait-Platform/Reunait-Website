@@ -1,13 +1,13 @@
 "use client"
 
 import React, { useState, useCallback, useRef } from "react"
-import { Dropzone, DropzoneContent, DropzoneEmptyState } from "@/components/ui/dropzone"
+import { Dropzone } from "@/components/ui/dropzone"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
-import { X, Crop, ZoomIn, ZoomOut, RotateCw } from "lucide-react"
+import { X, ZoomIn, ZoomOut, RotateCw } from "lucide-react"
 import Image from "next/image"
-import Cropper from "react-easy-crop"
+import Cropper, { Area } from "react-easy-crop"
 import { useToast } from "@/contexts/toast-context"
 
 interface ImageUploadDropzoneProps {
@@ -32,7 +32,7 @@ export function ImageUploadDropzone({
   const [crop, setCrop] = useState({ x: 0, y: 0 })
   const [zoom, setZoom] = useState(1)
   const [rotation, setRotation] = useState(0)
-  const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null)
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { showError, showSuccess } = useToast()
 
@@ -70,7 +70,7 @@ export function ImageUploadDropzone({
   }, [cropModalOpen])
 
   // Handle crop completion
-  const handleCropComplete = useCallback((croppedArea: any, croppedAreaPixels: any) => {
+  const handleCropComplete = useCallback((croppedArea: Area, croppedAreaPixels: Area) => {
     setCroppedAreaPixels(croppedAreaPixels)
   }, [])
 

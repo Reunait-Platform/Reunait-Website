@@ -2,7 +2,7 @@ import { CasesSection } from "@/components/cases/cases-section"
 import { fetchCases, type CasesParams } from "@/lib/api"
 import { cookies } from "next/headers"
 import type { Metadata } from "next"
-import { SITE_CONFIG, PAGE_KEYWORDS, METADATA_TEMPLATES, OPEN_GRAPH_DEFAULTS, TWITTER_DEFAULTS, getPageKeywords } from "@/lib/seo-config"
+import { SITE_CONFIG, METADATA_TEMPLATES, OPEN_GRAPH_DEFAULTS, TWITTER_DEFAULTS, getPageKeywords } from "@/lib/seo-config"
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0

@@ -7,7 +7,6 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react"
 import { useToast } from "@/contexts/toast-context"
-import { useAuth } from "@clerk/nextjs"
 import type { CaseDetail } from "@/lib/api"
 import { useNavigationLoader } from "@/hooks/use-navigation-loader"
 import { SimpleLoader } from "@/components/ui/simple-loader"
@@ -22,7 +21,7 @@ interface StatusChangeDialogProps {
 
 export function StatusChangeDialog({ 
   caseId, 
-  currentStatus, 
+  currentStatus: _currentStatus, 
   onStatusChange, 
   children 
 }: StatusChangeDialogProps) {
@@ -32,8 +31,7 @@ export function StatusChangeDialog({
   const [error, setError] = useState<string | null>(null)
   const [reunited, setReunited] = useState(true)
   const { showSuccess, showError } = useToast()
-  const { getToken, isLoaded, isSignedIn } = useAuth()
-  const { startLoading, stopLoading, isLoading: isNavLoading } = useNavigationLoader()
+  const { startLoading, isLoading: isNavLoading } = useNavigationLoader()
 
   const MIN_REASON_LENGTH = 10
   const MAX_REASON_LENGTH = 200
@@ -93,7 +91,6 @@ export function StatusChangeDialog({
     setIsOpen(open)
   }
 
-  const isDisabled = currentStatus === 'closed' || isLoading
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>

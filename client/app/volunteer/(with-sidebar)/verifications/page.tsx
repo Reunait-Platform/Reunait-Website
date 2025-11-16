@@ -5,7 +5,7 @@ import { VerificationsClient } from '@/components/volunteer/VerificationsClient'
 export default async function VerificationsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const user = await currentUser()
   if (!user) redirect('/sign-in')
-  const role = (user.publicMetadata as any)?.role
+  const role = (user.publicMetadata as { role?: string })?.role
   if (role !== 'volunteer') notFound()
 
   const sp = await searchParams

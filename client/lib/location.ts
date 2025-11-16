@@ -93,7 +93,7 @@ export class LocationService {
         state: data.principalSubdivision || 'Unknown',
         city: data.city || data.locality || 'Unknown'
       }
-    } catch (error) {
+    } catch {
       // Reverse geocoding failed
       return this.getDefaultLocation()
     }

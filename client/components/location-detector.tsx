@@ -83,7 +83,7 @@ export function LocationDetector() {
             setLocationCookie({ country: fallback.country, state: fallback.state, city: fallback.city })
               window.dispatchEvent(new CustomEvent('location:updated', { detail: fallback }))
             }
-          } catch (error) {
+          } catch {
             // Fallback to coordinates only
             const fallback = {
               latitude: position.coords.latitude,
@@ -98,7 +98,7 @@ export function LocationDetector() {
             window.dispatchEvent(new CustomEvent('location:updated', { detail: fallback }))
           }
         },
-        (error) => {
+        () => {
           // Silently handle errors
         },
         {

@@ -183,28 +183,17 @@ export function CasesSection({ initialCases, initialPagination, initialFilters }
         setHasAppliedLocationFilters(true)
         
         setHasInitialized(true)
-      } catch (error) {
+      } catch {
         setHasInitialized(true)
       }
     }
 
     initializeData()
-  }, [hasInitialized, fetchData, searchParams])
+  }, [hasInitialized, fetchData, searchParams, initialCases, initialFilters])
 
   // Listen for location updates in localStorage
   useEffect(() => {
-    const applyFromData = async (locationData: any) => {
-      const locationFilters: SearchFilters = {
-        keyword: "",
-        country: locationData.country,
-        state: locationData.state !== 'Unknown' ? locationData.state : 'all',
-        city: locationData.city !== 'Unknown' ? locationData.city : 'all',
-        status: undefined,
-        gender: undefined,
-        dateFrom: undefined,
-        dateTo: undefined
-      }
-        
+    const applyFromData = async (locationData: { country?: string; state?: string; city?: string }) => {
       setHasAppliedLocationFilters(true)
 
       // Fetch cases with location-based filters
@@ -245,20 +234,31 @@ export function CasesSection({ initialCases, initialPagination, initialFilters }
     return () => window.removeEventListener('storage', handleStorageChange)
   }, [hasAppliedLocationFilters, fetchData])
 
-  // Search handler
-  const handleSearch = useCallback(async (filters: SearchFilters) => {
-    // Reset to first page for a new search
-    setPagination(prev => ({ ...prev, currentPage: 1 }))
-    setSearchFilters(filters)
-    const sp = new URLSearchParams()
-    sp.set('page', '1')
-    sp.set('country', filters.country)
-    if (filters.state && filters.state !== 'all') sp.set('state', filters.state)
-    if (filters.city && filters.city !== 'all') sp.set('city', filters.city)
-    if (filters.status && filters.status !== 'all') sp.set('status', filters.status)
-    if (filters.gender && filters.gender !== 'all') sp.set('gender', filters.gender)
-    if (filters.keyword && filters.keyword.trim()) sp.set('keyword', filters.keyword.trim())
-    router.replace(`${pathname}?${sp.toString()}`)
+  // Debounced search handler – coalesce rapid filter updates into a single URL update + state change
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingFiltersRef = useRef<SearchFilters | null>(null)
+  const handleSearch = useCallback((filters: SearchFilters) => {
+    pendingFiltersRef.current = filters
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current)
+    }
+    searchDebounceRef.current = setTimeout(() => {
+      const f = pendingFiltersRef.current || filters
+      // Reset to first page for a new search
+      setPagination(prev => ({ ...prev, currentPage: 1 }))
+      setSearchFilters(f)
+  
+      // Build URL query for shareable/filterable URL
+      const sp = new URLSearchParams()
+      sp.set('page', '1')
+      sp.set('country', f.country)
+      if (f.state && f.state !== 'all') sp.set('state', f.state)
+      if (f.city && f.city !== 'all') sp.set('city', f.city)
+      if (f.status && f.status !== 'all') sp.set('status', f.status)
+      if (f.gender && f.gender !== 'all') sp.set('gender', f.gender)
+      if (f.keyword && f.keyword.trim()) sp.set('keyword', f.keyword.trim())
+      router.replace(`${pathname}?${sp.toString()}`)
+    }, 150)
   }, [router, pathname])
 
   // Clear handler

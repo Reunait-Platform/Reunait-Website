@@ -155,16 +155,16 @@ const InputComponent = React.forwardRef<
   };
 
   const handleBeforeInput: React.FormEventHandler<HTMLInputElement> = (e) => {
-    onBeforeInput?.(e as any);
-    if ((e as any).defaultPrevented) return;
+    onBeforeInput?.(e);
+    if (e.defaultPrevented) return;
     if (countryCallingCodeEditable) return;
     const input = e.currentTarget as HTMLInputElement;
     const prefixLen = getPrefixLength();
     const selStart = input.selectionStart ?? 0;
-    const selEnd = (input as any).selectionEnd ?? selStart;
+    const selEnd = input.selectionEnd ?? selStart;
     if (selStart < prefixLen || (selStart < prefixLen && selEnd > selStart)) {
-      (e as any).preventDefault();
-      const data = (e as any).nativeEvent?.data ?? (e as any).data ?? '';
+      e.preventDefault();
+      const data = (e.nativeEvent as { data?: string })?.data ?? (e as { data?: string }).data ?? '';
       const start = prefixLen;
       input.setSelectionRange(start, start);
       try {
@@ -218,9 +218,9 @@ const InputComponent = React.forwardRef<
     <Input
       className={cn("rounded-e-lg rounded-s-none h-10", className)}
       {...props}
-      value={value as any}
+      value={value ?? ""}
       onKeyDown={handleKeyDown}
-      onBeforeInput={handleBeforeInput as any}
+      onBeforeInput={handleBeforeInput}
       onPaste={handlePaste}
       onFocus={handleFocus}
       onClick={handleClick}
@@ -255,7 +255,7 @@ const CountrySelect = ({
       modal
       onOpenChange={(open) => {
         setIsOpen(open);
-        open && setSearchValue("");
+        if (open) setSearchValue("");
       }}
     >
       <PopoverTrigger asChild>

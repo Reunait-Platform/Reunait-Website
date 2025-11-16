@@ -4,12 +4,24 @@ export interface ClerkMetadata {
   lastUpdated: string
 }
 
+interface ClerkLikeWithMetadata {
+  publicMetadata?: {
+    onboardingCompleted?: boolean
+    role?: string
+    // Allow additional metadata fields without loosening to `any`
+    [key: string]: unknown
+  }
+  __raw?: unknown
+}
+
 /**
  * Extract onboarding status from Clerk user object or session claims
  * @param userOrSessionClaims - Clerk user object or session claims object
  * @returns boolean | null - onboardingCompleted status or null if not found
  */
-export const getOnboardingStatus = (userOrSessionClaims: any): boolean | null => {
+export const getOnboardingStatus = (
+  userOrSessionClaims: ClerkLikeWithMetadata | null | undefined
+): boolean | null => {
   try {
     // Try to get metadata from user object first (preferred method)
     let metadata = userOrSessionClaims?.publicMetadata
@@ -41,7 +53,7 @@ export const getOnboardingStatus = (userOrSessionClaims: any): boolean | null =>
  * @param sessionClaims - Clerk session claims object
  * @returns string | null - user role or null if not found
  */
-export const getUserRole = (sessionClaims: any): string | null => {
+export const getUserRole = (sessionClaims: ClerkLikeWithMetadata | null | undefined): string | null => {
   try {
     const metadata = sessionClaims?.publicMetadata
     if (!metadata) return null
@@ -63,7 +75,7 @@ export const getUserRole = (sessionClaims: any): string | null => {
  * @param sessionClaims - Clerk session claims object
  * @returns boolean - true if onboarding is completed
  */
-export const isOnboardingCompleted = (sessionClaims: any): boolean => {
+export const isOnboardingCompleted = (sessionClaims: ClerkLikeWithMetadata | null | undefined): boolean => {
   return getOnboardingStatus(sessionClaims) === true
 }
 
@@ -73,7 +85,7 @@ export const isOnboardingCompleted = (sessionClaims: any): boolean => {
  * @param role - Role to check for
  * @returns boolean - true if user has the specified role
  */
-export const hasRole = (sessionClaims: any, role: string): boolean => {
+export const hasRole = (sessionClaims: ClerkLikeWithMetadata | null | undefined, role: string): boolean => {
   return getUserRole(sessionClaims) === role
 }
 
@@ -82,7 +94,7 @@ export const hasRole = (sessionClaims: any, role: string): boolean => {
  * @param sessionClaims - Clerk session claims object
  * @returns boolean - true if user is police, NGO, or volunteer
  */
-export const isPrivilegedUser = (sessionClaims: any): boolean => {
+export const isPrivilegedUser = (sessionClaims: ClerkLikeWithMetadata | null | undefined): boolean => {
   const role = getUserRole(sessionClaims)
   return role === 'police' || role === 'NGO' || role === 'volunteer'
 }

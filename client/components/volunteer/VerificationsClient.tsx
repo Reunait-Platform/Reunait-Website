@@ -72,8 +72,8 @@ export function VerificationsClient({ initialCountry = "all" }: { initialCountry
       setPage(data.data.page || 1)
       setTotal(data.data.total || 0)
       setHasMore(Boolean(data.data.hasMore))
-    } catch (err: any) {
-      showError("Failed to load verifications", err?.message || "Please try again.")
+    } catch (err: unknown) {
+      showError("Failed to load verifications", err instanceof Error ? err.message : "Please try again.")
       setItems([])
       setTotal(0)
       setHasMore(false)
@@ -111,8 +111,8 @@ export function VerificationsClient({ initialCountry = "all" }: { initialCountry
       }
       showSuccess("Verification approved", "Role updated to police.")
       await fetchData()
-    } catch (err: any) {
-      showError("Approve failed", err?.message || "Please try again.")
+    } catch (err: unknown) {
+      showError("Approve failed", err instanceof Error ? err.message : "Please try again.")
     } finally {
       setLoading(false)
     }
@@ -134,8 +134,8 @@ export function VerificationsClient({ initialCountry = "all" }: { initialCountry
       }
       showSuccess("Verification denied", "User removed from Clerk and recorded for audit.")
       await fetchData()
-    } catch (err: any) {
-      showError("Deny failed", err?.message || "Please try again.")
+    } catch (err: unknown) {
+      showError("Deny failed", err instanceof Error ? err.message : "Please try again.")
     } finally {
       setLoading(false)
     }
@@ -146,7 +146,7 @@ export function VerificationsClient({ initialCountry = "all" }: { initialCountry
     return ["all", ...list]
   }, [])
 
-  const formatJoined = (v: any) => {
+  const formatJoined = (v: string | number | Date | null | undefined) => {
     try {
       const d = new Date(v)
       if (isNaN(d.getTime())) return "—"

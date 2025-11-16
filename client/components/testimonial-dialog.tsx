@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Typography } from '@/components/ui/typography'
-import { MessageSquare, Send, CheckCircle, AlertCircle, Quote } from 'lucide-react'
+import { MessageSquare, Send, CheckCircle, AlertCircle } from 'lucide-react'
 
 interface TestimonialFormData {
   name: string
@@ -60,7 +60,7 @@ export default function TestimonialDialog() {
         setSubmitStatus('error')
         setErrorMessage(result.message || 'Failed to submit testimonial')
       }
-    } catch (error) {
+    } catch {
       setSubmitStatus('error')
       setErrorMessage('Network error. Please try again.')
     } finally {

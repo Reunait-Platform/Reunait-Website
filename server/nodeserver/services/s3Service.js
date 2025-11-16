@@ -2,7 +2,7 @@ import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3
 import { config } from '../config/config.js';
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import axios from "axios";
-// import sharp from "sharp"; // Uncomment when sharp is installed
+import sharp from "sharp";
 
 // Initialize S3 client
 const s3Client = new S3Client({
@@ -37,6 +37,9 @@ const uploadToS3 = async (file, caseId, imageIndex, country, bucket = config.aws
         // Standardize to JPEG format for consistency
         const key = `${countryPath}/${caseId}_${imageIndex}.jpg`;
 
+        // Convert to JPEG using sharp to ensure the body and Content-Type match the presign
+        const jpegBuffer = await sharp(file.buffer).jpeg({ quality: 85 }).toBuffer();
+
         const command = new PutObjectCommand({
             Bucket: bucket,
             Key: key,
@@ -47,9 +50,9 @@ const uploadToS3 = async (file, caseId, imageIndex, country, bucket = config.aws
         const presignedUrl = await getSignedUrl(s3Client, command, { expiresIn: PRESIGNED_URL_EXPIRY.IMAGE_UPLOAD });
 
         // Upload the file using the presigned URL
-        const uploadResponse = await axios.put(presignedUrl, file.buffer, {
+        const uploadResponse = await axios.put(presignedUrl, jpegBuffer, {
             headers: {
-                'Content-Type': file.mimetype
+                'Content-Type': 'image/jpeg'
             }
         });
 

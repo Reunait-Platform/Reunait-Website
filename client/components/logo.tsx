@@ -10,7 +10,7 @@ export const Logo = ({ className, uniColor }: { className?: string; uniColor?: b
     )
 }
 
-export const LogoIcon = ({ className, uniColor }: { className?: string; uniColor?: boolean }) => {
+export const LogoIcon = ({ className }: { className?: string }) => {
     return (
         <Network className={cn('size-6 text-primary', className)} />
     )

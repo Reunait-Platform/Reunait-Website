@@ -8,13 +8,19 @@ export interface CountryStateData {
 
 export class CountriesStatesService {
   static getCountries(): string[] {
-    return Object.keys(countries).map((code: string) => (countries as any)[code].name).sort()
+    return Object.keys(countries)
+      .map((code: string) => {
+        const country = countries[code as keyof typeof countries]
+        return country?.name
+      })
+      .filter((name): name is string => Boolean(name))
+      .sort()
   }
   
   static getCountryCode(countryName: string): string | null {
     // Find the country code by searching through all countries
     for (const [code, countryData] of Object.entries(countries)) {
-      if ((countryData as any).name === countryName) {
+      if (countryData && 'name' in countryData && countryData.name === countryName) {
         return code
       }
     }
@@ -47,7 +53,7 @@ export class CountriesStatesService {
       }
       
       return []
-    } catch (error) {
+    } catch {
       // Error getting states for country
       return []
     }
@@ -75,12 +81,21 @@ export class CountriesStatesService {
         
         if (Array.isArray(cities)) {
           // Extract city names from the cities array
-          return cities.map((city: any) => city.name || city).sort()
+          return cities
+            .map((city) => {
+              if (typeof city === 'string') return city
+              if (city && typeof city === 'object' && 'name' in city && typeof city.name === 'string') {
+                return city.name
+              }
+              return null
+            })
+            .filter((name): name is string => Boolean(name))
+            .sort()
         }
       }
       
       return []
-    } catch (error) {
+    } catch {
       // Error getting cities for state
       return []
     }

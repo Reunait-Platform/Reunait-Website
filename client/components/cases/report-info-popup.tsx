@@ -24,7 +24,7 @@ export function ReportInfoPopup({ isOpen, onClose, caseId, addedBy, onSuccess }:
   const [reportType, setReportType] = useState("detailed");
   const [phoneError, setPhoneError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { showError, showSuccess } = useToast();
+  const { showError } = useToast();
 
   const MAX_CHARACTERS = 500;
 

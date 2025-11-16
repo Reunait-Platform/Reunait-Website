@@ -1,5 +1,5 @@
 import type { Metadata } from "next"
-import { SITE_CONFIG, PAGE_KEYWORDS, METADATA_TEMPLATES, OPEN_GRAPH_DEFAULTS, TWITTER_DEFAULTS, getPageKeywords } from "@/lib/seo-config"
+import { SITE_CONFIG, METADATA_TEMPLATES, OPEN_GRAPH_DEFAULTS, TWITTER_DEFAULTS, getPageKeywords } from "@/lib/seo-config"
 
 // SEO-optimized metadata for donate page
 export const metadata: Metadata = {

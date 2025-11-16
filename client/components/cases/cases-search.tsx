@@ -8,10 +8,9 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent } from "@/components/ui/card"
 import { SmartDateRangePicker } from "@/components/ui/smart-date-range-picker"
-import { Search, User, Shield, Calendar, MapPin, ChevronDown, ChevronUp, Filter, ChevronRight, X, Hash } from "lucide-react"
+import { Search, User, Shield, MapPin, ChevronDown, ChevronUp, Filter, ChevronRight, X } from "lucide-react"
 import { CountriesStatesService } from "@/lib/countries-states"
-import { locationService } from "@/lib/location-service"
-import { fetchCases, type CasesParams, type Case } from "@/lib/api"
+import { type Case } from "@/lib/api"
 import { useRouter } from "next/navigation"
 import { useUser, useAuth } from "@clerk/nextjs"
 import { useNavigationLoader } from "@/hooks/use-navigation-loader"
@@ -26,6 +25,17 @@ export interface SearchFilters {
   gender: string | undefined
   dateFrom: Date | undefined
   dateTo: Date | undefined
+}
+
+interface UserSearchResult {
+  clerkUserId?: string
+  fullName?: string
+  email?: string
+  phoneNumber?: string
+  age?: string | number
+  gender?: string
+  url?: string | null
+  _id?: string
 }
 
 interface CasesSearchProps {
@@ -48,7 +58,7 @@ const INITIAL_FILTERS: SearchFilters = {
   dateTo: undefined
 }
 
-export function CasesSearch({ onSearch, onClear, loading = false, hasCasesDisplayed = false, presetFilters }: CasesSearchProps) {
+export function CasesSearch({ onSearch, onClear, hasCasesDisplayed = false, presetFilters }: CasesSearchProps) {
   const [filters, setFilters] = useState<SearchFilters>(INITIAL_FILTERS)
   const [mounted, setMounted] = useState(false)
   const [countries, setCountries] = useState<string[]>([])
@@ -77,7 +87,7 @@ export function CasesSearch({ onSearch, onClear, loading = false, hasCasesDispla
   // Get user role from Clerk metadata
   const userRole = useMemo(() => {
     if (!user?.publicMetadata) return 'general_user'
-    return (user.publicMetadata as any)?.role || 'general_user'
+    return (user.publicMetadata as { role?: string })?.role || 'general_user'
   }, [user])
 
   // Check if current search is a user search (police or volunteer typing "user:")
@@ -169,14 +179,17 @@ export function CasesSearch({ onSearch, onClear, loading = false, hasCasesDispla
   }, [presetFilters])
 
   // Sync initial preset filters from URL/localStorage without triggering auto-search
+  // This should run only once for initial hydration, not on every user filter change
+  const presetAppliedRef = useRef(false)
   useEffect(() => {
-    if (!presetFilters) return
+    if (!presetFilters || presetAppliedRef.current) return
     const next: Partial<SearchFilters> = {}
     if (presetFilters.country && presetFilters.country !== filters.country) next.country = presetFilters.country
     // Only override state/city if provided in preset; otherwise preserve existing selections
     if (typeof presetFilters.state === 'string' && presetFilters.state.length > 0 && presetFilters.state !== filters.state) next.state = presetFilters.state
     if (typeof presetFilters.city === 'string' && presetFilters.city.length > 0 && presetFilters.city !== filters.city) next.city = presetFilters.city
     if (Object.keys(next).length > 0) {
+      presetAppliedRef.current = true
       skipNormalizeOnceRef.current = true
       skipFirstFilterSearchRef.current = true
       skipFirstKeywordSearchRef.current = true
@@ -191,6 +204,9 @@ export function CasesSearch({ onSearch, onClear, loading = false, hasCasesDispla
           setCities([])
         }
       }
+    } else {
+      // Mark as applied to avoid re-running for the same preset set
+      presetAppliedRef.current = true
     }
   }, [presetFilters])
 
@@ -234,9 +250,6 @@ export function CasesSearch({ onSearch, onClear, loading = false, hasCasesDispla
   }, [filters.country, filters.state])
 
   // Memoized handlers
-  const handleSearch = useCallback(() => {
-    onSearch(filters)
-  }, [filters, onSearch])
 
   const handleClear = useCallback(() => {
     setFilters(INITIAL_FILTERS)
@@ -253,7 +266,7 @@ export function CasesSearch({ onSearch, onClear, loading = false, hasCasesDispla
       onSearch(filters)
     }, 300)
     return () => clearTimeout(timeoutId)
-  }, [filters.country, filters.state, filters.city, filters.status, filters.gender, filters.dateFrom, filters.dateTo, onSearch])
+  }, [filters, onSearch])
 
   // Get active filter chips (excludes status since it has dedicated buttons)
   const getActiveFilters = useCallback(() => {
@@ -377,7 +390,7 @@ export function CasesSearch({ onSearch, onClear, loading = false, hasCasesDispla
         
         if (data.success && Array.isArray(data.data)) {
           // Transform user data to match Case interface for dropdown display
-          const userSuggestions = data.data.map((user: any) => ({
+          const userSuggestions = (data.data as UserSearchResult[]).map((user) => ({
             _id: user.clerkUserId || `user-${Math.random()}`, // Use clerkUserId as _id for React key compatibility
             fullName: user.fullName || user.email || "Unknown User",
             age: user.age ?? undefined,
@@ -395,11 +408,12 @@ export function CasesSearch({ onSearch, onClear, loading = false, hasCasesDispla
           setSuggestions([])
           setShowSuggestions(true)
         }
-      } catch (error: any) {
-        if (error.name === 'AbortError' || error.name === 'TimeoutError') {
+      } catch (error: unknown) {
+        const err = error as { name?: string; message?: string }
+        if (err.name === 'AbortError' || err.name === 'TimeoutError') {
           console.error("Request timeout: Backend server may not be responding")
         } else {
-          console.error("Error searching users:", error.message || error)
+          console.error("Error searching users:", err.message || error)
         }
         setSuggestions([])
         setShowSuggestions(false)
@@ -435,7 +449,7 @@ export function CasesSearch({ onSearch, onClear, loading = false, hasCasesDispla
     }, 300) // Restored original 300ms debouncing
 
     return () => clearTimeout(timeoutId)
-  }, [filters.keyword, onSearch])
+  }, [filters, onSearch])
 
 
   // Keep dropdown aligned on resize/scroll while visible
@@ -456,9 +470,9 @@ export function CasesSearch({ onSearch, onClear, loading = false, hasCasesDispla
     setShowSuggestions(false)
     
     // For user results (have email/phoneNumber), navigate to user profile using url
-    const isUserResult = (item as any).email || (item as any).phoneNumber
+    const isUserResult = item.email || item.phoneNumber
     if (isUserResult) {
-      const url = (item as any).url
+      const url = item.url
       if (url) {
         startLoading({ expectRouteChange: true })
         router.push(url)
@@ -490,14 +504,6 @@ export function CasesSearch({ onSearch, onClear, loading = false, hasCasesDispla
         {after}
       </span>
     )
-  }, [])
-
-  const getInitials = useCallback((name?: string) => {
-    if (!name) return "?"
-    const parts = name.trim().split(/\s+/)
-    const first = parts[0]?.[0] || ""
-    const second = parts[1]?.[0] || ""
-    return (first + second).toUpperCase() || first.toUpperCase() || "?"
   }, [])
 
   return (
@@ -545,7 +551,8 @@ export function CasesSearch({ onSearch, onClear, loading = false, hasCasesDispla
                     // Extract search term after "user:" for highlighting
                     const searchTerm = (filters.keyword || "").substring(5).trim()
                     // Check if this is a user result (has email or phoneNumber)
-                    const isUserResult = (item as any).email || (item as any).phoneNumber
+                    const userItem = item as Case & { email?: string; phoneNumber?: string; age?: string | number; gender?: string }
+                    const isUserResult = userItem.email || userItem.phoneNumber
                     
                     return (
                     <button
@@ -570,28 +577,28 @@ export function CasesSearch({ onSearch, onClear, loading = false, hasCasesDispla
                           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground min-w-0">
                             {isUserResult ? (
                               <>
-                                {(item as any).email && (
-                                  <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-muted/60 text-foreground/70 min-w-0 max-w-[calc(100%-8px)] overflow-hidden" title={(item as any).email}>
+                                {userItem.email && (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-muted/60 text-foreground/70 min-w-0 max-w-[calc(100%-8px)] overflow-hidden" title={userItem.email}>
                                     <span className="truncate block">
-                                      <Highlight text={(item as any).email} query={searchTerm} />
+                                      <Highlight text={userItem.email} query={searchTerm} />
                                     </span>
                                   </span>
                                 )}
-                                {(item as any).phoneNumber && (
-                                  <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-muted/60 text-foreground/70 min-w-0 max-w-[calc(100%-8px)] overflow-hidden" title={(item as any).phoneNumber}>
+                                {userItem.phoneNumber && (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-muted/60 text-foreground/70 min-w-0 max-w-[calc(100%-8px)] overflow-hidden" title={userItem.phoneNumber}>
                                     <span className="truncate block">
-                                      <Highlight text={(item as any).phoneNumber} query={searchTerm} />
+                                      <Highlight text={userItem.phoneNumber} query={searchTerm} />
                                     </span>
                                   </span>
                                 )}
-                                {(item as any).age !== undefined && (item as any).age !== null && (
+                                {userItem.age !== undefined && userItem.age !== null && (
                                   <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-muted/60 text-foreground/70 shrink-0 whitespace-nowrap">
-                                    {(item as any).age} years
+                                    {userItem.age} years
                                   </span>
                                 )}
-                                {(item as any).gender && (
+                                {userItem.gender && (
                                   <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-muted/60 text-foreground/70 capitalize shrink-0 whitespace-nowrap">
-                                    {String((item as any).gender)}
+                                    {String(userItem.gender)}
                                   </span>
                                 )}
                               </>

@@ -21,7 +21,7 @@ export default function ResetPasswordPage() {
     || search?.get("returnBackUrl")
     || search?.get("redirect_url")
     || "/profile") as string
-  const { isLoaded, signIn, setActive } = useSignIn()
+  const { isLoaded, signIn } = useSignIn()
   const { signOut } = useAuth()
   const { showSuccess, showError } = useToast()
 
@@ -30,9 +30,8 @@ export default function ResetPasswordPage() {
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [code, setCode] = useState("")
-  const [error, setError] = useState<string | null>(null)
+  const [, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [showPassword, setShowPassword] = useState(false)
   const [resendLoading, setResendLoading] = useState(false)
   const [resendCooldown, setResendCooldown] = useState(0)
   const [isProcessing, setIsProcessing] = useState(false)
@@ -63,7 +62,7 @@ export default function ResetPasswordPage() {
     if (isProcessing) {
       setIsProcessing(false)
     }
-  }, [pathname])
+  }, [pathname, isProcessing])
 
   const requestCode = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -81,7 +80,7 @@ export default function ResetPasswordPage() {
       showSuccess("If this email exists, we sent a verification code.")
       setResendCooldown(30)
       setIsProcessing(false) // Clear loader when transitioning to verify step
-    } catch (err: any) {
+    } catch {
       // Show neutral message; don't reveal if email exists
       setStep("verify")
       showSuccess("If this email exists, we sent a verification code.")
@@ -134,8 +133,9 @@ export default function ResetPasswordPage() {
           return
         }
       }
-    } catch (err: any) {
-      const raw = err?.errors?.[0]?.message || ""
+    } catch (err: unknown) {
+      const errorObj = err as { errors?: Array<{ message?: string }> }
+      const raw = errorObj?.errors?.[0]?.message || ""
       const lower = String(raw).toLowerCase()
       const msg = lower.includes("incorrect") || lower.includes("invalid")
         ? "Invalid code. Please try again."
@@ -157,8 +157,9 @@ export default function ResetPasswordPage() {
       await signIn.create({ strategy: "reset_password_email_code", identifier })
       showSuccess("Verification code resent.")
       setResendCooldown(30)
-    } catch (err: any) {
-      const raw = err?.errors?.[0]?.message || ""
+    } catch (err: unknown) {
+      const errorObj = err as { errors?: Array<{ message?: string }> }
+      const raw = errorObj?.errors?.[0]?.message || ""
       const lower = String(raw).toLowerCase()
       const msg = lower.includes("rate") || lower.includes("too many")
         ? "Too many requests. Please wait a moment before trying again."

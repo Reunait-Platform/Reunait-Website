@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '@clerk/nextjs';
 import { EventSourcePolyfill } from 'event-source-polyfill';
 import { useNotificationsStore } from '@/providers/notifications-store-provider';
+import { type NotificationItem } from '@/stores/notifications-store';
 
 /**
  * Custom hook for SSE (Server-Sent Events) notification streaming using EventSourcePolyfill
@@ -10,7 +11,7 @@ import { useNotificationsStore } from '@/providers/notifications-store-provider'
 export function useNotificationsSSE() {
   const { getToken, isSignedIn } = useAuth();
   const addNotification = useNotificationsStore(s => s.addNotification);
-  const ingestInitial = useNotificationsStore(s => (s as any).ingestInitial);
+  const ingestInitial = useNotificationsStore(s => s.ingestInitial);
   const eventSourceRef = useRef<EventSourcePolyfill | null>(null);
   const isManuallyClosedRef = useRef(false);
   const connectRef = useRef<() => Promise<void>>(() => Promise.resolve());
@@ -65,29 +66,32 @@ export function useNotificationsSSE() {
       hasConnectedRef.current = true;
 
       // Handle custom event types (Better SSE sends named events)
-      eventSource.addEventListener('notification', (event: any) => {
+      eventSource.addEventListener('notification', (event: MessageEvent | Event) => {
         try {
-          const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-          addNotification(data);
+          const eventData = event instanceof MessageEvent ? event.data : (event as { data?: unknown }).data;
+          const data = typeof eventData === 'string' ? JSON.parse(eventData) : eventData;
+          addNotification(data as NotificationItem);
         } catch (parseError) {
           // Silently ignore parse errors
         }
       });
 
-      eventSource.addEventListener('initial', (event: any) => {
+      eventSource.addEventListener('initial', (event: MessageEvent | Event) => {
         try {
-          const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-          if (data && Array.isArray(data.notifications)) {
+          const eventData = event instanceof MessageEvent ? event.data : (event as { data?: unknown }).data;
+          const data = typeof eventData === 'string' ? JSON.parse(eventData) : eventData;
+          const parsedData = data as { notifications?: NotificationItem[]; pagination?: unknown; unreadCount?: number };
+          if (parsedData && Array.isArray(parsedData.notifications)) {
             // Prefer ingestInitial to set pagination + unreadCount if provided
             if (typeof ingestInitial === 'function') {
               ingestInitial(
-                data.notifications,
-                data.pagination,
-                data.unreadCount,
+                parsedData.notifications,
+                parsedData.pagination as { currentPage: number; hasNextPage: boolean; totalPages: number } | undefined,
+                parsedData.unreadCount,
               );
             } else {
               // Fallback: add one by one
-              data.notifications.forEach((notif: any) => addNotification(notif));
+              parsedData.notifications.forEach((notif: NotificationItem) => addNotification(notif));
             }
           }
         } catch (parseError) {
@@ -99,13 +103,13 @@ export function useNotificationsSSE() {
       eventSource.onmessage = (event: MessageEvent) => {
         // Better SSE uses named events, so this is just a fallback
         try {
-          const data = JSON.parse(event.data);
-          if (data.notifications && Array.isArray(data.notifications)) {
-            data.notifications.forEach((notif: any) => {
+          const data = JSON.parse(event.data) as { notifications?: NotificationItem[]; [key: string]: unknown } | NotificationItem;
+          if (data && typeof data === 'object' && 'notifications' in data && Array.isArray(data.notifications)) {
+            data.notifications.forEach((notif: NotificationItem) => {
               addNotification(notif);
             });
           } else {
-            addNotification(data);
+            addNotification(data as NotificationItem);
           }
         } catch (parseError) {
           // Ignore parse errors for fallback handler
@@ -130,7 +134,7 @@ export function useNotificationsSSE() {
         // Otherwise, do nothing; polyfill will retry automatically
       };
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Silently handle connection errors - polyfill will auto-reconnect
       // Do not manually retry; rely on polyfill auto-reconnect on its own
     }

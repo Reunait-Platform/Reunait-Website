@@ -35,7 +35,7 @@ export async function closeCase(caseId: string, reason: string, reunited?: boole
     revalidateTag(`case:${caseId}`)
     revalidatePath(`/cases/${caseId}`)
     
-    const payload = await response.json().catch(() => ({})) as any
+    const payload = await response.json().catch(() => null) as { data?: unknown } | null
     return { success: true, message: 'Case closed successfully', data: payload?.data }
   } catch (error) {
     console.error('Error closing case:', error)
@@ -77,8 +77,8 @@ export async function flagCase(caseId: string, reason: string) {
     revalidateTag(`case:${caseId}`)
     revalidatePath(`/cases/${caseId}`)
     
-    const payload = await response.json().catch(() => ({})) as any
-    return { success: true, message: payload.message || 'Case flagged successfully', data: payload?.data }
+    const payload = await response.json().catch(() => null) as { message?: string; data?: unknown } | null
+    return { success: true, message: payload?.message || 'Case flagged successfully', data: payload?.data }
   } catch (error) {
     console.error('Error flagging case:', error)
     return { success: false, message: error instanceof Error ? error.message : 'Failed to flag case' }
@@ -117,8 +117,8 @@ export async function assignCase(caseId: string, userId: string) {
     revalidateTag(`case:${caseId}`)
     revalidatePath(`/cases/${caseId}`)
     
-    const payload = await response.json().catch(() => ({})) as any
-    return { success: true, message: payload.message || 'Case assigned successfully', data: payload?.data }
+    const payload = await response.json().catch(() => null) as { message?: string; data?: unknown } | null
+    return { success: true, message: payload?.message || 'Case assigned successfully', data: payload?.data }
   } catch (error) {
     console.error('Error assigning case:', error)
     return { success: false, message: error instanceof Error ? error.message : 'Failed to assign case' }

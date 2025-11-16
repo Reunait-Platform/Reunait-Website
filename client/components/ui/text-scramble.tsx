@@ -1,5 +1,5 @@
 'use client';
-import { type JSX, useEffect, useState } from 'react';
+import { type JSX, useEffect, useState, useCallback, useRef } from 'react';
 import { motion, MotionProps } from 'framer-motion';
 
 type TextScrambleProps = {
@@ -31,12 +31,12 @@ export function TextScramble({
     Component as keyof JSX.IntrinsicElements
   );
   const [displayText, setDisplayText] = useState(children);
-  const [isAnimating, setIsAnimating] = useState(false);
+  const isAnimatingRef = useRef(false);
   const text = children;
 
-  const scramble = async () => {
-    if (isAnimating) return;
-    setIsAnimating(true);
+  const scramble = useCallback(async () => {
+    if (isAnimatingRef.current) return;
+    isAnimatingRef.current = true;
 
     const steps = duration / speed;
     let step = 0;
@@ -65,17 +65,17 @@ export function TextScramble({
       if (step > steps) {
         clearInterval(interval);
         setDisplayText(text);
-        setIsAnimating(false);
+        isAnimatingRef.current = false;
         onScrambleComplete?.();
       }
     }, speed * 1000);
-  };
+  }, [duration, speed, text, characterSet, onScrambleComplete]);
 
   useEffect(() => {
     if (!trigger) return;
 
     scramble();
-  }, [trigger]);
+  }, [trigger, scramble]);
 
   return (
     <MotionComponent className={className} {...props}>

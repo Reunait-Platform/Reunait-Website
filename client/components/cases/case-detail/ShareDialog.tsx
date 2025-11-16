@@ -1,9 +1,9 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { Share2, Copy, Mail, Twitter, Facebook, Link, MessageSquare, MoreHorizontal, MessageCircleReply } from "lucide-react"
+import { Share2, Copy, Mail, Twitter, Facebook, MessageSquare, MoreHorizontal, MessageCircleReply } from "lucide-react"
 import { useToast } from "@/contexts/toast-context"
 import type { CaseDetail } from "@/lib/api"
 
@@ -81,7 +81,7 @@ export function ShareDialog({ isOpen, onClose, caseData }: ShareDialogProps) {
         document.body.removeChild(textarea)
         showSuccess('Link copied to clipboard')
       }
-    } catch (error) {
+    } catch {
       showError('Failed to copy link')
     } finally {
       setIsLoading(null)
@@ -155,9 +155,11 @@ export function ShareDialog({ isOpen, onClose, caseData }: ShareDialogProps) {
           {/* Case Preview (subtle) */}
           <div className="flex items-start gap-3 p-2 rounded-lg bg-muted/40">
             {caseData.imageUrls && caseData.imageUrls.length > 0 && (
-              <img
+              <Image
                 src={caseData.imageUrls[0]}
                 alt={caseData.fullName || 'Case image'}
+                width={40}
+                height={40}
                 className="w-10 h-10 rounded-md object-cover flex-shrink-0"
               />
             )}

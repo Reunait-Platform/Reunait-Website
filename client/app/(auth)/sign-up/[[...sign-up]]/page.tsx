@@ -1,13 +1,12 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useSignUp, useAuth } from "@clerk/nextjs"
 import { useRouter, useSearchParams, usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { InputOTP, InputOTPGroup, InputOTPSlot, InputOTPSeparator } from "@/components/ui/input-otp"
 import { Label } from "@/components/ui/label"
-import Link from "next/link"
 import { Eye, EyeOff } from "lucide-react"
 import { CaptchaRegion } from "@/components/auth/CaptchaRegion"
 import { useToast } from "@/contexts/toast-context"
@@ -37,8 +36,9 @@ export default function SignUpCatchAllPage() {
   const { isSignedIn } = useAuth()
   const { showSuccess, showError } = useToast()
 
-  const getFriendlyClerkError = (e: any): string => {
-    const raw = e?.errors?.[0]?.message || ""
+  const getFriendlyClerkError = (e: unknown): string => {
+    const errorObj = e as { errors?: Array<{ message?: string }> }
+    const raw = errorObj?.errors?.[0]?.message || ""
     const lower = String(raw).toLowerCase()
     if (lower.includes("incorrect") || lower.includes("invalid") || lower.includes("not valid")) {
       return "Invalid verification code. Please try again."
@@ -56,7 +56,7 @@ export default function SignUpCatchAllPage() {
   const [password, setPassword] = useState("")
   const [pendingVerification, setPendingVerification] = useState(false)
   const [code, setCode] = useState("")
-  const [error, setError] = useState<string | null>(null)
+  const [, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [resendLoading, setResendLoading] = useState(false)
@@ -75,21 +75,21 @@ export default function SignUpCatchAllPage() {
     if (isNavigating) {
       setIsNavigating(false)
     }
-  }, [pathname])
+  }, [pathname, isNavigating])
 
   // Hide authentication loader when route changes or verification state changes
   useEffect(() => {
     if (isAuthenticating) {
       setIsAuthenticating(false)
     }
-  }, [pathname, pendingVerification])
+  }, [pathname, pendingVerification, isAuthenticating])
 
   // Hide verification loader when route changes
   useEffect(() => {
     if (isVerifying) {
       setIsVerifying(false)
     }
-  }, [pathname])
+  }, [pathname, isVerifying])
 
   const handleSignInClick = () => {
     setIsNavigating(true)
@@ -123,8 +123,9 @@ export default function SignUpCatchAllPage() {
       await signUp.prepareEmailAddressVerification({ strategy: "email_code" })
       showSuccess("We sent a verification code to your email.")
       setResendCooldown(30)
-    } catch (err: any) {
-      showError(err?.errors?.[0]?.message || "Sign up failed. Please try again.")
+    } catch (err: unknown) {
+      const errorObj = err as { errors?: Array<{ message?: string }> }
+      showError(errorObj?.errors?.[0]?.message || "Sign up failed. Please try again.")
       setLoading(false)
       setIsAuthenticating(false)
     }
@@ -134,7 +135,7 @@ export default function SignUpCatchAllPage() {
     }
   }
 
-  const verifyCode = async () => {
+  const verifyCode = useCallback(async () => {
     if (!isLoaded || loading) return
     setError(null)
     const normalized = code.replace(/\D/g, "")
@@ -148,13 +149,13 @@ export default function SignUpCatchAllPage() {
         showSuccess("Account created. Let\'s complete your profile.")
         router.push(`/onboarding?returnTo=${encodeURIComponent(returnTo)}`)
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       showError(getFriendlyClerkError(err))
       setIsVerifying(false)
     } finally {
       setLoading(false)
     }
-  }
+  }, [isLoaded, loading, code, signUp, setActive, showSuccess, router, returnTo, showError])
 
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -166,7 +167,7 @@ export default function SignUpCatchAllPage() {
     if (normalized.length === 6) {
       void verifyCode()
     }
-  }, [code])
+  }, [code, verifyCode])
 
   const handleGoogle = async () => {
     if (!isLoaded) return
@@ -177,8 +178,9 @@ export default function SignUpCatchAllPage() {
         redirectUrl: "/sign-up",
         redirectUrlComplete: `/onboarding?returnTo=${encodeURIComponent(returnTo)}`,
       })
-    } catch (err: any) {
-      showError(err?.errors?.[0]?.message || "Google sign-up failed.")
+    } catch (err: unknown) {
+      const errorObj = err as { errors?: Array<{ message?: string }> }
+      showError(errorObj?.errors?.[0]?.message || "Google sign-up failed.")
       setIsAuthenticating(false)
     }
   }
@@ -191,19 +193,14 @@ export default function SignUpCatchAllPage() {
       await signUp.prepareEmailAddressVerification({ strategy: "email_code" })
       showSuccess("Verification code resent. Check your inbox.")
       setResendCooldown(30)
-    } catch (err: any) {
-      showError(err?.errors?.[0]?.message || "Could not resend code. Please try again.")
+    } catch (err: unknown) {
+      const errorObj = err as { errors?: Array<{ message?: string }> }
+      showError(errorObj?.errors?.[0]?.message || "Could not resend code. Please try again.")
     } finally {
       setResendLoading(false)
     }
   }
 
-  const handleChangeEmail = () => {
-    setPendingVerification(false)
-    setCode("")
-    setError(null)
-    setLoading(false)
-  }
 
   useEffect(() => {
     if (resendCooldown <= 0) return

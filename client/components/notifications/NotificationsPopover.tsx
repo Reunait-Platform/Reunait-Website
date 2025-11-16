@@ -4,6 +4,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Button } from "@/components/ui/button"
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso"
 import { useNotificationsStore } from "@/providers/notifications-store-provider"
+import { type NotificationItem } from "@/stores/notifications-store"
 import { useAuth } from "@clerk/nextjs"
 import { Bell } from "lucide-react"
 import * as React from "react"
@@ -12,6 +13,8 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useNavigationLoader } from "@/hooks/use-navigation-loader"
 import { SimpleLoader } from "@/components/ui/simple-loader"
 import { cn } from "@/lib/utils"
+
+type ListItem = NotificationItem | { id: '__loader__' } | { id: '__show_all__' }
 
 export default function NotificationsPopover() {
   const notifications = useNotificationsStore(s => s.notifications)
@@ -105,14 +108,14 @@ export default function NotificationsPopover() {
   const visible = React.useMemo(() => unreadOnly ? notifications.filter(n => !n.isRead) : notifications, [notifications, unreadOnly])
   React.useEffect(() => { prevVisibleLenRef.current = visible.length }, [visible.length])
   const listData = React.useMemo(() => {
-    const base = visible
+    const base: ListItem[] = visible
     if (!pagination.hasNextPage) return base
-    if (notifications.length < 100) return [...base, { id: '__loader__' } as any]
-    return [...base, { id: '__show_all__' } as any]
+    if (notifications.length < 100) return [...base, { id: '__loader__' }]
+    return [...base, { id: '__show_all__' }]
   }, [visible, pagination.hasNextPage, notifications.length])
 
 
-  const handleItemClick = async (n: any) => {
+  const handleItemClick = async (n: NotificationItem) => {
     enqueueRead(n.id)
     const token = await getToken()
     if (token) flushPendingReads(token)
@@ -229,7 +232,7 @@ export default function NotificationsPopover() {
                   ref={virtuosoRef}
                   style={{ height: '100%' }}
                   data={listData}
-                  computeItemKey={(_i, item: any) => item.id}
+                  computeItemKey={(_i, item: ListItem) => item.id}
                   defaultItemHeight={88}
                   increaseViewportBy={{ top: 200, bottom: 1200 }}
                   atBottomThreshold={200}
@@ -252,7 +255,7 @@ export default function NotificationsPopover() {
                       }
                     }
                   }}
-                  itemContent={(_index, n: any) => {
+                  itemContent={(_index, n: ListItem) => {
                     if (n?.id === '__loader__') {
                       return (
                         <div className="py-2">

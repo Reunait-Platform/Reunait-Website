@@ -4,6 +4,7 @@ import React from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@clerk/nextjs"
 import { format } from "date-fns"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Mail, BadgeCheck, MapPin, Calendar, Phone, ChevronDown, ChevronRight, Network } from "lucide-react"
 import { CasesGrid } from "@/components/cases/cases-grid"
@@ -72,7 +73,7 @@ export default function CaseOwnerProfileClient({ caseOwner, initialProfile, init
           return
         }
         setProfile(data.data as ProfileData)
-      } catch (_) {
+      } catch {
         setError("Unable to load profile. Please try again.")
       } finally {
         setLoading(false)
@@ -168,8 +169,14 @@ export default function CaseOwnerProfileClient({ caseOwner, initialProfile, init
                 <div className="h-24 w-full rounded-2xl bg-gray-100 dark:bg-gray-800 pointer-events-none" />
                 <div className="relative z-10 -mt-20 px-2 flex justify-center items-center">
                   {profile.profileImageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={profile.profileImageUrl} alt="Avatar" className="h-56 w-56 sm:h-64 sm:w-64 lg:h-72 lg:w-72 rounded-full object-cover ring-4 ring-card" />
+                    <Image
+                      src={profile.profileImageUrl}
+                      alt="Avatar"
+                      width={288}
+                      height={288}
+                      className="h-56 w-56 sm:h-64 sm:w-64 lg:h-72 lg:w-72 rounded-full object-cover ring-4 ring-card"
+                      unoptimized
+                    />
                   ) : (
                     <div className="h-56 w-56 sm:h-64 sm:w-64 lg:h-72 lg:w-72 rounded-full bg-primary/15 text-primary grid place-items-center text-2xl font-semibold ring-4 ring-card">
                       {initials(profile.fullName, (profile.role || "U")[0])}
@@ -274,7 +281,7 @@ export default function CaseOwnerProfileClient({ caseOwner, initialProfile, init
                 cases={profile?.cases || []}
                 loading={loading || casesLoading}
                 emptyMessage="No cases found for this user"
-                getMuted={(c) => (c as any).isFlagged === true}
+                getMuted={(c) => (c as { isFlagged?: boolean }).isFlagged === true}
                 showMutedHint
               />
             </div>

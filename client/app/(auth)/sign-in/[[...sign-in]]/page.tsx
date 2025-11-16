@@ -1,15 +1,13 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useSignIn, useAuth } from "@clerk/nextjs"
+import { useSignIn } from "@clerk/nextjs"
 import { useRouter, useSearchParams, usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import Link from "next/link"
 import { Eye, EyeOff } from "lucide-react"
 import { CaptchaRegion } from "@/components/auth/CaptchaRegion"
-import { getOnboardingStatus } from "@/lib/clerk-metadata"
 import { createPortal } from "react-dom"
 import { SimpleLoader } from "@/components/ui/simple-loader"
 
@@ -47,13 +45,11 @@ export default function SignInCatchAllPage() {
   const origin = search?.get("origin") || ""
   const isFromRegisterCase = returnTo === "/register-case"
   const isFromFlagCase = origin === "flag" && returnTo.startsWith("/cases/")
-  const { isLoaded: isSignInLoaded, signIn, setActive } = useSignIn() as any
-  const { getToken, sessionClaims, isSignedIn, isLoaded: isAuthLoaded } = useAuth()
+  const { isLoaded: isSignInLoaded, signIn, setActive } = useSignIn()
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [isNavigating, setIsNavigating] = useState(false)
   const [mounted, setMounted] = useState(false)
@@ -63,27 +59,6 @@ export default function SignInCatchAllPage() {
   useEffect(() => {
     setMounted(true)
   }, [])
-
-  // Hide loader when route changes
-  useEffect(() => {
-    if (isNavigating) {
-      setIsNavigating(false)
-    }
-  }, [pathname])
-
-  // Hide authentication loader when route changes
-  useEffect(() => {
-    if (isAuthenticating) {
-      setIsAuthenticating(false)
-    }
-  }, [pathname])
-
-  // Hide reset password navigation loader when route changes
-  useEffect(() => {
-    if (isNavigatingToReset) {
-      setIsNavigatingToReset(false)
-    }
-  }, [pathname])
 
   const handleSignUpClick = () => {
     setIsNavigating(true)
@@ -95,64 +70,28 @@ export default function SignInCatchAllPage() {
     router.push(`/reset-password?returnTo=${encodeURIComponent(returnTo)}`)
   }
 
-  const routeBasedOnOnboarding = async () => {
-    try {
-      // If user came from register-case, return there directly
-      if (isFromRegisterCase) {
-        router.replace(returnTo)
-        return
-      }
-      // If user came from flag flow on case detail, return directly to the case
-      if (isFromFlagCase) {
-        router.replace(returnTo)
-        return
-      }
-      // Primary: Check Clerk metadata (use top-level sessionClaims to avoid hook misuse)
-      const onboardingFromMetadata = getOnboardingStatus(sessionClaims)
-      
-      if (onboardingFromMetadata !== null) {
-        // Metadata exists, use it
-        if (onboardingFromMetadata) {
-          router.replace(returnTo)
-        } else {
-          router.replace(`/onboarding?returnTo=${encodeURIComponent(returnTo)}`)
-        }
-        return
-      }
-      
-      // Fallback removed to avoid duplicate API calls; assume onboarding needed
-      router.replace(`/onboarding?returnTo=${encodeURIComponent(returnTo)}`)
-    } catch (_) {
-      router.replace(`/onboarding?returnTo=${encodeURIComponent(returnTo)}`)
-    }
-  }
-
-  useEffect(() => {
-    if ((isAuthLoaded as any) && (isSignedIn as any)) {
-      void routeBasedOnOnboarding()
-    }
-  }, [isAuthLoaded, isSignedIn, router, returnTo])
+  // After sign-in, just navigate to returnTo.
+  // Middleware is the single source of truth for onboarding and will redirect
+  // to /onboarding or /profile as needed based on Clerk metadata.
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!isSignInLoaded) return
     setError(null)
-    setLoading(true)
     setIsAuthenticating(true)
     try {
       const res = await signIn.create({ identifier: email, password })
       if (res.status === "complete") {
         await setActive({ session: res.createdSessionId })
-        await routeBasedOnOnboarding()
+        router.replace(returnTo)
       } else {
         setError("Additional steps required. Please use the default sign-in.")
         setIsAuthenticating(false)
       }
-    } catch (err: any) {
-      setError(err?.errors?.[0]?.message || "Sign in failed. Check your credentials.")
+    } catch (err: unknown) {
+      const errorObj = err as { errors?: Array<{ message?: string }> }
+      setError(errorObj?.errors?.[0]?.message || "Sign in failed. Check your credentials.")
       setIsAuthenticating(false)
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -165,8 +104,9 @@ export default function SignInCatchAllPage() {
         redirectUrl: "/sso-callback",
         redirectUrlComplete: `/sso-complete?returnTo=${encodeURIComponent(returnTo)}`,
       })
-    } catch (err: any) {
-      setError(err?.errors?.[0]?.message || "Google sign-in failed.")
+    } catch (err: unknown) {
+      const errorObj = err as { errors?: Array<{ message?: string }> }
+      setError(errorObj?.errors?.[0]?.message || "Google sign-in failed.")
       setIsAuthenticating(false)
     }
   }
@@ -174,7 +114,7 @@ export default function SignInCatchAllPage() {
   return (
     <>
       {/* Full Screen Loader with Background Blur (Portal to body) */}
-      {(isNavigating || isAuthenticating || isNavigatingToReset) && mounted && createPortal(
+      {(isAuthenticating || isNavigating || isNavigatingToReset) && mounted && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 backdrop-blur-md">
           <SimpleLoader />
         </div>,
@@ -235,7 +175,7 @@ export default function SignInCatchAllPage() {
                 </button>
               </div>
             </div>
-            <Button type="submit" className="w-full h-12 cursor-pointer text-base font-medium" disabled={loading || isAuthenticating} aria-busy={loading || isAuthenticating}>
+            <Button type="submit" className="w-full h-12 cursor-pointer text-base font-medium" disabled={isAuthenticating} aria-busy={isAuthenticating}>
               Sign In
             </Button>
           </form>

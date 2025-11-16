@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { createPortal } from "react-dom"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { useAuth } from "@clerk/nextjs"
 import { ChevronRight } from "lucide-react"
 import { CountriesStatesService } from "@/lib/countries-states"
@@ -39,7 +38,6 @@ export function PoliceStationAutocomplete({
   state,
   city,
   error,
-  required = false,
   placeholder = "Start typing to search...",
   id = "policeStationName"
 }: PoliceStationAutocompleteProps) {
@@ -161,8 +159,9 @@ export function PoliceStationAutocomplete({
         }
         setShowDropdown(false)
       }
-    } catch (error: any) {
-      if (error.name === 'AbortError' || error.name === 'TimeoutError') {
+    } catch (error: unknown) {
+      const err = error as { name?: string; message?: string }
+      if (err.name === 'AbortError' || err.name === 'TimeoutError') {
         console.error("Request timeout: Backend server may not be responding")
       } else if (error.cause?.code === 'UND_ERR_CONNECT_TIMEOUT') {
         console.error("Connection timeout: Make sure the backend server is running")
@@ -347,6 +346,7 @@ export function PoliceStationAutocomplete({
               key={station.id}
               type="button"
               role="option"
+              aria-selected={selectedStationId === station.id}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => handleStationSelect(station)}
               className={`w-full text-left px-4 py-3 flex items-center gap-3 transition-colors duration-150 hover:bg-accent/50 focus:bg-accent focus:outline-none cursor-pointer ${idx > 0 ? 'border-t border-border/50' : ''}`}

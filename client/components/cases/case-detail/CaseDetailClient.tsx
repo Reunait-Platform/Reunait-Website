@@ -1,8 +1,8 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { createPortal } from "react-dom"
 import Image from "next/image"
-import Link from "next/link"
 import { useAuth } from "@clerk/nextjs"
 import { useRouter } from "next/navigation"
 import { Flag } from "lucide-react"
@@ -28,15 +28,21 @@ import { useImageUrlRefresh } from "@/hooks/useImageUrlRefresh"
 type Props = {
   id: string
   initialData?: CaseDetail | null
-  initialMeta?: any
+  initialMeta?: Record<string, unknown>
   initialNow?: number
 }
 
 export function CaseDetailClient({ id, initialData, initialMeta, initialNow }: Props) {
-  const { getToken, isSignedIn, userId } = useAuth()
+  const { getToken, isSignedIn } = useAuth()
   const router = useRouter()
   const { isLoading: isNavLoading, startLoading, stopLoading } = useNavigationLoader()
   const { handleApiResponse } = useNotificationsIngestion()
+  const [isLeaving, setIsLeaving] = useState(false)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const [data, setData] = useState<CaseDetail | null>(initialData ?? null)
   const [loading, setLoading] = useState(!initialData)
@@ -58,8 +64,8 @@ export function CaseDetailClient({ id, initialData, initialMeta, initialNow }: P
       return getUrl(id, imageIndex, url)
     })
     // Include 'version' so that when refreshed URLs are cached, we recompute and use them.
-    // getUrl is pure and uses a module-level cache, so this does not trigger extra API calls.
-  }, [data?.imageUrls, id, getUrl, version])
+    // This ensures the component re-renders when URLs are refreshed.
+  }, [id, getUrl, data, version])
 
   // After a router.refresh (SSR re-run), Next.js will send new props.
   // Sync any updated initialData back into local state so all child components reflect updates.
@@ -69,7 +75,7 @@ export function CaseDetailClient({ id, initialData, initialMeta, initialNow }: P
       // stop loader when new data is synced
       stopLoading()
     }
-  }, [initialData])
+  }, [initialData, stopLoading])
 
   const { selectedIndex, setSelectedIndex } = useCaseImages({ images })
 
@@ -140,15 +146,16 @@ export function CaseDetailClient({ id, initialData, initialMeta, initialNow }: P
       }
     }
     if (id) load()
-  }, [id, getToken, initialData, initialMeta])
+  }, [id, getToken, initialData, initialMeta, handleApiResponse])
 
   if (loading) {
     return (
       <div className="container mx-auto px-4 sm:px-6 md:px-4 lg:px-8 py-8">
-        {isNavLoading && (
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-background/60 backdrop-blur-sm">
+        {mounted && (isNavLoading || isLeaving) && createPortal(
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-background/70 backdrop-blur-md">
             <SimpleLoader />
-          </div>
+          </div>,
+          document.body
         )}
         <div className="animate-pulse grid grid-cols-1 lg:grid-cols-12 gap-6">
           <div className="lg:col-span-5 h-[460px] bg-muted rounded-xl" />
@@ -172,10 +179,11 @@ export function CaseDetailClient({ id, initialData, initialMeta, initialNow }: P
 
   return (
     <div className="min-h-screen bg-background">
-      {isNavLoading && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-background/60 backdrop-blur-sm">
+      {mounted && (isNavLoading || isLeaving) && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-background/70 backdrop-blur-md">
           <SimpleLoader />
-        </div>
+        </div>,
+        document.body
       )}
       <div className="container mx-auto px-4 sm:px-6 md:px-4 lg:px-8 py-4 sm:py-8">
         <div className="mb-4">
@@ -185,8 +193,12 @@ export function CaseDetailClient({ id, initialData, initialMeta, initialNow }: P
             <div className="text-sm text-muted-foreground mb-4">
               <button 
                 onClick={() => {
+                  setIsLeaving(true)
                   startLoading({ expectRouteChange: true })
-                  router.push('/cases')
+                  // Defer to next frame to allow loader to paint before unmount
+                  requestAnimationFrame(() => {
+                    router.push('/cases')
+                  })
                 }}
                 className="text-primary hover:underline cursor-pointer"
               >
@@ -292,8 +304,11 @@ export function CaseDetailClient({ id, initialData, initialMeta, initialNow }: P
             <div className="text-sm text-muted-foreground">
               <button 
                 onClick={() => {
+                  setIsLeaving(true)
                   startLoading({ expectRouteChange: true })
-                  router.push('/cases')
+                  requestAnimationFrame(() => {
+                    router.push('/cases')
+                  })
                 }}
                 className="text-primary hover:underline cursor-pointer"
               >
@@ -401,21 +416,25 @@ export function CaseDetailClient({ id, initialData, initialMeta, initialNow }: P
                     <div className="relative w-full overflow-hidden rounded-xl border border-border bg-card">
                       <div className="relative w-full aspect-[4/5] md:max-h-[520px] lg:max-h-none">
                         <Image
-                          key={`${id}-${selectedIndex}-${images[selectedIndex]}`}
+                          key={`${id}-${selectedIndex}-${images[selectedIndex]}-${version}`}
                           src={images[selectedIndex]}
                           alt={`${data?.fullName ?? 'Person'} - Image ${selectedIndex + 1}`}
                           fill
                           className="object-cover"
                           sizes="(max-width: 1024px) 100vw, 40vw"
                           priority={selectedIndex === 0}
-                          onError={async (e) => {
-                            // Fallback error handler - proactive refresh should prevent most errors
+                          unoptimized={images[selectedIndex]?.includes('X-Amz-Signature')}
+                          onError={async () => {
+                            // Immediate refresh on 403/expired URL error
                             const imageIndex = selectedIndex + 1
                             try {
-                              await refreshUrl(id, imageIndex)
-                              // URL will be updated via getUrl on next render
-                            } catch (error) {
-                              console.error(`Failed to refresh URL for case ${id}, image ${imageIndex}:`, error)
+                              const newUrl = await refreshUrl(id, imageIndex)
+                              if (newUrl) {
+                                // Force re-render by updating version (handled by hook)
+                                // Image key change will force Next.js to reload
+                              }
+                            } catch {
+                              // Silently handle refresh errors - will retry
                             }
                           }}
                         />
@@ -440,18 +459,22 @@ export function CaseDetailClient({ id, initialData, initialMeta, initialNow }: P
                               aria-label={`Select image ${i + 1}`}
                             >
                               <Image 
+                                key={`thumb-${id}-${i}-${src}-${version}`}
                                 src={src} 
                                 alt={`Thumb ${i + 1}`} 
                                 fill 
                                 className="object-cover" 
                                 sizes="96px"
-                                onError={async (e) => {
-                                  // Fallback error handler - proactive refresh should prevent most errors
+                                unoptimized={src?.includes('X-Amz-Signature')}
+                                onError={async () => {
+                                  // Immediate refresh on 403/expired URL error
                                   try {
-                                    await refreshUrl(id, imageIndex)
-                                    // URL will be updated via getUrl on next render
-                                  } catch (error) {
-                                    console.error(`Failed to refresh URL for case ${id}, image ${imageIndex}:`, error)
+                                    const newUrl = await refreshUrl(id, imageIndex)
+                                    if (newUrl) {
+                                      // Force re-render by updating version (handled by hook)
+                                    }
+                                  } catch {
+                                    // Silently handle refresh errors - will retry
                                   }
                                 }}
                               />
@@ -486,15 +509,13 @@ export function CaseDetailClient({ id, initialData, initialMeta, initialNow }: P
               onOpenSimilar={openSimilarDialog}
               notifications={data?.notifications || []}
               isCaseOwner={data?.isCaseOwner}
-              canCloseCase={data?.canCloseCase}
-              canFlag={data?.canFlag}
               isSignedIn={isSignedIn}
             />
             <CaseDescription data={data} />
             <CaseDetailSection 
               sections={data.sections?.map(section => ({
                 ...section,
-                items: section.items.map((item: any) => {
+                items: section.items.map((item) => {
                   // Add onClick handler for "Assigned: No" when clickable
                   if (item.label === 'Assigned' && item.isClickable && data?.canAssign && id) {
                     return {

@@ -1,20 +1,18 @@
 'use client'
 import Link from 'next/link'
 import { Logo } from '@/components/logo'
-import { Menu, X, Plus, CupSoda, Bell } from 'lucide-react'
+import { Menu, X, Plus, CupSoda } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/theme-toggle'
-import { SignedIn, SignedOut, useAuth } from '@clerk/nextjs'
+import { SignedIn, SignedOut } from '@clerk/nextjs'
 import { AccountMenu } from '@/components/account-menu'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import NotificationsPopover from '@/components/notifications/NotificationsPopover'
-import React, { useState, useEffect } from 'react'
+import React from 'react'
 import { cn } from '@/lib/utils'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useNavigationLoader } from '@/hooks/use-navigation-loader'
 import { createPortal } from 'react-dom'
 import { SimpleLoader } from '@/components/ui/simple-loader'
-import { useNotificationsStore } from '@/providers/notifications-store-provider'
 
 export function Navbar() {
     const [menuState, setMenuState] = React.useState(false)
@@ -62,13 +60,6 @@ const handleButtonClick = React.useCallback((href: string) => {
     }, [])
 
     // Popover handles its own open state
-    const notifications = useNotificationsStore(s => s.notifications)
-    const unreadCount = useNotificationsStore(s => s.unreadCount)
-    const enqueueRead = useNotificationsStore(s => s.enqueueRead)
-    const flushPendingReads = useNotificationsStore(s => s.flushPendingReads)
-    const markAllReadOptimistic = useNotificationsStore(s => s.markAllReadOptimistic)
-    const setLastSeenAt = useNotificationsStore(s => s.setLastSeenAt)
-    const { getToken } = useAuth()
 
     React.useEffect(() => {
         const measure = () => {
@@ -107,7 +98,7 @@ const handleButtonClick = React.useCallback((href: string) => {
                                 href="/"
                                 aria-label="home"
                                 className="flex items-center space-x-2"
-                                onClick={(e) => {
+                                onClick={() => {
                                     startLoading({ expectRouteChange: pathname !== '/' })
                                     if (pathname === '/') {
                                         stopAfterNextPaint()

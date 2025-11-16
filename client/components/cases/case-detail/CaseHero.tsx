@@ -9,12 +9,6 @@ interface CaseHeroProps {
   data: CaseDetail
 }
 
-const STATUS_INFO = {
-  missing: { label: "Missing" },
-  found: { label: "Found" },
-  closed: { label: "Closed" },
-} as const
-
 export function CaseHero({ data }: CaseHeroProps) {
   const dateText = data.dateMissingFound ? formatCaseStatus(data.dateMissingFound, data.status, data.originalStatus) : null
   

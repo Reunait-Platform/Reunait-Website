@@ -5,6 +5,7 @@ import { Popover, PopoverContent, PopoverAnchor } from "@/components/ui/popover"
 import { Button } from "@/components/ui/button"
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso"
 import { useNotificationsStore } from "@/providers/notifications-store-provider"
+import { type NotificationItem } from "@/stores/notifications-store"
 import { useAuth } from "@clerk/nextjs"
 import { Bell } from "lucide-react"
 import * as React from "react"
@@ -13,6 +14,8 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useNavigationLoader } from "@/hooks/use-navigation-loader"
 import { SimpleLoader } from "@/components/ui/simple-loader"
 import { cn } from "@/lib/utils"
+
+type ListItem = NotificationItem | { id: '__loader__' } | { id: '__show_all__' }
 
 type NotificationsDrawerProps = {
   open: boolean
@@ -54,34 +57,6 @@ export default function NotificationsDrawer({ open, onOpenChange, anchorRef }: N
   // Update refs on changes
   React.useEffect(() => { paginationRef.current = pagination }, [pagination])
   React.useEffect(() => { isFetchingRef.current = isFetching }, [isFetching])
-  
-  // Debounce ref to prevent rapid calls
-  const loadMoreTimeoutRef = React.useRef<NodeJS.Timeout | null>(null)
-  
-  // Stable loadMore callback using refs
-  const loadMore = React.useCallback(async () => {
-    if (isFetchingRef.current || !paginationRef.current.hasNextPage) return
-    
-    // Smart loading: Don't load more than 100 notifications total (5 pages)
-    // This prevents memory issues with very large notification counts
-    const maxNotifications = 100
-    if (notifications.length >= maxNotifications) {
-      return
-    }
-    
-    // Clear any existing timeout
-    if (loadMoreTimeoutRef.current) {
-      clearTimeout(loadMoreTimeoutRef.current)
-    }
-    
-    // Debounce the call by 100ms
-    loadMoreTimeoutRef.current = setTimeout(async () => {
-      const token = await getToken()
-      if (token) {
-        await fetchNotifications(token, paginationRef.current.currentPage + 1)
-      }
-    }, 100)
-  }, [getToken, fetchNotifications, notifications.length, unreadOnly])
   
   // Track fetch transitions for optional state handling
   React.useEffect(() => { wasFetchingRef.current = isFetching }, [isFetching])
@@ -140,9 +115,9 @@ export default function NotificationsDrawer({ open, onOpenChange, anchorRef }: N
   const listData = React.useMemo(() => {
     const base = visible
     if (!pagination.hasNextPage) return base
-    if (notifications.length < 100) return [...base, { id: '__loader__' } as any]
+    if (notifications.length < 100) return [...base, { id: '__loader__' }]
     // After 100 items, replace loader with a stable in-list "show all" row to avoid layout shifts
-    return [...base, { id: '__show_all__' } as any]
+    return [...base, { id: '__show_all__' }]
   }, [visible, pagination.hasNextPage, notifications.length])
 
   const handleOpenChange = async (next: boolean) => {
@@ -155,7 +130,7 @@ export default function NotificationsDrawer({ open, onOpenChange, anchorRef }: N
     if (token) markAllReadOptimistic(token)
   }
 
-  const handleItemClick = async (n: any) => {
+  const handleItemClick = async (n: NotificationItem) => {
     enqueueRead(n.id)
     const token = await getToken()
     if (token) flushPendingReads(token)
@@ -215,7 +190,7 @@ export default function NotificationsDrawer({ open, onOpenChange, anchorRef }: N
           <Popover open>
             <PopoverAnchor asChild>
               {/* invisible anchor to compute transform origin near the icon */}
-              <div ref={anchorRef as any} />
+              <div ref={anchorRef as React.RefObject<HTMLDivElement>} />
             </PopoverAnchor>
             <PopoverContent align="end" sideOffset={10} className="pointer-events-none bg-transparent border-0 p-0 shadow-none">
               <div className="h-2 w-2 rotate-45 bg-background border-l border-t" />
@@ -277,7 +252,7 @@ export default function NotificationsDrawer({ open, onOpenChange, anchorRef }: N
                   style={{ height: '100%' }}
                   data={listData}
                   increaseViewportBy={{ top: 200, bottom: 1200 }}
-                  computeItemKey={(_index, item: any) => item.id}
+                  computeItemKey={(_index, item: ListItem) => item.id}
                   atBottomThreshold={200}
                   atBottomStateChange={setAtBottom}
                   followOutput={atBottom ? 'auto' : false}
@@ -317,7 +292,7 @@ export default function NotificationsDrawer({ open, onOpenChange, anchorRef }: N
                     }
                   }}
                   // No footer; we render loader/show-all as in-list rows to keep height stable
-                  itemContent={(index, n: any) => {
+                  itemContent={(index, n: ListItem) => {
                     if (n?.id === '__loader__') {
                       return (
                         <div className="py-2">

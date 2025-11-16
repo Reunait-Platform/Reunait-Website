@@ -2,7 +2,6 @@
 
 import * as React from 'react'
 import Image from 'next/image'
-import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
 import { useUser, useClerk, useReverification } from '@clerk/nextjs'
 import { Button } from '@/components/ui/button'
@@ -15,7 +14,7 @@ export function AccountMenu() {
     const router = useRouter()
     const pathname = usePathname()
     const { user, isSignedIn } = useUser()
-    const { signOut, client, openUserProfile } = useClerk()
+    const { signOut } = useClerk()
     const [isManageOpen, setIsManageOpen] = React.useState(false)
     const [activeTab, setActiveTab] = React.useState<'profile' | 'security'>('profile')
     const [mounted, setMounted] = React.useState(false)
@@ -23,7 +22,6 @@ export function AccountMenu() {
     const [showPhotoCard, setShowPhotoCard] = React.useState(false)
     const [selectedFile, setSelectedFile] = React.useState<File | null>(null)
     const [previewUrl, setPreviewUrl] = React.useState<string | null>(null)
-    const [isRemoving, setIsRemoving] = React.useState(false)
     const [isSaving, setIsSaving] = React.useState(false)
     const [errorMsg, setErrorMsg] = React.useState<string | null>(null)
     const fileInputRef = React.useRef<HTMLInputElement | null>(null)
@@ -34,7 +32,6 @@ export function AccountMenu() {
     const [confirmPassword, setConfirmPassword] = React.useState('')
     const [passwordSaving, setPasswordSaving] = React.useState(false)
     const [passwordError, setPasswordError] = React.useState<string | null>(null)
-    const [passwordSuccess, setPasswordSuccess] = React.useState<string | null>(null)
     const [signOutAll, setSignOutAll] = React.useState(true)
     const isTooShort = newPassword.length > 0 && newPassword.length < 8
     const isMismatch = confirmPassword.length > 0 && newPassword !== confirmPassword
@@ -100,19 +97,8 @@ export function AccountMenu() {
     const avatar = user?.imageUrl || ''
     const displayName = user?.fullName || user?.username || 'Account'
     const email = user?.primaryEmailAddress?.emailAddress || ''
-    const isVolunteer = (user?.publicMetadata as any)?.role === 'volunteer'
+    const isVolunteer = (user?.publicMetadata as { role?: string })?.role === 'volunteer'
 
-    const formatLastActive = (input: any) => {
-        if (!input) return '—'
-        const d = new Date(input)
-        if (Number.isNaN(d.getTime())) return '—'
-        const now = new Date()
-        const isToday = d.toDateString() === now.toDateString()
-        const time = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-        if (isToday) return `Today at ${time}`
-        const y = d.toLocaleDateString([], { month: 'short', day: 'numeric' })
-        return `${y} at ${time}`
-    }
 
     
 
@@ -167,8 +153,10 @@ export function AccountMenu() {
                     <DropdownMenuItem
                         className="text-red-600 cursor-pointer"
                         onClick={async () => {
-                            await signOut()
-                            router.push('/')
+                            // Show loader immediately on sign out for better UX
+                            // and rely on Clerk to handle redirect
+                            startLoading({ expectRouteChange: true })
+                            await signOut({ redirectUrl: '/' })
                         }}
                     >
                         Sign out
@@ -305,7 +293,7 @@ export function AccountMenu() {
                                                                         setPreviewUrl(null)
                                                                         ;(async () => {
                                                                             try {
-                                                                                const anyUser = user as unknown as { removeProfileImage?: () => Promise<void>; deleteProfileImage?: () => Promise<void>; setProfileImage?: (args: any) => Promise<any> }
+                                                                                const anyUser = user as unknown as { removeProfileImage?: () => Promise<void>; deleteProfileImage?: () => Promise<void>; setProfileImage?: (args: { file: File | null }) => Promise<void> }
                                                                                 if (anyUser?.removeProfileImage) {
                                                                                     await anyUser.removeProfileImage()
                                                                                 } else if (anyUser?.deleteProfileImage) {
@@ -319,9 +307,9 @@ export function AccountMenu() {
                                                                                 setIsRemoving(false)
                                                                                 setIsSaving(false)
                                                                                 router.refresh?.()
-                                                                            } catch (err: any) {
+                                                                            } catch (err: unknown) {
                                                                                 setIsSaving(false)
-                                                                                setErrorMsg(err?.message || 'Failed to remove photo')
+                                                                                setErrorMsg(err instanceof Error ? err.message : 'Failed to remove photo')
                                                                             }
                                                                         })()
                                                                     }}
@@ -359,7 +347,7 @@ export function AccountMenu() {
                                                                         setIsSaving(true)
                                                                         setErrorMsg(null)
                                                                         if (selectedFile) {
-                                                                            const anyUser = user as unknown as { setProfileImage?: (args: { file: File }) => Promise<any> }
+                                                                            const anyUser = user as unknown as { setProfileImage?: (args: { file: File }) => Promise<void> }
                                                                             if (!anyUser?.setProfileImage) throw new Error('Profile image update not available')
                                                                             await anyUser.setProfileImage({ file: selectedFile })
                                                                         }
@@ -367,8 +355,8 @@ export function AccountMenu() {
                                                                         setSelectedFile(null)
                                                                         setPreviewUrl(null)
                                                                         router.refresh?.()
-                                                                    } catch (err: any) {
-                                                                        setErrorMsg(err?.message || 'Failed to update photo')
+                                                                    } catch (err: unknown) {
+                                                                        setErrorMsg(err instanceof Error ? err.message : 'Failed to update photo')
                                                                     } finally {
                                                                         setIsSaving(false)
                                                                     }
@@ -480,8 +468,8 @@ export function AccountMenu() {
                                                                                     setSignOutAll(true)
                                                                                     setRequiresCurrentPassword(false)
                                                                                     setCurrentPassword('')
-                                                                                } catch (err: any) {
-                                                                                    setPasswordError(err?.message || 'Failed to update password')
+                                                                                } catch (err: unknown) {
+                                                                                    setPasswordError(err instanceof Error ? err.message : 'Failed to update password')
                                                                                 } finally {
                                                                                     setPasswordSaving(false)
                                                                                 }

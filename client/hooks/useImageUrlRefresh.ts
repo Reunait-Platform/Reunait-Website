@@ -473,13 +473,10 @@ export function useImageUrlRefresh() {
   }, [])
 
   /**
-   * Get current URL for an image (PURE FUNCTION - no side effects)
+   * Get current URL for an image
    * 
-   * Industry best practice: Pure functions don't trigger re-renders or API calls
-   * This function ONLY reads from cache and initializes metadata ONCE
-   * 
-   * CRITICAL: This function should NEVER call queueRefreshRequest directly
-   * All refreshes must go through proactive timers or explicit refreshUrl() calls
+   * Industry best practice: When URL is expired, immediately queue refresh
+   * This ensures expired URLs are refreshed as soon as detected, not waiting for proactive refresh
    */
   const getUrl = useCallback(
     (caseId: string, imageIndex: number, originalUrl: string): string => {
@@ -491,11 +488,25 @@ export function useImageUrlRefresh() {
         const isExpired = now >= metadata.expiresAt
 
         if (!isExpired) {
-          // Return cached valid URL - pure function, no side effects
+          // Return cached valid URL
           return metadata.url
         }
-        // URL expired - return cached URL anyway (proactive refresh will update it)
-        // Don't trigger refresh here to prevent loops
+        
+        // URL expired - immediately queue refresh (async to prevent infinite loops)
+        // Check if refresh is already queued or in progress
+        const isQueued = refreshQueue.has(key)
+        const hasProactiveTimer = proactiveRefreshTimers.has(key)
+        
+        if (!isQueued && !hasProactiveTimer) {
+          // Queue refresh asynchronously to avoid blocking render
+          setTimeout(() => {
+            queueRefreshRequest(caseId, imageIndex).catch(() => {
+              // Silent fail - will retry on next access
+            })
+          }, 0)
+        }
+        
+        // Return expired URL for now - refresh will update it
         return metadata.url
       }
 
@@ -509,6 +520,8 @@ export function useImageUrlRefresh() {
 
       // Only set metadata if we have a valid expiration
       if (expiresAt > now || expiresIn > 0) {
+        const isAlreadyExpired = expiresAt <= now
+        
         urlCache.set(key, {
           url: originalUrl,
           createdAt: now,
@@ -516,18 +529,28 @@ export function useImageUrlRefresh() {
           expiresAt: expiresAt,
         })
 
-        // Schedule proactive refresh ONLY if:
-        // 1. URL is not expired
-        // 2. Not already scheduled
-        // 3. We have enough time before expiration (at least 10 seconds)
-        const timeUntilExpiry = expiresAt - now
-        if (timeUntilExpiry > 10000 && !proactiveRefreshTimers.has(key)) {
-          scheduleProactiveRefresh(caseId, imageIndex, key)
+        if (isAlreadyExpired) {
+          // URL is already expired - immediately queue refresh
+          const isQueued = refreshQueue.has(key)
+          const hasProactiveTimer = proactiveRefreshTimers.has(key)
+          
+          if (!isQueued && !hasProactiveTimer) {
+            setTimeout(() => {
+              queueRefreshRequest(caseId, imageIndex).catch(() => {
+                // Silent fail - will retry on next access
+              })
+            }, 0)
+          }
+        } else {
+          // Schedule proactive refresh ONLY if:
+          // 1. URL is not expired
+          // 2. Not already scheduled
+          // 3. We have enough time before expiration (at least 10 seconds)
+          const timeUntilExpiry = expiresAt - now
+          if (timeUntilExpiry > 10000 && !proactiveRefreshTimers.has(key)) {
+            scheduleProactiveRefresh(caseId, imageIndex, key)
+          }
         }
-
-        // CRITICAL: Do NOT call queueRefreshRequest here
-        // If URL is expired, proactive refresh or explicit refreshUrl() will handle it
-        // Calling it here causes infinite loops when getUrl is called in useMemo
       }
 
       return originalUrl

@@ -62,7 +62,7 @@ export const corsMiddleware = cors((req, callback) => {
             return isAllowed ? cb(null, true) : cb(new Error('Not allowed by CORS'));
         },
         methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-        allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Include-Notifications'],
+        allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
         credentials: true,
         maxAge: 86400, // cache preflight for 24h
     };

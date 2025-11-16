@@ -4,7 +4,7 @@ import { GradientButton } from "@/components/ui/gradient-button"
 import { Share2, Megaphone, Activity, Brain, Loader, Lock, Users } from "lucide-react"
 import { CaseProgressTimeline } from "./CaseProgressTimeline"
 import { FloatingDock } from "@/components/ui/floating-dock"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { useUser } from "@clerk/nextjs"
 
 interface CaseActionsProps {
@@ -26,8 +26,6 @@ interface CaseActionsProps {
   }>
   // New permission props
   isCaseOwner?: boolean
-  canCloseCase?: boolean
-  canFlag?: boolean
   isSignedIn?: boolean
 }
 
@@ -38,14 +36,11 @@ export function CaseActions({
   isAiSearchLoading = false,
   aiSearchRemainingTime = 0,
   isAiSearchEnabled = true,
-  remainingTimeFormatted = '',
   hasSimilarResults = false,
   onOpenSimilar,
   notifications = [],
   // New permission props
   isCaseOwner = false,
-  canCloseCase = false,
-  canFlag = false,
   isSignedIn = false,
 }: CaseActionsProps) {
   
@@ -64,7 +59,6 @@ export function CaseActions({
   const canViewProgress = isCaseOwner
   // Allow reporting for general users (guest tips supported by backend)
   const canReportInfo = true
-  const canShare = true // Always visible
 
   const formatRemainingTime = (ms: number): string => {
     if (ms <= 0) return "Available"

@@ -3,7 +3,7 @@ import { redirect, notFound } from 'next/navigation'
 import VortexDemoSecond from '@/components/ui/vortex-demo-2'
 import { VolunteerActions } from '@/components/volunteer/VolunteerActions'
 import type { Metadata } from "next"
-import { PAGE_KEYWORDS, METADATA_TEMPLATES, getPageKeywords } from "@/lib/seo-config"
+import { METADATA_TEMPLATES, getPageKeywords } from "@/lib/seo-config"
 
 // SEO-optimized metadata for volunteer page
 export const metadata: Metadata = {
@@ -19,7 +19,7 @@ export const metadata: Metadata = {
 export default async function VolunteerPage() {
   const user = await currentUser()
   if (!user) redirect('/sign-in')
-  const role = (user.publicMetadata as any)?.role
+  const role = (user.publicMetadata as { role?: string })?.role
   if (role !== 'volunteer') notFound()
   
   return (
@@ -33,7 +33,7 @@ export default async function VolunteerPage() {
           Thank you for volunteering
           </h1>
           <p className="mt-6 md:mt-8 text-balance text-lg md:text-xl text-muted-foreground leading-relaxed max-w-3xl mx-auto">
-            Your time and dedication help families find hope faster. Get started whenever you're ready—review pending police
+            Your time and dedication help families find hope faster. Get started whenever you&apos;re ready—review pending police
             verifications or moderate flagged cases.
           </p>
           <VolunteerActions />

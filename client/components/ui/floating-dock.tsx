@@ -108,7 +108,7 @@ const FloatingDockDesktop = ({
   className?: string
   children?: React.ReactNode
 }) => {
-  let mouseX = useMotionValue(Infinity)
+  const mouseX = useMotionValue(Infinity)
   return (
     <motion.div
       onMouseMove={(e) => mouseX.set(e.pageX)}
@@ -141,10 +141,10 @@ function IconContainer({
   onClick?: () => void
   badge?: number
 }) {
-  let ref = React.useRef<HTMLDivElement>(null)
+  const ref = React.useRef<HTMLDivElement>(null)
 
-  let distance = useTransform(mouseX, (val) => {
-    let bounds = ref.current?.getBoundingClientRect() ?? { x: 0, width: 0 } as any
+  const distance = useTransform(mouseX, (val) => {
+    const bounds = ref.current?.getBoundingClientRect() ?? { x: 0, width: 0 }
     return val - bounds.x - bounds.width / 2
   })
 
@@ -154,15 +154,15 @@ function IconContainer({
   const easingPower = 3.5
   const radius = 70
 
-  let scaleTransform = useTransform(distance, (d) => {
+  const scaleTransform = useTransform(distance, (d) => {
     const t = Math.max(0, 1 - Math.abs(Number(d)) / radius)
     return baseScale + (maxScale - baseScale) * Math.pow(t, easingPower)
   })
-  let scale = useSpring(scaleTransform, { mass: 0.1, stiffness: 150, damping: 12 })
+  const scale = useSpring(scaleTransform, { mass: 0.1, stiffness: 150, damping: 12 })
 
   const [hovered, setHovered] = React.useState(false)
 
-  const Wrapper: any = onClick ? 'button' : 'a'
+  const Wrapper = onClick ? 'button' : 'a'
 
   return (
     <Wrapper href={href} onClick={onClick} aria-label={title}>

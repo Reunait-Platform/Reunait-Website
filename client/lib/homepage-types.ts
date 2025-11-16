@@ -2,7 +2,7 @@ export interface HomepageSection {
   section: string
   title: string
   subtitle: string
-  data: any
+  data: unknown
   order: number
   isActive: boolean
 }

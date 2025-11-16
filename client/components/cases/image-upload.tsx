@@ -3,7 +3,7 @@
 import React, { useState, useRef, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Upload, X, Eye, AlertCircle } from "lucide-react"
+import { Upload, X, AlertCircle } from "lucide-react"
 import Image from "next/image"
 import { useToast } from "@/contexts/toast-context"
 
@@ -24,7 +24,6 @@ export function ImageUpload({
 }: ImageUploadProps) {
   const [previews, setPreviews] = useState<string[]>([])
   const [dragActive, setDragActive] = useState(false)
-  const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { showError } = useToast()
 
@@ -38,22 +37,22 @@ export function ImageUpload({
     setPreviews(newPreviews)
   }, [])
 
-  // Validate file
-  const validateFile = (file: File): string | null => {
-    if (!acceptedFormats.includes(file.type)) {
-      return `File type not supported. Please use: ${acceptedFormats.map(f => f.split('/')[1].toUpperCase()).join(', ')}`
-    }
-    
-    if (file.size > maxSize * 1024 * 1024) {
-      return `File size must be less than ${maxSize}MB`
-    }
-    
-    return null
-  }
-
   // Handle file selection
   const handleFiles = useCallback((files: FileList | null) => {
     if (!files) return
+
+    // Validate file (moved inside to avoid dependency issues)
+    const validateFile = (file: File): string | null => {
+      if (!acceptedFormats.includes(file.type)) {
+        return `File type not supported. Please use: ${acceptedFormats.map(f => f.split('/')[1].toUpperCase()).join(', ')}`
+      }
+      
+      if (file.size > maxSize * 1024 * 1024) {
+        return `File size must be less than ${maxSize}MB`
+      }
+      
+      return null
+    }
 
     const fileArray = Array.from(files)
     const validFiles: File[] = []
@@ -76,7 +75,7 @@ export function ImageUpload({
     const finalFiles = validFiles.slice(0, 2)
     onImagesChange(finalFiles)
     generatePreviews(finalFiles)
-  }, [onImagesChange, generatePreviews, showError, maxSize, acceptedFormats])
+  }, [onImagesChange, generatePreviews, showError, acceptedFormats, maxSize])
 
   // Handle drag events
   const handleDrag = useCallback((e: React.DragEvent) => {

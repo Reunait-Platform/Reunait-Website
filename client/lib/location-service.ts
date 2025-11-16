@@ -257,7 +257,7 @@ class LocationService {
     try {
       await this.getCurrentLocation()
       return true
-    } catch (error) {
+    } catch {
       return false
     }
   }
@@ -270,7 +270,7 @@ class LocationService {
 
     try {
       // Try to get high accuracy position with very short timeout
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+      await new Promise<GeolocationPosition>((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(
           resolve,
           reject,
@@ -278,7 +278,7 @@ class LocationService {
         )
       })
       return true
-    } catch (error) {
+    } catch {
       return false
     }
   }

@@ -6,7 +6,7 @@ import { AppVolunteerSidebar } from '@/components/app-volunteer-sidebar'
 export default async function VolunteerWithSidebarLayout({ children }: { children: React.ReactNode }) {
 	const user = await currentUser()
 	if (!user) redirect('/sign-in')
-	const role = (user.publicMetadata as any)?.role
+	const role = (user.publicMetadata as { role?: string })?.role
 	if (role !== 'volunteer') notFound()
 
 	return (

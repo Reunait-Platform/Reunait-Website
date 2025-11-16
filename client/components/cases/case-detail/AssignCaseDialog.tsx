@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
-import { UserPlus, Loader2, Search, AlertTriangle, CheckCircle2, ChevronRight, User, X } from "lucide-react"
+import { UserPlus, Loader2, Search, AlertTriangle, ChevronRight, X } from "lucide-react"
 import { useToast } from "@/contexts/toast-context"
 import { useAuth } from "@clerk/nextjs"
 import { assignCase } from "@/lib/actions/case-actions"
@@ -59,7 +59,7 @@ export function AssignCaseDialog({
     }, 300)
 
     return () => clearTimeout(timeoutId)
-  }, [searchQuery])
+  }, [searchQuery, performUserSearch])
 
   const performUserSearch = useCallback(async (query: string) => {
     setIsSearching(true)

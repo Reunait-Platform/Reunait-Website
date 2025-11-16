@@ -109,7 +109,7 @@ export function AllNotificationsView() {
       if (typeof data.totalAll === 'number') {
         setTotalAll(data.totalAll)
       }
-    } catch (error) {
+    } catch {
       // Silently handle fetch errors
     } finally {
       setIsLoading(false)

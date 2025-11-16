@@ -1,7 +1,7 @@
 export async function fetchWithNotifications(input: RequestInfo | URL, init: RequestInit = {}) {
-  const headers = new Headers(init.headers || {})
-  headers.set('X-Include-Notifications', '1')
-  const res = await fetch(input, { ...init, headers })
+  // Legacy helper retained for compatibility; header-based notifications are deprecated.
+  // Simply delegates to fetch without adding any custom headers.
+  const res = await fetch(input, init)
   return res
 }
 

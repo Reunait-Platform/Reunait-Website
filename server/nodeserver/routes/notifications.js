@@ -13,9 +13,29 @@ const MAX_CONNECTIONS = parseInt(process.env.MAX_NOTIFICATIONS_CONNECTIONS || '1
 router.post('/notifications/read', requireAuth(), async (req, res) => {
   try {
     const { userId } = req.auth() || {};
-    const ids = Array.isArray(req.body?.ids) ? req.body.ids.filter(Boolean) : [];
     if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
-    if (ids.length === 0) return res.json({ success: true, updatedIds: [], alreadyReadIds: [], invalidIds: [] });
+    
+    // Validate and sanitize notification IDs
+    const rawIds = req.body?.ids;
+    if (!Array.isArray(rawIds)) {
+      return res.status(400).json({ success: false, message: 'Invalid request: ids must be an array' });
+    }
+    
+    // Filter out invalid IDs (must be non-empty strings or valid ObjectId format)
+    const ids = rawIds
+      .filter((id) => {
+        if (typeof id !== 'string') return false;
+        if (id.trim().length === 0) return false;
+        // Basic validation: ObjectId is 24 hex characters
+        if (id.length !== 24) return false;
+        return /^[0-9a-fA-F]{24}$/.test(id);
+      })
+      .map((id) => String(id).trim());
+    
+    if (ids.length === 0) {
+      return res.json({ success: true, updatedIds: [], alreadyReadIds: [], invalidIds: [] });
+    }
+    
     const batchSize = parseInt(process.env.NOTIFICATIONS_READ_BATCH_SIZE || '100', 10);
     const capped = ids.slice(0, batchSize);
 
@@ -44,8 +64,11 @@ router.post('/notifications/read', requireAuth(), async (req, res) => {
 
     return res.json({ success: true, updatedIds: toMark, alreadyReadIds, invalidIds });
   } catch (err) {
-    try { console.error('[POST /api/notifications/read]', err); } catch {}
-    return res.status(500).json({ success: false, message: 'Server error' });
+    console.error('[POST /api/notifications/read] Error:', err);
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Failed to update notification read status' 
+    });
   }
 });
 
@@ -62,7 +85,11 @@ router.post('/notifications/read-all', requireAuth(), async (req, res) => {
     
     return res.json({ success: true });
   } catch (err) {
-    return res.status(500).json({ success: false, message: 'Server error' });
+    console.error('[POST /api/notifications/read-all] Error:', err);
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Failed to mark all notifications as read' 
+    });
   }
 });
 
@@ -72,10 +99,20 @@ router.get('/notifications', requireAuth(), async (req, res) => {
     const { userId } = req.auth() || {};
     if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
     
-    const page = parseInt(req.query.page) || 1;
+    // Validate and parse pagination parameters
+    const pageParam = req.query.page;
+    const page = (typeof pageParam === 'string' && !isNaN(Number(pageParam)) && Number(pageParam) > 0)
+      ? Number(pageParam)
+      : 1;
+    
     const defaultPageSize = parseInt(process.env.NOTIFICATIONS_DEFAULT_PAGE_SIZE || '20', 10);
     const maxPageSize = parseInt(process.env.NOTIFICATIONS_MAX_PAGE_SIZE || '50', 10);
-    const limit = Math.min(parseInt(req.query.limit) || defaultPageSize, maxPageSize);
+    
+    const limitParam = req.query.limit;
+    const requestedLimit = (typeof limitParam === 'string' && !isNaN(Number(limitParam)) && Number(limitParam) > 0)
+      ? Number(limitParam)
+      : defaultPageSize;
+    const limit = Math.min(requestedLimit, maxPageSize);
     const filter = req.query.filter === 'unread' ? 'unread' : 'all';
     
     const user = await User.findOne({ clerkUserId: userId }).select('notifications').lean();
@@ -127,14 +164,16 @@ router.get('/notifications', requireAuth(), async (req, res) => {
       totalAll
     });
   } catch (err) {
-    console.error('[GET /api/notifications]', err);
-    return res.status(500).json({ success: false, message: 'Server error' });
+    console.error('[GET /api/notifications] Error:', err);
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Failed to fetch notifications' 
+    });
   }
 });
 
 // GET /api/notifications/stream - Server-Sent Events endpoint using Better SSE
 router.get('/notifications/stream', requireAuth(), async (req, res) => {
-  const connectionId = `conn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   try {
     const { userId } = req.auth() || {};
     
@@ -234,13 +273,16 @@ router.get('/notifications/stream', requireAuth(), async (req, res) => {
     // No need for manual intervals or cleanup - Better SSE handles it
 
   } catch (err) {
-    console.error(`[SSE] SSE connection setup failed:`, err);
+    console.error('[SSE] Connection setup failed:', err);
     try {
       if (!res.headersSent) {
-        res.status(500).json({ success: false, message: 'Server error' });
+        res.status(500).json({ 
+          success: false, 
+          message: 'Failed to establish notification stream' 
+        });
       }
     } catch (error) {
-      // Response already sent or closed
+      // Response already sent or closed - ignore
     }
   }
 });

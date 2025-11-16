@@ -3,7 +3,7 @@ import type { Metadata } from "next"
 import { auth } from "@clerk/nextjs/server"
 import { fetchCaseById, type CaseDetail } from "@/lib/api"
 import { CaseDetailClient } from "@/components/cases/case-detail/CaseDetailClient"
-import { SITE_CONFIG, METADATA_TEMPLATES, OPEN_GRAPH_DEFAULTS, TWITTER_DEFAULTS, getLocationKeywords, BASE_KEYWORDS } from "@/lib/seo-config"
+import { METADATA_TEMPLATES, OPEN_GRAPH_DEFAULTS, TWITTER_DEFAULTS, getLocationKeywords, BASE_KEYWORDS } from "@/lib/seo-config"
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -12,7 +12,7 @@ interface PageProps {
 export default async function CaseDetailPage({ params }: PageProps) {
   const { id } = await params
   let initialData: CaseDetail | null = null
-  let initialMeta: any = null
+  let initialMeta: Record<string, unknown> | null = null
   const serverNow = Date.now()
 
   try {
@@ -20,8 +20,8 @@ export default async function CaseDetailPage({ params }: PageProps) {
     const token = getToken ? await getToken() : undefined
     const res = await fetchCaseById(id, token || undefined)
     initialData = res?.data ?? null
-    initialMeta = (res as any)?._meta ?? null
-  } catch (_) {
+    initialMeta = (res as CaseResponse & { _meta?: Record<string, unknown> })?._meta ?? null
+  } catch {
     // ignore, will render notFound below
   }
 
@@ -40,9 +40,6 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     const res = await fetchCaseById(id)
     const data = res?.data
     const name = data?.fullName || 'Missing Person Case'
-    const title = `Missing: ${name}`
-    const descBase = data?.description || `Help find ${name}.`
-    const description = descBase.length > 180 ? `${descBase.slice(0, 177)}…` : descBase
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || ''
     const url = siteUrl ? `${siteUrl}/cases/${id}` : undefined
     const images = Array.isArray(data?.imageUrls) && data.imageUrls.length > 0 ? [data.imageUrls[0]] : undefined

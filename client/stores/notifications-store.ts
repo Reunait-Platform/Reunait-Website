@@ -25,7 +25,7 @@ export type NotificationsState = {
 }
 
 export type NotificationsActions = {
-  ingestFromMeta: (meta: any) => void
+  ingestFromMeta: (meta: { notifications?: NotificationItem[]; unreadCount?: number; [key: string]: unknown }) => void
   ingestInitial: (
     notifications: NotificationItem[],
     pagination?: { currentPage: number; hasNextPage: boolean; totalPages: number; totalItems?: number; hasPrevPage?: boolean },
@@ -35,7 +35,7 @@ export type NotificationsActions = {
   enqueueRead: (id: string) => void
   flushPendingReads: (token?: string) => Promise<void>
   markAllReadOptimistic: (token?: string) => void
-  fetchNotifications: (token: string, page?: number) => Promise<any>
+  fetchNotifications: (token: string, page?: number) => Promise<{ notifications: NotificationItem[]; pagination?: { currentPage: number; hasNextPage: boolean; totalPages: number }; unreadCount?: number }>
   addNotification: (notification: NotificationItem) => void
   reset: () => void
 }
@@ -57,7 +57,7 @@ export const defaultInitState: NotificationsState = {
 }
 
 // Lightweight client helper to call backend
-async function postJson(path: string, body: any, token?: string): Promise<void> {
+async function postJson(path: string, body: Record<string, unknown>, token?: string): Promise<void> {
   const base = process.env.NEXT_PUBLIC_BACKEND_URL;
   if (!base) {
     throw new Error('NEXT_PUBLIC_BACKEND_URL is not configured');
@@ -97,7 +97,7 @@ export const createNotificationsStore = (
       (set, get) => ({
         ...initState,
 
-        ingestFromMeta: (meta: any) => {
+        ingestFromMeta: (meta: { notifications?: NotificationItem[]; unreadCount?: number; [key: string]: unknown }) => {
           if (!meta || !Array.isArray(meta.notifications)) {
             return
           }
@@ -265,7 +265,7 @@ export const createNotificationsStore = (
                 return bt - at;
               });
               
-              const serverUnread = (notification as any)?.unreadCount;
+              const serverUnread = (notification as { unreadCount?: number })?.unreadCount;
               const unreadCount = typeof serverUnread === 'number'
                 ? serverUnread
                 : sorted.filter(n => !n.isRead).length;
@@ -289,7 +289,7 @@ export const createNotificationsStore = (
               ? sorted.slice(0, memoryLimit) // Keep first N (newest)
               : sorted;
             
-            const serverUnread = (notification as any)?.unreadCount;
+            const serverUnread = (notification as { unreadCount?: number })?.unreadCount;
             const unreadCount = typeof serverUnread === 'number'
               ? serverUnread
               : trimmed.filter(n => !n.isRead).length;
@@ -323,7 +323,7 @@ export const createNotificationsStore = (
         onRehydrateStorage: () => (state, error) => {
           // Mark store as hydrated once persistence completes (success or error)
           try {
-            ;(state as any).hasHydrated = true
+            ;(state as NotificationsState & { hasHydrated?: boolean }).hasHydrated = true
           } catch {}
         },
         partialize: (state) => ({

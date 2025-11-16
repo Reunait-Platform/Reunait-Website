@@ -17,7 +17,7 @@ interface LocationPermissionBannerProps {
 }
 
 export function LocationPermissionBanner({ onDismiss, className = '' }: LocationPermissionBannerProps) {
-  const { requestLocation, loading, error, isSupported, location, hasPermission } = useLocationContext()
+  const { requestLocation, loading, error, isSupported, location } = useLocationContext()
   const [isDismissed, setIsDismissed] = useState(false)
 
   const handleRequestLocation = async () => {

@@ -24,7 +24,6 @@ import { PoliceStationAutocomplete } from "@/components/cases/police-station-aut
 import { countries } from "countries-list"
 import { MultiStepLoader as Loader } from "@/components/ui/multi-step-loader"
 import { SimpleLoader } from "@/components/ui/simple-loader"
-import { IconSquareRoundedX } from "@tabler/icons-react"
 
 // Loading states for multi-step loader
 const loadingStates = [
@@ -284,7 +283,7 @@ export default function RegisterCasePage() {
   const { showSuccess, showError } = useToast()
   const [isPending, startTransition] = useTransition()
   const [submitting, setSubmitting] = useState(false)
-  const [userProfile, setUserProfile] = useState<any>(null)
+  const [userProfile, setUserProfile] = useState<{ phoneNumber: string; role: string } | null>(null)
   const [loading, setLoading] = useState(false)
   const [isNavigatingToCase, setIsNavigatingToCase] = useState(false)
 
@@ -333,17 +332,17 @@ export default function RegisterCasePage() {
   })
 
   const shouldShowError = (name: keyof FormValues) => {
-    const errors: any = form.formState.errors
-    if (!errors?.[name]) return false
+    const errors = form.formState.errors
+    if (!errors[name]) return false
     if (form.formState.isSubmitted) return true
-    const dirty: any = form.formState.dirtyFields
-    const touched: any = form.formState.touchedFields
+    const dirty = form.formState.dirtyFields
+    const touched = form.formState.touchedFields
     // For police country and postal code, show only after touch or submit
     if (name === 'policeStationCountry' || name === 'policeStationPostalCode') {
-      return !!touched?.[name]
+      return !!touched[name]
     }
-    if (dirty?.[name] || touched?.[name]) return true
-    const value: any = (form as any).getValues?.(name as any)
+    if (dirty[name] || touched[name]) return true
+    const value = form.getValues(name)
     return value !== undefined && value !== null && String(value).length > 0
   }
 
@@ -352,7 +351,7 @@ export default function RegisterCasePage() {
     if (user) {
       const basicProfile = {
         phoneNumber: user.phoneNumbers?.[0]?.phoneNumber || "",
-        role: (user.publicMetadata as any)?.role || "general_user"
+        role: ((user.publicMetadata as { role?: string })?.role) || "general_user"
       }
       setUserProfile(basicProfile)
       form.setValue("contactNumber", basicProfile.phoneNumber)
@@ -387,7 +386,7 @@ export default function RegisterCasePage() {
   } | null>(null)
   
   // Memoize form state to prevent unnecessary re-renders
-  const formState = useMemo(() => form.formState, [form.formState.isValid, form.formState.errors, form.formState.isSubmitting])
+  const formState = useMemo(() => form.formState, [form.formState])
 
   // Ensure police section validity reflects in isValid when status is missing
   useEffect(() => {
@@ -533,19 +532,6 @@ export default function RegisterCasePage() {
   }, [watchedPoliceCountry, watchedPoliceState, form])
 
 
-  // Calculate form completion percentage
-  const calculateProgress = () => {
-    const fields = [
-      'fullName', 'age', 'gender', 'contactNumber', 'status', 'dateMissingFound',
-      'country', 'state', 'city', 'postalCode', 'images'
-    ]
-    const completedFields = fields.filter(field => {
-      const value = form.watch(field as keyof FormValues)
-      if (field === 'images') return Array.isArray(value) && value.length === 2
-      return value && value.toString().trim() !== ""
-    })
-    return Math.round((completedFields.length / fields.length) * 100)
-  }
 
   const onSubmit = async (values: FormValues) => {
     try {
@@ -565,7 +551,7 @@ export default function RegisterCasePage() {
       Object.entries(values).forEach(([key, value]) => {
         if (key === 'images') {
           // Handle images separately
-          values.images.forEach((file, index) => {
+          values.images.forEach((file) => {
             formData.append('images', file)
           })
         } else if (key === 'reward') {
@@ -636,7 +622,6 @@ export default function RegisterCasePage() {
   }
 
 
-  const progress = calculateProgress()
 
   return (
     <div className="container mx-auto px-4 sm:px-6 md:px-4 lg:px-8 py-10 lg:py-14 max-w-6xl">
@@ -684,7 +669,7 @@ export default function RegisterCasePage() {
                       aria-invalid={shouldShowError("fullName")}
                     />
                     {shouldShowError("fullName") && (
-                      <p className="text-xs text-destructive">{form.formState.errors.fullName?.message as any}</p>
+                      <p className="text-xs text-destructive">{form.formState.errors.fullName?.message}</p>
                     )}
                   </div>
 
@@ -701,7 +686,7 @@ export default function RegisterCasePage() {
                         aria-invalid={shouldShowError("age")}
                       />
                       {shouldShowError("age") && (
-                        <p className="text-xs text-destructive">{form.formState.errors.age?.message as any}</p>
+                        <p className="text-xs text-destructive">{form.formState.errors.age?.message}</p>
                       )}
                     </div>
 
@@ -727,7 +712,7 @@ export default function RegisterCasePage() {
                         </SelectContent>
                       </Select>
                       {shouldShowError("height") && (
-                        <p className="text-xs text-destructive">{form.formState.errors.height?.message as any}</p>
+                        <p className="text-xs text-destructive">{form.formState.errors.height?.message}</p>
                       )}
                     </div>
                   </div>
@@ -794,7 +779,7 @@ export default function RegisterCasePage() {
                         countryCallingCodeEditable={false}
                       />
                       {shouldShowError("contactNumber") && (
-                        <p className="text-xs text-destructive">{form.formState.errors.contactNumber?.message as any}</p>
+                        <p className="text-xs text-destructive">{form.formState.errors.contactNumber?.message}</p>
                       )}
                     </div>
 
@@ -812,7 +797,7 @@ export default function RegisterCasePage() {
                         </SelectContent>
                       </Select>
                       {shouldShowError("complexion") && (
-                        <p className="text-xs text-destructive">{form.formState.errors.complexion?.message as any}</p>
+                        <p className="text-xs text-destructive">{form.formState.errors.complexion?.message}</p>
                       )}
                     </div>
                   </div>
@@ -827,7 +812,7 @@ export default function RegisterCasePage() {
                       rows={3}
                     />
                     {shouldShowError("identificationMark") && (
-                      <p className="text-xs text-destructive">{form.formState.errors.identificationMark?.message as any}</p>
+                      <p className="text-xs text-destructive">{form.formState.errors.identificationMark?.message}</p>
                     )}
                     <p className="text-xs text-muted-foreground">
                       {form.watch("identificationMark")?.length || 0}/100 characters
@@ -901,7 +886,7 @@ export default function RegisterCasePage() {
                         )
                       })()}
                       {shouldShowError("dateMissingFound") && (
-                        <p className="text-xs text-destructive">{form.formState.errors.dateMissingFound?.message as any}</p>
+                        <p className="text-xs text-destructive">{form.formState.errors.dateMissingFound?.message}</p>
                       )}
                     </div>
 
@@ -923,7 +908,7 @@ export default function RegisterCasePage() {
                           }}
                         />
                         {(shouldShowError("reward") || rewardHint) && (
-                          <p className="text-xs text-destructive">{(form.formState.errors.reward?.message as any) || rewardHint}</p>
+                          <p className="text-xs text-destructive">{(form.formState.errors.reward?.message) || rewardHint}</p>
                         )}
                       </div>
                     )}
@@ -939,7 +924,7 @@ export default function RegisterCasePage() {
                       rows={4}
                     />
                     {shouldShowError("description") && (
-                      <p className="text-xs text-destructive">{form.formState.errors.description?.message as any}</p>
+                      <p className="text-xs text-destructive">{form.formState.errors.description?.message}</p>
                     )}
                     <p className="text-xs text-muted-foreground">
                       {form.watch("description")?.length || 0}/250 characters
@@ -975,7 +960,7 @@ export default function RegisterCasePage() {
                       aria-invalid={shouldShowError("address")}
                     />
                     {shouldShowError("address") && (
-                      <p className="text-xs text-destructive">{form.formState.errors.address?.message as any}</p>
+                      <p className="text-xs text-destructive">{form.formState.errors.address?.message}</p>
                     )}
                   </div>
 
@@ -996,7 +981,7 @@ export default function RegisterCasePage() {
                         </SelectContent>
                       </Select>
                       {shouldShowError("country") && (
-                        <p className="text-xs text-destructive">{form.formState.errors.country?.message as any}</p>
+                        <p className="text-xs text-destructive">{form.formState.errors.country?.message}</p>
                       )}
                     </div>
                     <div className="space-y-2">
@@ -1014,7 +999,7 @@ export default function RegisterCasePage() {
                         </SelectContent>
                       </Select>
                       {shouldShowError("state") && (
-                        <p className="text-xs text-destructive">{form.formState.errors.state?.message as any}</p>
+                        <p className="text-xs text-destructive">{form.formState.errors.state?.message}</p>
                       )}
                     </div>
                     <div className="space-y-3">
@@ -1032,7 +1017,7 @@ export default function RegisterCasePage() {
                         </SelectContent>
                       </Select>
                       {shouldShowError("city") && (
-                        <p className="text-xs text-destructive">{form.formState.errors.city?.message as any}</p>
+                        <p className="text-xs text-destructive">{form.formState.errors.city?.message}</p>
                       )}
                     </div>
                     <div className="space-y-2">
@@ -1045,7 +1030,7 @@ export default function RegisterCasePage() {
                       aria-invalid={shouldShowError("postalCode")}
                       />
                     {shouldShowError("postalCode") && (
-                      <p className="text-xs text-destructive">{form.formState.errors.postalCode?.message as any}</p>
+                      <p className="text-xs text-destructive">{form.formState.errors.postalCode?.message}</p>
                       )}
                     </div>
                   </div>
@@ -1059,7 +1044,7 @@ export default function RegisterCasePage() {
                       {...form.register("landMark")}
                     />
                     {shouldShowError("landMark") && (
-                      <p className="text-xs text-destructive">{form.formState.errors.landMark?.message as any}</p>
+                      <p className="text-xs text-destructive">{form.formState.errors.landMark?.message}</p>
                     )}
                     <p className="text-xs text-muted-foreground">
                       {form.watch("landMark")?.length || 0}/75 characters
@@ -1142,7 +1127,7 @@ export default function RegisterCasePage() {
                           </SelectContent>
                         </Select>
                         {shouldShowError("policeStationCountry") && (
-                          <p className="text-xs text-destructive">{form.formState.errors.policeStationCountry?.message as any}</p>
+                          <p className="text-xs text-destructive">{form.formState.errors.policeStationCountry?.message}</p>
                         )}
                       </div>
 
@@ -1207,7 +1192,7 @@ export default function RegisterCasePage() {
                           }}
                         />
                         {shouldShowError("policeStationPostalCode") && (
-                          <p className="text-xs text-destructive">{form.formState.errors.policeStationPostalCode?.message as any}</p>
+                          <p className="text-xs text-destructive">{form.formState.errors.policeStationPostalCode?.message}</p>
                         )}
                       </div>
                     </div>
@@ -1224,7 +1209,7 @@ export default function RegisterCasePage() {
                         aria-invalid={shouldShowError("FIRNumber")}
                       />
                       {shouldShowError("FIRNumber") && (
-                        <p className="text-xs text-destructive">{form.formState.errors.FIRNumber?.message as any}</p>
+                        <p className="text-xs text-destructive">{form.formState.errors.FIRNumber?.message}</p>
                       )}
                     </div>
 

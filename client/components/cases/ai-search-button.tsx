@@ -9,14 +9,14 @@ import { useToast } from "@/contexts/toast-context"
 
 interface AiSearchButtonProps {
   caseId: string
-  onSearchComplete?: (results: any) => void
+  onSearchComplete?: (results: unknown) => void
   className?: string
 }
 
 export function AiSearchButton({ caseId, onSearchComplete, className }: AiSearchButtonProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [isRateLimited, setIsRateLimited] = useState(false)
-  const [rateLimitMessage, setRateLimitMessage] = useState("")
+  const [, setRateLimitMessage] = useState("")
   const { getToken, isLoaded, isSignedIn } = useAuth()
   const { showError } = useToast()
 

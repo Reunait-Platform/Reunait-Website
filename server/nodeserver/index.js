@@ -18,7 +18,6 @@ import donationsRoutes from "./routes/donations.js"
 import healthRoutes from "./routes/health.js"
 import { clerkMiddleware } from "@clerk/express";
 import { rateLimiter } from "./middleware/rateLimiter.js";
-import notificationsInterceptor from "./middleware/notificationsInterceptor.js";
 import { skipJsonForWebhooks, bodyParserMiddleware } from "./middleware/bodyParser.js";
 import { corsMiddleware, privateNetworkAccess } from "./middleware/cors.js";
 import { startServer } from "./lib/server.js";
@@ -62,9 +61,6 @@ if (!fs.existsSync('uploads')) {
 
 // Apply rate limiter to all routes
 app.use(rateLimiter);
-
-// Attach notifications (only when client opts in via header)
-app.use(notificationsInterceptor({ readLimit: 20 }));
 
 /*  ROUTES  */
 // Health check endpoint (before other routes for faster response)

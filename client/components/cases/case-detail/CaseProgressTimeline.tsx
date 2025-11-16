@@ -1,6 +1,4 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Activity } from "lucide-react"
 import { formatDate } from "@/lib/helpers"
 import { format } from "date-fns"
@@ -19,36 +17,9 @@ interface CaseProgressTimelineProps {
   }>
 }
 
-const TIMELINE_DATA = [
-  { 
-    message: "New lead reported in Bandra West area", 
-    time: "2024-01-15T14:30:25.123Z",
-    ipAddress: "192.168.1.100"
-  },
-  { 
-    message: "Case status updated to 'Under Investigation'", 
-    time: "2024-01-14T10:15:30.456Z",
-    ipAddress: "10.0.0.50"
-  },
-  { 
-    message: "Police station contacted for additional details", 
-    time: "2024-01-13T16:45:20.789Z",
-    ipAddress: null // Simulating missing IP from backend
-  },
-  { 
-    message: "Witness interview scheduled for tomorrow", 
-    time: "2024-01-12T09:20:15.321Z",
-    ipAddress: "203.0.113.10"
-  },
-  { 
-    message: "Case assigned to Detective Sharma", 
-    time: "2024-01-08T11:30:45.654Z",
-    ipAddress: "198.51.100.75"
-  }
-]
 
 // Dynamic Vertical Line Component
-function DynamicVerticalLine({ contentRef, isLast }: { contentRef: React.RefObject<HTMLDivElement | null>, isLast: boolean }) {
+function DynamicVerticalLine({ contentRef }: { contentRef: React.RefObject<HTMLDivElement | null> }) {
   const [lineHeight, setLineHeight] = useState(0)
 
   useEffect(() => {
@@ -79,18 +50,14 @@ function DynamicVerticalLine({ contentRef, isLast }: { contentRef: React.RefObje
 // Timeline Item Component
 function TimelineItem({ 
   activity, 
-  isLast, 
   getDotStyle, 
   getContentSpacing, 
-  localTime, 
   relativeTime, 
   formattedDateTime 
 }: {
-  activity: any
-  isLast: boolean
+  activity: { message: string; time: string; ipAddress?: string; phoneNumber?: string; isRead: boolean; [key: string]: unknown }
   getDotStyle: (isRead: boolean) => string
   getContentSpacing: (message: string) => string
-  localTime: Date
   relativeTime: string
   formattedDateTime: string
 }) {
@@ -100,7 +67,7 @@ function TimelineItem({
     <div className="flex items-start gap-3 sm:gap-4 transition-all duration-200 rounded-lg p-2 -m-2 mb-6 sm:mb-8 border-l-4 border-primary/30 pl-4">
       <div className="flex flex-col items-center">
         <div className={getDotStyle(!activity.isRead)}></div>
-        <DynamicVerticalLine contentRef={contentRef} isLast={isLast} />
+        <DynamicVerticalLine contentRef={contentRef} />
       </div>
       
       <div className="flex-1 min-w-0">
@@ -193,10 +160,8 @@ export function CaseProgressTimeline({ children, open, onOpenChange, notificatio
               <TimelineItem 
                 key={index} 
                 activity={activity} 
-                isLast={index === notifications.length - 1}
                 getDotStyle={getDotStyle}
                 getContentSpacing={getContentSpacing}
-                localTime={localTime}
                 relativeTime={relativeTime}
                 formattedDateTime={formattedDateTime}
               />

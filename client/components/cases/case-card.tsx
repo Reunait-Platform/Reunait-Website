@@ -3,7 +3,7 @@
 import { useState, useEffect, memo, useMemo, useCallback, useRef } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { MapPin, User, Clock, CheckCircle, AlertCircle, ChevronLeft, ChevronRight } from "lucide-react"
+import { MapPin, User, Clock, CheckCircle, AlertCircle } from "lucide-react"
 import { format } from "date-fns"
 import Image from "next/image"
 import Link from "next/link"
@@ -59,7 +59,7 @@ export const CaseCard = memo(({ case: caseData, index = 0, highlightQuery = "", 
   const [isLoading, setIsLoading] = useState(true)
   // Touch/swipe state
   const [touchStart, setTouchStart] = useState<number | null>(null)
-  const [touchEnd, setTouchEnd] = useState<number | null>(null)
+  const [, setTouchEnd] = useState<number | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [dragOffset, setDragOffset] = useState(0)
   
@@ -136,14 +136,6 @@ export const CaseCard = memo(({ case: caseData, index = 0, highlightQuery = "", 
     )
   }, [caseData.fullName, highlightQuery])
 
-  // Reporter chip (text-only) - only for police/NGO
-  const showReporterChip = caseData.reportedBy === "police" || caseData.reportedBy === "NGO"
-  const reporterLabel = useMemo(() => (caseData.reportedBy ? (caseData.reportedBy as string).toUpperCase() : ""), [caseData.reportedBy])
-  const reporterClassName = useMemo(() => {
-    if (caseData.reportedBy === "police") return "bg-blue-600/90 text-white"
-    if (caseData.reportedBy === "NGO") return "bg-purple-600/90 text-white"
-    return ""
-  }, [caseData.reportedBy])
 
   // Card base classes
   const cardClassName = useMemo(() => {
@@ -272,15 +264,6 @@ export const CaseCard = memo(({ case: caseData, index = 0, highlightQuery = "", 
     }
   }, [caseData._id, refreshUrl])
   
-  const handleImageNavigation = useCallback((direction: 'prev' | 'next') => (e: React.MouseEvent) => {
-    e.stopPropagation()
-    setCurrentImageIndex(prev => direction === 'prev' ? (prev === 0 ? availableImages.length - 1 : prev - 1) : (prev === availableImages.length - 1 ? 0 : prev + 1))
-  }, [availableImages.length])
-  
-  const handleImageSelect = useCallback((i: number) => (e: React.MouseEvent) => { 
-    e.stopPropagation(); 
-    setCurrentImageIndex(i) 
-  }, [])
 
   // Navigation loader integration for consistent UX
   const router = useRouter()
@@ -374,6 +357,7 @@ export const CaseCard = memo(({ case: caseData, index = 0, highlightQuery = "", 
                       style={imageWidthStyle}
                     >
                       <Image
+                        key={`${caseData._id}-image-${idx}-${imageUrl}-${version}`}
                         src={imageUrl}
                         alt={`${caseData.fullName} - Image ${idx + 1}`}
                         fill
@@ -381,6 +365,7 @@ export const CaseCard = memo(({ case: caseData, index = 0, highlightQuery = "", 
                         onError={(e) => handleImageError(e, imageIndex)}
                         priority={idx < 2}
                         sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
+                        unoptimized={imageUrl?.includes('X-Amz-Signature')}
                       />
                     </div>
                   )
@@ -474,7 +459,7 @@ export const CaseCard = memo(({ case: caseData, index = 0, highlightQuery = "", 
       <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/70 backdrop-blur-md">
         <SimpleLoader />
       </div>,
-      typeof document !== 'undefined' ? document.body : (null as any)
+      typeof document !== 'undefined' ? document.body : null
     )}
     </>
    )

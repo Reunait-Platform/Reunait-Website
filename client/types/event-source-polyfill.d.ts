@@ -19,12 +19,12 @@ declare module 'event-source-polyfill' {
     onerror: ((this: EventSourcePolyfill, ev: Event) => unknown) | null;
     addEventListener(
       type: string,
-      listener: EventListener | EventListenerObject | ((event: any) => void),
+      listener: EventListener | EventListenerObject | ((event: Event | MessageEvent) => void),
       options?: boolean | AddEventListenerOptions
     ): void;
     removeEventListener(
       type: string,
-      listener: EventListener | EventListenerObject | ((event: any) => void),
+      listener: EventListener | EventListenerObject | ((event: Event | MessageEvent) => void),
       options?: boolean | EventListenerOptions
     ): void;
     dispatchEvent(event: Event): boolean;

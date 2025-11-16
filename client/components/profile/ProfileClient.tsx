@@ -1,9 +1,10 @@
 "use client"
 
-import React from "react"
+import React, { useCallback, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth, useUser } from "@clerk/nextjs"
 import { format } from "date-fns"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -14,10 +15,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { CountriesStatesService } from "@/lib/countries-states"
 import { useToast } from "@/contexts/toast-context"
 import { z } from "zod"
-import { Mail, BadgeCheck, Pencil, X, Save, MapPin, Calendar, Phone, ChevronDown, ChevronRight } from "lucide-react"
+import { Mail, BadgeCheck, Pencil, MapPin, Calendar, Phone, ChevronDown, ChevronRight } from "lucide-react"
 import { CasesGrid } from "@/components/cases/cases-grid"
 import { Pagination } from "@/components/ui/pagination"
 import type { Case } from "@/lib/api"
+import { useNavigationLoader } from "@/hooks/use-navigation-loader"
+import { SimpleLoader } from "@/components/ui/simple-loader"
+import { createPortal } from "react-dom"
 
 type ProfileData = {
   onboardingCompleted: boolean
@@ -124,6 +128,7 @@ export default function ProfileClient({ initialProfile }: { initialProfile?: Pro
   const { getToken, isLoaded, isSignedIn } = useAuth()
   const { user } = useUser()
   const { showSuccess, showError, showRateLimit } = useToast()
+  const { isLoading: isNavLoading, mounted: navLoaderMounted, startLoading } = useNavigationLoader()
   
   const [loading, setLoading] = React.useState(!initialProfile)
   const [error, setError] = React.useState<string | null>(null)
@@ -136,47 +141,20 @@ export default function ProfileClient({ initialProfile }: { initialProfile?: Pro
   const [saving, setSaving] = React.useState(false)
   const [edit, setEdit] = React.useState<ProfileData | null>(initialProfile ?? null)
   const [mobileDetailsOpen, setMobileDetailsOpen] = React.useState(false)
-  const [validationErrors, setValidationErrors] = React.useState<Record<string, string>>({})
+  const [validationErrors, setValidationErrors] = React.useState<Partial<Record<string, string>>>({})
   const [casesLoading, setCasesLoading] = React.useState(false)
 
+  // When SSR provides initialProfile, we rely entirely on it and do not re-fetch client-side.
+  // If the user is not signed in, simply stop showing the skeleton once auth state is known.
   React.useEffect(() => {
-    (async () => {
-      if (initialProfile) {
-        // SSR provided data; ensure loading is false and state is aligned
-        setLoading(false)
-        return
-      }
-      if (!isLoaded || !isSignedIn) return
-      try {
-        setLoading(true)
-        const token = await getToken()
-        if (!token) return
-        const base = process.env.NEXT_PUBLIC_BACKEND_URL as string
-        const res = await fetch(`${base}/api/users/profile`, {
-          method: "GET",
-          headers: { Authorization: `Bearer ${token}` },
-        })
-        const data = await res.json().catch(() => null)
-        if (!res.ok || !data?.success) {
-          setError(data?.message || "Failed to fetch profile")
-          return
-        }
-        const p: ProfileData = data.data
-        setProfile(p)
-        setEdit(p)
-      } catch (_) {
-        setError("Unable to load profile. Please try again.")
-      } finally {
-        setLoading(false)
-      }
-    })()
-  }, [getToken, isLoaded, isSignedIn, initialProfile])
-
-  React.useEffect(() => {
-    if (isEditing && edit && profile) {
-      validateForm()
+    if (initialProfile) {
+      setLoading(false)
+      return
     }
-  }, [isEditing, edit, profile])
+    if (isLoaded && !isSignedIn) {
+      setLoading(false)
+    }
+  }, [initialProfile, isLoaded, isSignedIn])
 
   const initials = (name?: string, fallback: string = "U") => {
     const n = (name || "").trim()
@@ -214,7 +192,7 @@ export default function ProfileClient({ initialProfile }: { initialProfile?: Pro
     )
   }
 
-  const validateForm = (): boolean => {
+  const validateForm = useCallback((): boolean => {
     if (!profile || !edit) return false
     try {
       const formData: ProfileEditValues = {
@@ -228,32 +206,41 @@ export default function ProfileClient({ initialProfile }: { initialProfile?: Pro
         })(),
         phoneNumber: edit.phoneNumber || '',
         address: edit.address || '',
-        dateOfBirth: edit.dateOfBirth ? (edit.dateOfBirth as any).toString() : '',
+        dateOfBirth: edit.dateOfBirth ? (typeof edit.dateOfBirth === 'string' ? edit.dateOfBirth : edit.dateOfBirth instanceof Date ? edit.dateOfBirth.toISOString().split('T')[0] : '') : '',
         gender: edit.gender || 'male',
         city: edit.city || '',
         state: edit.state || '',
         country: edit.country || '',
         pincode: edit.pincode || '',
-        role: ((r => (r === 'general_user' || r === 'police' || r === 'NGO') ? r : 'general_user')(profile.role as any)) as 'general_user' | 'police' | 'NGO',
+        role: ((r => (r === 'general_user' || r === 'police' || r === 'NGO') ? r : 'general_user')(profile.role || 'general_user')) as 'general_user' | 'police' | 'NGO',
       }
       profileEditSchema.parse(formData)
       setValidationErrors({})
       return true
-    } catch (error: any) {
-      const issues = error?.issues || error?.errors
+    } catch (error: unknown) {
+      const zodError = error as { issues?: Array<{ path?: (string | number)[]; message?: string }>; errors?: Array<{ path?: (string | number)[]; message?: string }> }
+      const issues = zodError?.issues || zodError?.errors
       if (Array.isArray(issues)) {
         const errors: Record<string, string> = {}
-        issues.forEach((issue: any) => {
+        issues.forEach((issue) => {
           const key = Array.isArray(issue.path) ? issue.path[0] : issue.path
-          if (key) errors[key as string] = issue.message
+          if (key && typeof key === 'string' && issue.message) {
+            errors[key] = issue.message
+          }
         })
         setValidationErrors(errors)
       }
       return false
     }
-  }
+  }, [profile, edit, setValidationErrors])
 
-  const validateField = (fieldName: string, value: any) => {
+  React.useEffect(() => {
+    if (isEditing && edit && profile) {
+      validateForm()
+    }
+  }, [isEditing, edit, profile, validateForm])
+
+  const validateField = (fieldName: string, value: unknown) => {
     if (!profile || !edit) return
     try {
       const formData: ProfileEditValues = {
@@ -267,26 +254,35 @@ export default function ProfileClient({ initialProfile }: { initialProfile?: Pro
         })(),
         phoneNumber: edit.phoneNumber || '',
         address: edit.address || '',
-        dateOfBirth: edit.dateOfBirth ? (edit.dateOfBirth as any).toString() : '',
+        dateOfBirth: edit.dateOfBirth ? (typeof edit.dateOfBirth === 'string' ? edit.dateOfBirth : edit.dateOfBirth instanceof Date ? edit.dateOfBirth.toISOString().split('T')[0] : '') : '',
         gender: edit.gender || 'male',
         city: edit.city || '',
         state: edit.state || '',
         country: edit.country || '',
         pincode: edit.pincode || '',
-        role: ((r => (r === 'general_user' || r === 'police' || r === 'NGO') ? r : 'general_user')(profile.role as any)) as 'general_user' | 'police' | 'NGO',
+        role: ((r => (r === 'general_user' || r === 'police' || r === 'NGO') ? r : 'general_user')(profile.role || 'general_user')) as 'general_user' | 'police' | 'NGO',
       }
-      ;(formData as any)[fieldName] = value
+      ;(formData as Record<string, unknown>)[fieldName] = value
       profileEditSchema.parse(formData)
-      setValidationErrors(prev => { const n = { ...prev }; delete n[fieldName]; return n })
-    } catch (error: any) {
-      const issues = error?.issues || error?.errors
+      setValidationErrors(prev => {
+        const { [fieldName]: _removed, ...rest } = prev
+        return rest
+      })
+    } catch (error: unknown) {
+      const zodError = error as { issues?: Array<{ path?: (string | number)[]; message?: string }>; errors?: Array<{ path?: (string | number)[]; message?: string }> }
+      const issues = zodError?.issues || zodError?.errors
       if (Array.isArray(issues)) {
-        const fieldIssue = issues.find((iss: any) => {
+        const fieldIssue = issues.find((iss) => {
           const key = Array.isArray(iss.path) ? iss.path[0] : iss.path
           return key === fieldName
         })
-        if (fieldIssue) {
-          setValidationErrors(prev => ({ ...prev, [fieldName]: fieldIssue.message }))
+        if (fieldIssue && typeof fieldIssue.message === 'string') {
+          setValidationErrors(prev => ({ ...prev, [fieldName]: fieldIssue.message as string }))
+        } else {
+          setValidationErrors(prev => {
+            const { [fieldName]: _removed, ...rest } = prev
+            return rest
+          })
         }
       }
     }
@@ -315,7 +311,7 @@ export default function ProfileClient({ initialProfile }: { initialProfile?: Pro
       pincode: normalize(current.pincode),
       governmentIdNumber: normalize(current.governmentIdNumber),
       orgName: normalize(current.orgName),
-      dateOfBirth: current.dateOfBirth ? normalize(typeof current.dateOfBirth === 'string' ? current.dateOfBirth : format(new Date(current.dateOfBirth as any), 'yyyy-MM-dd')) : "",
+      dateOfBirth: current.dateOfBirth ? normalize(typeof current.dateOfBirth === 'string' ? current.dateOfBirth : current.dateOfBirth instanceof Date ? format(current.dateOfBirth, 'yyyy-MM-dd') : format(new Date(String(current.dateOfBirth)), 'yyyy-MM-dd')) : "",
     }
     const keys: Array<keyof typeof comparableCurrent> = role === 'general_user'
       ? ["phoneNumber", "address", "country", "state", "city", "pincode", "governmentIdNumber", "dateOfBirth"]
@@ -355,7 +351,7 @@ export default function ProfileClient({ initialProfile }: { initialProfile?: Pro
       const token = await getToken()
       if (!token) return
       const base = process.env.NEXT_PUBLIC_BACKEND_URL as string
-      const payload: Record<string, any> = {
+      const payload: Record<string, unknown> = {
         role: profile.role,
         fullName: (edit.fullName || '').trim() || undefined,
         orgName: (edit.orgName || '').trim() || undefined,
@@ -369,7 +365,7 @@ export default function ProfileClient({ initialProfile }: { initialProfile?: Pro
       }
       if (profile.role === 'general_user') {
         payload.gender = edit.gender
-        payload.dateOfBirth = (edit.dateOfBirth as any) ? format(new Date(edit.dateOfBirth as any), 'yyyy-MM-dd') : undefined
+        payload.dateOfBirth = edit.dateOfBirth ? (typeof edit.dateOfBirth === 'string' ? format(new Date(edit.dateOfBirth), 'yyyy-MM-dd') : edit.dateOfBirth instanceof Date ? format(edit.dateOfBirth, 'yyyy-MM-dd') : undefined) : undefined
       } else if (profile.role === 'police' || profile.role === 'NGO' || profile.role === 'volunteer') {
         payload.fullName = (edit.orgName || '').trim() || undefined
       }
@@ -396,7 +392,7 @@ export default function ProfileClient({ initialProfile }: { initialProfile?: Pro
       setProfile(prev => {
         if (!prev) return updated
         const next: ProfileData = { ...prev, ...updated }
-        const isArrayOfStrings = Array.isArray(updated.cases) && updated.cases.every((c: any) => typeof c === 'string')
+        const isArrayOfStrings = Array.isArray(updated.cases) && updated.cases.every((c) => typeof c === 'string')
         if (isArrayOfStrings) {
           next.cases = prev.cases
         }
@@ -408,7 +404,7 @@ export default function ProfileClient({ initialProfile }: { initialProfile?: Pro
       })
       setEdit(prev => {
         const base = { ...(prev as ProfileData), ...updated }
-        const isArrayOfStrings = Array.isArray(updated.cases) && updated.cases.every((c: any) => typeof c === 'string')
+        const isArrayOfStrings = Array.isArray(updated.cases) && updated.cases.every((c) => typeof c === 'string')
         if (isArrayOfStrings) {
           base.cases = (prev as ProfileData)?.cases
         }
@@ -430,7 +426,14 @@ export default function ProfileClient({ initialProfile }: { initialProfile?: Pro
   }
 
   return (
-    <div className="container mx-auto px-3 sm:px-4 md:px-4 lg:px-8 xl:px-10 py-6 lg:py-8 max-w-full">
+    <>
+      {navLoaderMounted && isNavLoading && typeof window !== "undefined" && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-background/80 backdrop-blur-sm">
+          <SimpleLoader />
+        </div>,
+        document.body
+      )}
+      <div className="container mx-auto px-3 sm:px-4 md:px-4 lg:px-8 xl:px-10 py-6 lg:py-8 max-w-full">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 items-start">
         <div className="lg:col-span-5 w-full lg:sticky lg:top-6">
           <div className="rounded-2xl border border-border bg-card px-6 py-6 shadow-sm">
@@ -441,15 +444,21 @@ export default function ProfileClient({ initialProfile }: { initialProfile?: Pro
                 <div className="h-24 w-full rounded-2xl bg-gray-100 dark:bg-gray-800 pointer-events-none" />
                 <div className="absolute top-2 right-2 z-30">
                   {!isEditing && isVerified !== false ? (
-                    <Button variant="outline" size="icon" className="cursor-pointer" onClick={() => { setIsEditing(true); setEdit(prev => { const p = profile as ProfileData | undefined; if (!p) return prev as any; const effectiveOrg = p.role !== 'general_user' ? ((p.orgName && p.orgName.trim()) || (p.fullName && p.fullName.trim()) || '') : (p.fullName || ''); return { ...(p as any), orgName: effectiveOrg }; }); setMobileDetailsOpen(true); setValidationErrors({}) }} aria-label="Edit profile">
+                    <Button variant="outline" size="icon" className="cursor-pointer" onClick={() => { setIsEditing(true); setEdit(prev => { const p = profile as ProfileData | undefined; if (!p) return prev; const effectiveOrg = p.role !== 'general_user' ? ((p.orgName && p.orgName.trim()) || (p.fullName && p.fullName.trim()) || '') : (p.fullName || ''); return { ...p, orgName: effectiveOrg }; }); setMobileDetailsOpen(true); setValidationErrors({}) }} aria-label="Edit profile">
                       <Pencil className="h-4 w-4" />
                     </Button>
                   ) : null}
                 </div>
                 <div className="relative z-10 -mt-20 px-2 flex justify-center items-center">
                   {user?.imageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={user.imageUrl} alt="Avatar" className="h-56 w-56 sm:h-64 sm:w-64 lg:h-72 lg:w-72 rounded-full object-cover ring-4 ring-card" />
+                    <Image
+                      src={user.imageUrl}
+                      alt="Avatar"
+                      width={288}
+                      height={288}
+                      className="h-56 w-56 sm:h-64 sm:w-64 lg:h-72 lg:w-72 rounded-full object-cover ring-4 ring-card"
+                      unoptimized
+                    />
                   ) : (
                     <div className="h-56 w-56 sm:h-64 sm:w-64 lg:h-72 lg:w-72 rounded-full bg-primary/15 text-primary grid place-items-center text-2xl font-semibold ring-4 ring-card">
                       {initials(profile.fullName, (profile.role || "U")[0])}
@@ -525,7 +534,7 @@ export default function ProfileClient({ initialProfile }: { initialProfile?: Pro
                         <RadioGroup
                           className="grid grid-cols-3 gap-3"
                           value={edit.gender || 'male'}
-                          onValueChange={(v) => { setEdit(prev => ({ ...(prev as ProfileData), gender: v as any })); validateField('gender', v) }}
+                          onValueChange={(v) => { setEdit(prev => ({ ...(prev as ProfileData), gender: v as "male" | "female" | "other" })); validateField('gender', v) }}
                         >
                           <div className="flex items-center gap-2"><RadioGroupItem id="gender-male" value="male" /><Label htmlFor="gender-male" className="font-normal">Male</Label></div>
                           <div className="flex items-center gap-2"><RadioGroupItem id="gender-female" value="female" /><Label htmlFor="gender-female" className="font-normal">Female</Label></div>
@@ -537,7 +546,7 @@ export default function ProfileClient({ initialProfile }: { initialProfile?: Pro
                       <div className="space-y-2">
                         <Label>Date of birth</Label>
                         <DatePicker
-                          date={edit.dateOfBirth ? new Date(edit.dateOfBirth as any) : undefined}
+                          date={edit.dateOfBirth ? (typeof edit.dateOfBirth === 'string' ? new Date(edit.dateOfBirth) : edit.dateOfBirth instanceof Date ? edit.dateOfBirth : new Date(String(edit.dateOfBirth))) : undefined}
                           onDateChange={(d?: Date) => { const v = d ? d.toISOString().slice(0,10) : ''; setEdit(prev => ({ ...(prev as ProfileData), dateOfBirth: v })); validateField('dateOfBirth', v) }}
                         />
                         {validationErrors.dateOfBirth && (<p className="text-xs text-destructive">{validationErrors.dateOfBirth}</p>)}
@@ -659,7 +668,7 @@ export default function ProfileClient({ initialProfile }: { initialProfile?: Pro
                 cases={profile?.cases || []} 
                 loading={loading || casesLoading} 
                 emptyMessage="You haven't registered any cases yet"
-                getMuted={(c) => (c as any).isFlagged === true}
+                getMuted={(c) => (c as { isFlagged?: boolean }).isFlagged === true}
                 showMutedHint
               />
             </div>
@@ -673,15 +682,30 @@ export default function ProfileClient({ initialProfile }: { initialProfile?: Pro
                 </div>
               </div>
             )}
-            <div className="mt-4"><Button size="sm" onClick={() => router.push('/cases')}>Browse cases</Button></div>
+            <div className="mt-4">
+              <Button
+                size="sm"
+                className="cursor-pointer"
+                onClick={() => {
+                  startLoading({ expectRouteChange: true })
+                  // Defer navigation to the next frame so the loader can render before unmount
+                  requestAnimationFrame(() => {
+                    router.push('/cases')
+                  })
+                }}
+              >
+                Browse cases
+              </Button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   )
 }
 
-function InfoRow({ icon, label, value }: { icon?: React.ReactNode, label: string, value?: string | null | undefined }) {
+function InfoRow({ icon, label, value }: { icon?: ReactNode, label: string, value?: string | null | undefined }) {
   const display = (value ?? "").toString().trim() || "—"
   return (
     <div className="grid grid-cols-6 gap-2.5 text-sm">

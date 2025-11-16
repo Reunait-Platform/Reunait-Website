@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Info } from "lucide-react";
 import { ReportInfoPopup } from "./report-info-popup";
 
@@ -27,9 +27,9 @@ export function ReportInfoDemo() {
         </CardHeader>
         <CardContent>
           <ul className="space-y-2 text-sm">
-            <li>• Two radio button options: "Provide Details" and "Anonymous Report"</li>
-            <li>• "Provide Details" shows: Name, Mobile Number, and Update Message</li>
-            <li>• "Anonymous Report" shows: Only Update Message field</li>
+            <li>• Two radio button options: &quot;Provide Details&quot; and &quot;Anonymous Report&quot;</li>
+            <li>• &quot;Provide Details&quot; shows: Name, Mobile Number, and Update Message</li>
+            <li>• &quot;Anonymous Report&quot; shows: Only Update Message field</li>
             <li>• Form validation for required fields</li>
             <li>• Mobile number validation (10 digits)</li>
             <li>• API integration with loading states</li>

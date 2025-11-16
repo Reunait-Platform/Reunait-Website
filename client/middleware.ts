@@ -34,7 +34,7 @@ export default clerkMiddleware(async (auth, req) => {
     let onboardingCompleted = false
 
     // Try to get onboarding status from session claims first
-    const sessionMetadata = (sessionClaims?.publicMetadata as any)?.onboardingCompleted
+    const sessionMetadata = (sessionClaims?.publicMetadata as { onboardingCompleted?: boolean })?.onboardingCompleted
     if (sessionMetadata !== undefined) {
       onboardingCompleted = sessionMetadata === true
     } else {

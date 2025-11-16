@@ -101,7 +101,7 @@ export class ApiError extends Error {
   constructor(
     message: string,
     public status: number,
-    public data?: any
+    public data?: Record<string, unknown>
   ) {
     super(message);
     this.name = 'ApiError';
@@ -132,7 +132,6 @@ export const fetchCases = async (params: CasesParams = {}): Promise<CasesRespons
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        'X-Include-Notifications': '1',
       },
     });
 
@@ -169,10 +168,14 @@ export const fetchCaseById = async (id: string, token?: string): Promise<CaseRes
   try {
     // Dedupe burst requests to the same resource
     const cacheKey = `case:${id}`;
-    if (!(globalThis as any).__caseFetchCache) {
-      (globalThis as any).__caseFetchCache = new Map<string, Promise<CaseResponse>>();
+    type GlobalWithCaseCache = typeof globalThis & {
+      __caseFetchCache?: Map<string, Promise<CaseResponse>>
+    };
+    const globalWithCache = globalThis as GlobalWithCaseCache;
+    if (!globalWithCache.__caseFetchCache) {
+      globalWithCache.__caseFetchCache = new Map<string, Promise<CaseResponse>>();
     }
-    const cache: Map<string, Promise<CaseResponse>> = (globalThis as any).__caseFetchCache;
+    const cache = globalWithCache.__caseFetchCache;
     if (cache.has(cacheKey)) {
       return await cache.get(cacheKey)!;
     }
@@ -187,7 +190,7 @@ export const fetchCaseById = async (id: string, token?: string): Promise<CaseRes
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const fetchOptions: any = {
+    const fetchOptions: RequestInit & { next?: { tags: string[] } } = {
       method: 'GET',
       headers,
     }
@@ -198,10 +201,7 @@ export const fetchCaseById = async (id: string, token?: string): Promise<CaseRes
       fetchOptions.cache = 'no-store' as RequestCache
     }
 
-    const response = await fetch(`${API_BASE_URL}/cases/${id}`, {
-      ...fetchOptions,
-      headers: { ...(fetchOptions.headers || {}), 'X-Include-Notifications': '1' }
-    });
+    const response = await fetch(`${API_BASE_URL}/cases/${id}`, fetchOptions);
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));

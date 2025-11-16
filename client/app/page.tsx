@@ -1,10 +1,11 @@
 import { Typography } from "@/components/ui/typography"
 import { TextScramble } from "@/components/ui/text-scramble"
 import { TracingBeam } from "@/components/ui/tracing-beam"
-import { Search, Users, Shield, Heart,CheckCircle, ArrowRight, Sparkles, AlertTriangle } from "lucide-react"
+import { Search, Users, Shield, Heart, CheckCircle, AlertTriangle } from "lucide-react"
 import { GlowingEffect } from "@/components/ui/glowing-effect"
 import HeroSection from "@/components/hero-section"
 import { HomepageService } from "@/lib/homepage-service"
+import type { HomepageSection } from "@/lib/homepage-types"
 import { InfiniteSlider } from "@/components/ui/infinite-slider"
 import { ProgressiveBlur } from "@/components/ui/progressive-blur"
 import TestimonialDialog from "@/components/testimonial-dialog"
@@ -13,7 +14,6 @@ import { StructuredData } from "@/components/seo/structured-data"
 import type { Metadata } from "next"
 import { 
   SITE_CONFIG, 
-  PAGE_KEYWORDS, 
   METADATA_TEMPLATES,
   OPEN_GRAPH_DEFAULTS,
   TWITTER_DEFAULTS,
@@ -22,7 +22,7 @@ import {
 } from "@/lib/seo-config"
 
 
-const iconMap: Record<string, any> = {
+const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Search: Search,
   Users: Users,
   Shield: Shield,
@@ -66,10 +66,10 @@ export default async function Home() {
     .sort((a, b) => a.order - b.order)
 
   // Render sections based on order
-  const renderSection = (section: any) => {
+  const renderSection = (section: HomepageSection) => {
     switch (section.section) {
       case "hero":
-        return <HeroSection key={section.section} casesRoute={section.data?.casesRoute || '/cases'} />
+        return <HeroSection key={section.section} casesRoute={((section.data as { casesRoute?: string })?.casesRoute) || '/cases'} />
       
       case "features":
         return (
@@ -86,7 +86,7 @@ export default async function Home() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
-                  {section.data.features.map((feature: any, index: number) => {
+                  {Array.isArray((section.data as { features?: Array<{ icon?: string; title?: string; description?: string }> })?.features) && (section.data as { features: Array<{ icon?: string; title?: string; description?: string }> }).features.map((feature, index: number) => {
                     const IconComponent = iconMap[feature.icon] || Search // Fallback to Search icon
                     
                     return (
@@ -136,7 +136,7 @@ export default async function Home() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {section.data.stats.map((stat: any, index: number) => (
+                  {Array.isArray((section.data as { stats?: Array<{ value?: string; label?: string; description?: string }> })?.stats) && (section.data as { stats: Array<{ value?: string; label?: string; description?: string }> }).stats.map((stat, index: number) => (
                     <div key={index} className="group">
                       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-background/80 to-background/40 backdrop-blur-sm border border-border/50 p-8 hover:border-primary/30 transition-all duration-300 hover:shadow-lg hover:shadow-primary/10 hover:-translate-y-1">
                         {/* Background gradient overlay */}
@@ -191,7 +191,7 @@ export default async function Home() {
                 <div className="relative">
                   <TracingBeam className="px-6 hidden md:block">
                     <div className="space-y-12">
-                      {section.data.steps.map((step: any, index: number) => (
+                      {Array.isArray((section.data as { steps?: Array<{ type?: string; step?: number; title?: string; description?: string }> })?.steps) && (section.data as { steps: Array<{ type?: string; step?: number; title?: string; description?: string }> }).steps.map((step, index: number) => (
                         <div key={`${step.type}-${step.step}-${index}`} className="relative">
                           <div className={`flex flex-col md:flex-row items-start ${index % 2 === 0 ? 'md:flex-row' : 'md:flex-row-reverse'} md:justify-between gap-6 md:gap-12`}>
                             {/* Missing Person Steps */}
@@ -281,7 +281,7 @@ export default async function Home() {
                         </div>
                       </div>
                       <div className="space-y-5">
-                        {section.data.steps.filter((s: any) => s.type === 'missing').map((step: any, index: number) => (
+                        {Array.isArray((section.data as { steps?: Array<{ type?: string; step?: number; title?: string; description?: string }> })?.steps) && (section.data as { steps: Array<{ type?: string; step?: number; title?: string; description?: string }> }).steps.filter((s) => s.type === 'missing').map((step, index: number) => (
                           <div key={`m-${step.step}-${index}`} className="relative overflow-hidden rounded-2xl p-4 bg-gradient-to-br from-red-50 to-red-100/60 dark:from-red-950/40 dark:to-red-900/20 border border-red-200/70 dark:border-red-800/40 shadow-md shadow-red-500/10">
                             {/* Top divider shimmer */}
                             <div className="absolute inset-x-4 top-0 h-px bg-gradient-to-r from-transparent via-red-500/20 to-transparent" />
@@ -316,7 +316,7 @@ export default async function Home() {
                         </div>
                       </div>
                       <div className="space-y-5">
-                        {section.data.steps.filter((s: any) => s.type === 'found').map((step: any, index: number) => (
+                        {Array.isArray((section.data as { steps?: Array<{ type?: string; step?: number; title?: string; description?: string }> })?.steps) && (section.data as { steps: Array<{ type?: string; step?: number; title?: string; description?: string }> }).steps.filter((s) => s.type === 'found').map((step, index: number) => (
                           <div key={`f-${step.step}-${index}`} className="relative overflow-hidden rounded-2xl p-4 bg-gradient-to-br from-emerald-50 to-emerald-100/60 dark:from-emerald-950/40 dark:to-emerald-900/20 border border-emerald-200/70 dark:border-emerald-800/40 shadow-md shadow-emerald-500/10">
                             {/* Top divider shimmer */}
                             <div className="absolute inset-x-4 top-0 h-px bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent" />
@@ -370,7 +370,7 @@ export default async function Home() {
                       speedOnHover={20}
                       speed={40}
                       gap={24}>
-                      {section.data.testimonials.map((testimonial: any, index: number) => (
+                      {Array.isArray((section.data as { testimonials?: Array<{ name?: string; role?: string; content?: string; rating?: number }> })?.testimonials) && (section.data as { testimonials: Array<{ name?: string; role?: string; content?: string; rating?: number }> }).testimonials.map((testimonial, index: number) => (
                       <div key={index} className="w-[85vw] min-w-[85vw] max-w-[85vw] sm:w-[28rem] sm:min-w-[28rem] sm:max-w-[28rem] md:w-[30rem] md:min-w-[30rem] md:max-w-[30rem] lg:w-[32rem] lg:min-w-[32rem] lg:max-w-[32rem] flex-shrink-0 flex-grow-0 snap-center">
                         <div className="relative bg-gradient-to-br from-background via-background/95 to-muted/20 dark:from-background dark:via-background/90 dark:to-muted/10 backdrop-blur-sm border border-border/50 rounded-xl sm:rounded-2xl p-5 sm:p-6 md:p-7 shadow-lg hover:shadow-xl transition-shadow duration-300 h-[280px] sm:h-[320px] md:h-[340px] w-full flex flex-col overflow-hidden">
                             {/* Decorative corner accent */}

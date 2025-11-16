@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@clerk/nextjs"
-import { useForm } from "react-hook-form"
+import { useForm, useWatch } from "react-hook-form"
 import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Button } from "@/components/ui/button"
@@ -148,10 +148,15 @@ export default function OnboardingPage() {
     mode: "onChange",
   })
 
+  // Watch form values for dependencies
+  const watchedRole = useWatch({ control: form.control, name: "role" })
+  const watchedCountry = useWatch({ control: form.control, name: "country" })
+  const watchedState = useWatch({ control: form.control, name: "state" })
+
   // Reset the form to a fresh state when role changes and notify the user
   const prevRoleRef = React.useRef<FormValues["role"]>("general_user")
   React.useEffect(() => {
-    const currentRole = form.watch("role")
+    const currentRole = watchedRole
     const prevRole = prevRoleRef.current
     if (!currentRole || prevRole === currentRole) return
 
@@ -174,7 +179,7 @@ export default function OnboardingPage() {
     prevRoleRef.current = currentRole
     const roleLabel = currentRole === "NGO" ? "NGO" : currentRole === "police" ? "Police" : "General User"
     try { showSuccess(`Switched to ${roleLabel}. We've reset the fields for you.`) } catch {}
-  }, [form.watch("role")])
+  }, [watchedRole, form, showSuccess])
 
   // Role-change side effects removed per request; keep user inputs as-is across role switches
 
@@ -191,7 +196,7 @@ export default function OnboardingPage() {
   }, [])
 
   React.useEffect(() => {
-    const c = form.watch("country")
+    const c = watchedCountry
     if (!c) {
       setStates([])
       setCities([])
@@ -204,11 +209,11 @@ export default function OnboardingPage() {
     setCities([])
     form.setValue("state", "", { shouldValidate: true })
     form.setValue("city", "", { shouldValidate: true })
-  }, [form.watch("country")])
+  }, [watchedCountry, form])
 
   React.useEffect(() => {
-    const c = form.watch("country")
-    const s = form.watch("state")
+    const c = watchedCountry
+    const s = watchedState
     if (!c || !s) {
       setCities([])
       form.setValue("city", "", { shouldValidate: true })
@@ -217,7 +222,7 @@ export default function OnboardingPage() {
     const newCities = CountriesStatesService.getCities(c, s)
     setCities(newCities)
     form.setValue("city", "", { shouldValidate: true })
-  }, [form.watch("country"), form.watch("state")])
+  }, [watchedCountry, watchedState, form])
 
   const onSubmit = async (values: FormValues) => {
     try {
@@ -232,7 +237,7 @@ export default function OnboardingPage() {
       const hasStates = values.country ? CountriesStatesService.getStates(values.country).length > 0 : false
       const hasCities = hasStates && values.state ? CountriesStatesService.getCities(values.country!, values.state!).length > 0 : false
 
-      const payload: Record<string, any> = {
+      const payload: Record<string, unknown> = {
         role,
         phoneNumber: trimmed(values.phoneNumber) || undefined,
         address: trimmed(values.address) || undefined,
@@ -278,7 +283,7 @@ export default function OnboardingPage() {
       // Start navigation loader and navigate
       startLoading({ expectRouteChange: true })
       router.push(returnTo)
-    } catch (e: any) {
+    } catch {
       showError("Unable to save profile. Check your connection and try again.")
     } finally {
       setSubmitting(false)

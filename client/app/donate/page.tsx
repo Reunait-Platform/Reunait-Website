@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/contexts/toast-context"
-import { Sparkles, IndianRupee, Loader2, CheckCircle2, XCircle, Globe } from "lucide-react"
+import { Sparkles, Loader2, CheckCircle2, Globe } from "lucide-react"
 import Script from "next/script"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useSearchParams, useRouter } from "next/navigation"
@@ -25,10 +25,54 @@ const DEFAULT_PREDEFINED_AMOUNTS: Record<string, number[]> = {
     JPY: [1000, 2500, 5000, 10000, 25000],
 }
 
+// Razorpay types based on official SDK
+interface RazorpayPaymentResponse {
+    razorpay_order_id: string
+    razorpay_payment_id: string
+    razorpay_signature: string
+}
+
+interface RazorpayError {
+    error?: {
+        description?: string
+        reason?: string
+    }
+    message?: string
+}
+
+interface RazorpayOptions {
+    key: string
+    amount: number
+    currency: string
+    name: string
+    description: string
+    order_id: string
+    callback_url?: string
+    redirect?: boolean
+    handler?: (response: RazorpayPaymentResponse) => void | Promise<void>
+    prefill?: Record<string, unknown>
+    theme?: {
+        color?: string
+    }
+    modal?: {
+        ondismiss?: () => void
+    }
+    handler_error?: (error: RazorpayError) => void
+}
+
+interface RazorpayInstance {
+    open: () => void
+    close: () => void
+}
+
+interface RazorpayConstructor {
+    new (options: RazorpayOptions): RazorpayInstance
+}
+
 // Declare Razorpay type
 declare global {
     interface Window {
-        Razorpay: any
+        Razorpay: RazorpayConstructor
     }
 }
 
@@ -39,8 +83,18 @@ interface CurrencyInfo {
     exponent?: number
 }
 
-const currencyDisplayNames = typeof Intl !== "undefined" && (Intl as any).DisplayNames
-    ? new (Intl as any).DisplayNames(undefined, { type: "currency" })
+interface IntlDisplayNamesConstructor {
+    new (locales?: string | string[], options?: { type: "currency" | "language" | "region" | "script" }): {
+        of: (code: string) => string
+    }
+}
+
+interface IntlWithDisplayNames extends Intl {
+    DisplayNames?: IntlDisplayNamesConstructor
+}
+
+const currencyDisplayNames = typeof Intl !== "undefined" && "DisplayNames" in Intl
+    ? new (Intl as IntlWithDisplayNames).DisplayNames!(undefined, { type: "currency" })
     : null
 
 const getCurrencyName = (code: string): string => {
@@ -86,7 +140,6 @@ export default function DonatePage() {
     const searchParams = useSearchParams()
     const router = useRouter()
 
-    const currentCurrency = currencies.find(c => c.code === currency) || { code: currency, isZeroDecimal: false }
 
     // Fetch supported currencies from backend (once on mount)
     useEffect(() => {
@@ -104,7 +157,7 @@ export default function DonatePage() {
                         setCurrency(data.data.currencies[0].code)
                     }
                 }
-            } catch (error) {
+            } catch {
                 // Fallback: use default currencies if API fails
                 showError("Failed to load currencies. Using default.", "Error")
             } finally {
@@ -230,7 +283,6 @@ export default function DonatePage() {
             // Step 2: Open Razorpay Checkout
             // Best Practice: Add callback URLs for better browser compatibility
             const backendBase = base
-            const frontendBase = typeof window !== "undefined" ? window.location.origin : ""
             
             const options = {
                 key: keyId,
@@ -243,7 +295,7 @@ export default function DonatePage() {
                 // Official Docs: https://razorpay.com/docs/payments/payment-gateway/callback-url/
                 callback_url: `${backendBase}/api/donations/callback`,
                 redirect: true, // Enable redirect for better compatibility
-                handler: async function (response: any) {
+                handler: async function (response: RazorpayPaymentResponse) {
                     // Step 3: Verify payment on backend
                     try {
                         const verifyResponse = await fetch(`${base}/api/donations/verify-payment`, {
@@ -273,9 +325,10 @@ export default function DonatePage() {
                         } else {
                             throw new Error(verifyData.message || "Payment verification failed")
                         }
-                    } catch (error: any) {
+                    } catch (error: unknown) {
+                        const errorMessage = error instanceof Error ? error.message : "Payment verification failed. Please contact support if the amount was deducted."
                         showError(
-                            error.message || "Payment verification failed. Please contact support if the amount was deducted.",
+                            errorMessage,
                             "Verification Error"
                         )
                     } finally {
@@ -294,7 +347,7 @@ export default function DonatePage() {
                     },
                 },
                 // Handle payment errors
-                handler_error: function (error: any) {
+                handler_error: function (error: RazorpayError) {
                     setIsProcessing(false)
                     // Check for common error messages
                     const errorMessage = error?.error?.description || error?.error?.reason || error?.message || "Payment failed"
@@ -317,9 +370,10 @@ export default function DonatePage() {
 
             const razorpay = new window.Razorpay(options)
             razorpay.open()
-        } catch (error: any) {
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : "Failed to process donation. Please try again."
             showError(
-                error.message || "Failed to process donation. Please try again.",
+                errorMessage,
                 "Donation Error"
             )
             setIsProcessing(false)

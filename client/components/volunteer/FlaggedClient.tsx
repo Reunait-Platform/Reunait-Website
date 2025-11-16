@@ -73,8 +73,8 @@ export function FlaggedClient({ initialCountry = "all" }: { initialCountry?: str
       setPage(data.page || 1)
       setTotal(data.total || 0)
       setHasMore(Boolean(data.hasMore))
-    } catch (err: any) {
-      showError("Failed to load flagged cases", err?.message || "Please try again.")
+    } catch (err: unknown) {
+      showError("Failed to load flagged cases", err instanceof Error ? err.message : "Please try again.")
       setItems([])
       setTotal(0)
       setHasMore(false)
@@ -112,8 +112,8 @@ export function FlaggedClient({ initialCountry = "all" }: { initialCountry?: str
       }
       showSuccess("Case unflagged", "The case is visible again.")
       await fetchData()
-    } catch (err: any) {
-      showError("Unflag failed", err?.message || "Please try again.")
+    } catch (err: unknown) {
+      showError("Unflag failed", err instanceof Error ? err.message : "Please try again.")
     } finally {
       setLoading(false)
     }
@@ -135,8 +135,8 @@ export function FlaggedClient({ initialCountry = "all" }: { initialCountry?: str
       }
       showSuccess("Case hidden", "The case has been removed due to violations.")
       await fetchData()
-    } catch (err: any) {
-      showError("Hide failed", err?.message || "Please try again.")
+    } catch (err: unknown) {
+      showError("Hide failed", err instanceof Error ? err.message : "Please try again.")
     } finally {
       setLoading(false)
     }
