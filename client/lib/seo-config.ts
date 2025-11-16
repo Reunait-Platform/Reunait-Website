@@ -266,7 +266,7 @@ export const OPEN_GRAPH_DEFAULTS = {
       height: 630,
       alt: `${SITE_CONFIG.name} - Missing Person Platform`,
     },
-  ] as const,
+  ],
 }
 
 // Twitter Card defaults
