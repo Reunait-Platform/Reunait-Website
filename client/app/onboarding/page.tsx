@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, Suspense } from "react"
+import dynamic from "next/dynamic"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@clerk/nextjs"
 import { useForm, useWatch } from "react-hook-form"
@@ -14,12 +15,17 @@ import { PhoneInput } from "@/components/ui/phone-input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { CountriesStatesService } from "@/lib/countries-states"
 import { useToast } from "@/contexts/toast-context"
-import { Player } from "@lottiefiles/react-lottie-player"
 import { Shield, Clock, CheckCircle2 } from "lucide-react"
 import { DatePicker } from "@/components/ui/date-picker"
 import { SimpleLoader } from "@/components/ui/simple-loader"
 import { createPortal } from "react-dom"
 import { useNavigationLoader } from "@/hooks/use-navigation-loader"
+
+// Dynamically import Player component with SSR disabled (uses browser-only APIs)
+const Player = dynamic(
+  () => import("@lottiefiles/react-lottie-player").then((mod) => ({ default: mod.Player })),
+  { ssr: false }
+)
 
 // Component that uses useSearchParams - must be wrapped in Suspense
 function ReturnToReader({ children }: { children: (returnTo: string) => React.ReactNode }) {
@@ -302,7 +308,7 @@ function OnboardingPageContent({ returnTo }: { returnTo: string }) {
   return (
     <>
       {/* Full Screen Loader with Background Blur (Portal to body) */}
-      {mounted && isPageLoading && createPortal(
+      {mounted && isPageLoading && typeof window !== 'undefined' && document.body && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 backdrop-blur-md">
           <SimpleLoader />
         </div>,
@@ -310,7 +316,7 @@ function OnboardingPageContent({ returnTo }: { returnTo: string }) {
       )}
       
       {/* Navigation Loader (Portal to body) */}
-      {loaderMounted && isNavigating && createPortal(
+      {loaderMounted && isNavigating && typeof window !== 'undefined' && document.body && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 backdrop-blur-md">
           <SimpleLoader />
         </div>,
