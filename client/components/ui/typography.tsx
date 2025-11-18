@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils"
 import { VariantProps, cva } from "class-variance-authority"
-import { forwardRef } from "react"
+import React, { forwardRef } from "react"
 
 const typographyVariants = cva("", {
   variants: {
@@ -30,14 +30,30 @@ export interface TypographyProps
 }
 
 const Typography = forwardRef<HTMLElement, TypographyProps>(
-  ({ className, variant, as, ...props }, ref) => {
-    const Component = as || "p"
-    return (
-      <Component
-        className={cn(typographyVariants({ variant }), className)}
-        ref={ref}
-        {...props}
-      />
+  ({ className, variant, as = "p", ...props }, ref) => {
+    const elementMap: Record<string, keyof React.JSX.IntrinsicElements> = {
+      h1: "h1",
+      h2: "h2",
+      h3: "h3",
+      h4: "h4",
+      p: "p",
+      blockquote: "blockquote",
+      code: "code",
+      lead: "p",
+      large: "p",
+      small: "small",
+      muted: "p",
+    }
+    
+    const Component = elementMap[as] || "p"
+    
+    return React.createElement(
+      Component,
+      {
+        className: cn(typographyVariants({ variant }), className),
+        ref,
+        ...props,
+      }
     )
   }
 )

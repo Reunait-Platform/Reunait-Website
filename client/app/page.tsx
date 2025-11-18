@@ -87,7 +87,11 @@ export default async function Home() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
                   {Array.isArray((section.data as { features?: Array<{ icon?: string; title?: string; description?: string }> })?.features) && (section.data as { features: Array<{ icon?: string; title?: string; description?: string }> }).features.map((feature, index: number) => {
-                    const IconComponent = iconMap[feature.icon] || Search // Fallback to Search icon
+                    // Type-safe icon lookup: ensure feature.icon exists and is a valid key in iconMap
+                    const iconKey = feature.icon
+                    const IconComponent = (iconKey && iconKey in iconMap) 
+                      ? iconMap[iconKey as keyof typeof iconMap] 
+                      : Search // Fallback to Search icon
                     
                     return (
                       <div key={index} className="group">
@@ -150,7 +154,7 @@ export default async function Home() {
                             duration={1.2}
                             speed={0.03}
                           >
-                            {stat.value}
+                            {stat.value ?? ''}
                           </TextScramble>
                           <TextScramble 
                             as="div"
@@ -158,7 +162,7 @@ export default async function Home() {
                             duration={1.0}
                             speed={0.04}
                           >
-                            {stat.label}
+                            {stat.label ?? ''}
                           </TextScramble>
                         </div>
                         
@@ -384,7 +388,7 @@ export default async function Home() {
                             </div>
                             
                           <Typography variant="muted" className="text-sm sm:text-base mb-5 sm:mb-6 md:mb-7 italic leading-relaxed sm:leading-loose pl-8 sm:pl-10 md:pl-12 text-foreground/85 break-words whitespace-pre-wrap hyphens-auto max-h-[160px] sm:max-h-[200px] md:max-h-[220px] overflow-y-auto pr-2">
-                              {testimonial.message}
+                              {testimonial.content ?? ''}
                             </Typography>
                             
                             {/* Name with accent typography */}

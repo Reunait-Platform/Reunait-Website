@@ -1,7 +1,7 @@
 "use client"
 
 import { cn } from "@/lib/utils";
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useCallback } from "react";
 import { createNoise3D } from "simplex-noise";
 import { motion } from "motion/react";
 
@@ -55,19 +55,23 @@ export const Vortex = (props: VortexProps) => {
   const lerp = (n1: number, n2: number, speed: number): number =>
     (1 - speed) * n1 + speed * n2;
 
-  const setup = useCallback(() => {
-    const canvas = canvasRef.current;
+  const resize = useCallback((
+    canvas: HTMLCanvasElement,
+  ) => {
     const container = containerRef.current;
-    if (canvas && container) {
-      const ctx = canvas.getContext("2d");
-
-      if (ctx) {
-        resize(canvas);
-        initParticles();
-        draw(canvas, ctx);
-      }
+    if (container) {
+      const rect = container.getBoundingClientRect();
+      canvas.width = rect.width;
+      canvas.height = rect.height;
+    } else {
+      // Fallback to window size
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
     }
-  }, [draw, initParticles, resize]);
+
+    center[0] = 0.5 * canvas.width;
+    center[1] = 0.5 * canvas.height;
+  }, []);
 
   const initParticles = useCallback(() => {
     tick = 0;
@@ -185,23 +189,19 @@ export const Vortex = (props: VortexProps) => {
     return x > canvas.width || x < 0 || y > canvas.height || y < 0;
   };
 
-  const resize = useCallback((
-    canvas: HTMLCanvasElement,
-  ) => {
+  const setup = useCallback(() => {
+    const canvas = canvasRef.current;
     const container = containerRef.current;
-    if (container) {
-      const rect = container.getBoundingClientRect();
-      canvas.width = rect.width;
-      canvas.height = rect.height;
-    } else {
-      // Fallback to window size
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-    }
+    if (canvas && container) {
+      const ctx = canvas.getContext("2d");
 
-    center[0] = 0.5 * canvas.width;
-    center[1] = 0.5 * canvas.height;
-  }, []);
+      if (ctx) {
+        resize(canvas);
+        initParticles();
+        draw(canvas, ctx);
+      }
+    }
+  }, [draw, initParticles, resize]);
 
   const renderGlow = (
     canvas: HTMLCanvasElement,

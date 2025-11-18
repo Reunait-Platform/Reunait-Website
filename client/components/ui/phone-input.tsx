@@ -155,7 +155,11 @@ const InputComponent = React.forwardRef<
   };
 
   const handleBeforeInput: React.FormEventHandler<HTMLInputElement> = (e) => {
-    onBeforeInput?.(e);
+    // onBeforeInput expects InputEvent but we receive FormEvent
+    // Type assertion is safe here as both events have compatible properties
+    if (onBeforeInput) {
+      (onBeforeInput as (e: React.FormEvent<HTMLInputElement>) => void)(e);
+    }
     if (e.defaultPrevented) return;
     if (countryCallingCodeEditable) return;
     const input = e.currentTarget as HTMLInputElement;

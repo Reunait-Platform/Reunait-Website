@@ -230,7 +230,6 @@ export function AccountMenu() {
                                                                     className="cursor-pointer"
                                                                     onClick={() => {
                                                                         setShowPhotoCard(true)
-                                                                        setIsRemoving(false)
                                                                         setErrorMsg(null)
                                                                     }}
                                                                 >
@@ -268,7 +267,6 @@ export function AccountMenu() {
                                                                             return
                                                                         }
                                                                         setSelectedFile(file)
-                                                                        setIsRemoving(false)
                                                                         setErrorMsg(null)
                                                                         const url = URL.createObjectURL(file)
                                                                         setPreviewUrl(url)
@@ -304,7 +302,6 @@ export function AccountMenu() {
                                                                                     throw new Error('Remove profile image not supported in this SDK version')
                                                                                 }
                                                                                 setShowPhotoCard(false)
-                                                                                setIsRemoving(false)
                                                                                 setIsSaving(false)
                                                                                 router.refresh?.()
                                                                             } catch (err: unknown) {
@@ -331,7 +328,6 @@ export function AccountMenu() {
                                                                     setShowPhotoCard(false)
                                                                     setSelectedFile(null)
                                                                     setPreviewUrl(null)
-                                                                    setIsRemoving(false)
                                                                     setErrorMsg(null)
                                                                 }}
                                                             >
@@ -413,7 +409,7 @@ export function AccountMenu() {
                                                                     <p className="text-sm font-medium">Password</p>
                                                                     <p className="text-sm text-muted-foreground">Change your account password</p>
                                                                 </div>
-                                                                <Button variant="outline" size="sm" className="cursor-pointer" onClick={() => { setShowPasswordCard(true); setPasswordError(null); setPasswordSuccess(null) }}>Update</Button>
+                                                                <Button variant="outline" size="sm" className="cursor-pointer" onClick={() => { setShowPasswordCard(true); setPasswordError(null) }}>Update</Button>
                                                             </div>
                                                             {showPasswordCard ? (
                                                                 <div className="mt-4 border-t pt-4">
@@ -443,7 +439,7 @@ export function AccountMenu() {
                                                                     {passwordError ? <p className="mt-2 text-xs text-red-600">{passwordError}</p> : null}
 
                                                                     <div className="mt-4 flex justify-end gap-2">
-                                                                        <Button variant="ghost" size="sm" className="cursor-pointer" onClick={() => { setShowPasswordCard(false); setNewPassword(''); setConfirmPassword(''); setPasswordError(null); setPasswordSuccess(null); setSignOutAll(true); setRequiresCurrentPassword(false); setCurrentPassword('') }}>Cancel</Button>
+                                                                        <Button variant="ghost" size="sm" className="cursor-pointer" onClick={() => { setShowPasswordCard(false); setNewPassword(''); setConfirmPassword(''); setPasswordError(null); setSignOutAll(true); setRequiresCurrentPassword(false); setCurrentPassword('') }}>Cancel</Button>
                                                                         <Button
                                                                             variant="default"
                                                                             size="sm"
@@ -453,7 +449,6 @@ export function AccountMenu() {
                                                                                 try {
                                                                                     setPasswordSaving(true)
                                                                                     setPasswordError(null)
-                                                                                    setPasswordSuccess(null)
                                                                                     if (newPassword.length < 8) {
                                                                                         throw new Error('Password must contain 8 or more characters.')
                                                                                     }
@@ -461,7 +456,6 @@ export function AccountMenu() {
                                                                                         throw new Error("Passwords don't match.")
                                                                                     }
                                                                                     await performPasswordUpdate()
-                                                                                    setPasswordSuccess('Password updated successfully')
                                                                                     setShowPasswordCard(false)
                                                                                     setNewPassword('')
                                                                                     setConfirmPassword('')

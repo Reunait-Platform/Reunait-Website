@@ -61,9 +61,7 @@ export function LocationPermission({ onLocationSet }: LocationPermissionProps) {
     const defaultLocation: LocationData = {
       country: 'Unknown',
       state: 'Unknown',
-      city: 'Unknown',
-      latitude: 0,
-      longitude: 0
+      city: 'Unknown'
     }
     setLocation(defaultLocation)
     onLocationSet(defaultLocation)

@@ -21,7 +21,7 @@ export default function ResetPasswordPage() {
     || search?.get("returnBackUrl")
     || search?.get("redirect_url")
     || "/profile") as string
-  const { isLoaded, signIn } = useSignIn()
+  const { isLoaded, signIn, setActive } = useSignIn()
   const { signOut } = useAuth()
   const { showSuccess, showError } = useToast()
 
@@ -30,8 +30,9 @@ export default function ResetPasswordPage() {
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [code, setCode] = useState("")
-  const [, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
   const [resendLoading, setResendLoading] = useState(false)
   const [resendCooldown, setResendCooldown] = useState(0)
   const [isProcessing, setIsProcessing] = useState(false)
@@ -62,7 +63,7 @@ export default function ResetPasswordPage() {
     if (isProcessing) {
       setIsProcessing(false)
     }
-  }, [pathname, isProcessing])
+  }, [pathname])
 
   const requestCode = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -80,8 +81,10 @@ export default function ResetPasswordPage() {
       showSuccess("If this email exists, we sent a verification code.")
       setResendCooldown(30)
       setIsProcessing(false) // Clear loader when transitioning to verify step
-    } catch {
+    } catch (err: unknown) {
       // Show neutral message; don't reveal if email exists
+      // Error is intentionally unused - we show the same message regardless
+      void err
       setStep("verify")
       showSuccess("If this email exists, we sent a verification code.")
       setResendCooldown(30)

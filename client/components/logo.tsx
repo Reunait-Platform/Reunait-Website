@@ -2,9 +2,12 @@ import { cn } from '@/lib/utils'
 import { Network } from 'lucide-react'
 
 export const Logo = ({ className, uniColor }: { className?: string; uniColor?: boolean }) => {
+    // uniColor prop is accepted but not currently used in LogoIcon
+    // Keeping it in the interface for potential future use
+    void uniColor
     return (
         <div className={cn('flex items-center space-x-2', className)}>
-            <LogoIcon className={className} uniColor={uniColor} />
+            <LogoIcon className={className} />
             <span className="text-xl sm:text-2xl font-semibold text-foreground">Reunait</span>
         </div>
     )

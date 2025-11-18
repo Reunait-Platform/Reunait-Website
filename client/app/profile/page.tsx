@@ -1,5 +1,6 @@
 import ProfileClient from "@/components/profile/ProfileClient"
 import { auth } from "@clerk/nextjs/server"
+import type { Case } from "@/lib/api"
 
 type ProfileData = {
   onboardingCompleted: boolean
@@ -17,7 +18,7 @@ type ProfileData = {
   pincode?: string
   role?: "general_user" | "police" | "NGO" | "volunteer" | "police_denied"
   isVerified?: boolean | null
-  cases?: unknown[]
+  cases?: Case[]
   casesPagination?: {
     currentPage: number
     totalCases: number

@@ -48,5 +48,7 @@ export const useNotificationsStore = <T,>(
     throw new Error(`useNotificationsStore must be used within NotificationsStoreProvider`)
   }
 
-  return useStore(notificationsStoreContext, selector, equalityFn)
+  // Zustand v5 useStore only accepts 2 arguments (store, selector)
+  // equalityFn parameter is kept for API compatibility but not used
+  return useStore(notificationsStoreContext, selector)
 }

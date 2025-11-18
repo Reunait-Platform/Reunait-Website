@@ -455,11 +455,11 @@ export const CaseCard = memo(({ case: caseData, index = 0, highlightQuery = "", 
        </CardContent>
       </Card>
     </Link>
-    {navLoading && loaderMounted && createPortal(
+    {navLoading && loaderMounted && typeof document !== 'undefined' && document.body && createPortal(
       <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/70 backdrop-blur-md">
         <SimpleLoader />
       </div>,
-      typeof document !== 'undefined' ? document.body : null
+      document.body
     )}
     </>
    )

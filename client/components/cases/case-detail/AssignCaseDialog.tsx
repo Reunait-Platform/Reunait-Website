@@ -46,21 +46,7 @@ export function AssignCaseDialog({
   const { showSuccess, showError } = useToast()
   const { getToken } = useAuth()
 
-  // Debounced user search
-  useEffect(() => {
-    if (!searchQuery.trim() || searchQuery.trim().length < 3) {
-      setSearchResults([])
-      setSelectedUser(null)
-      return
-    }
-
-    const timeoutId = setTimeout(async () => {
-      await performUserSearch(searchQuery.trim())
-    }, 300)
-
-    return () => clearTimeout(timeoutId)
-  }, [searchQuery, performUserSearch])
-
+  // User search function - declared before useEffect that uses it
   const performUserSearch = useCallback(async (query: string) => {
     setIsSearching(true)
     setError(null)
@@ -110,6 +96,21 @@ export function AssignCaseDialog({
       setIsSearching(false)
     }
   }, [getToken])
+
+  // Debounced user search
+  useEffect(() => {
+    if (!searchQuery.trim() || searchQuery.trim().length < 3) {
+      setSearchResults([])
+      setSelectedUser(null)
+      return
+    }
+
+    const timeoutId = setTimeout(async () => {
+      await performUserSearch(searchQuery.trim())
+    }, 300)
+
+    return () => clearTimeout(timeoutId)
+  }, [searchQuery, performUserSearch])
 
   const handleAssignCase = async () => {
     if (!selectedUser) {

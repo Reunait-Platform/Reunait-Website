@@ -61,6 +61,9 @@ export default function NotificationsDrawer({ open, onOpenChange, anchorRef }: N
   // Track fetch transitions for optional state handling
   React.useEffect(() => { wasFetchingRef.current = isFetching }, [isFetching])
 
+  // Compute visible notifications (declared before useEffect hooks that use it)
+  const visible = React.useMemo(() => unreadOnly ? notifications.filter(n => !n.isRead) : notifications, [notifications, unreadOnly])
+
   // Eager prefetch page 2 on open to eliminate first-append gap under fast scroll
   React.useEffect(() => {
     const prefetch = async () => {
@@ -111,13 +114,12 @@ export default function NotificationsDrawer({ open, onOpenChange, anchorRef }: N
     prevDataLenRef.current = dataLen
   }, [notifications.length, visible.length])
 
-  const visible = React.useMemo(() => unreadOnly ? notifications.filter(n => !n.isRead) : notifications, [notifications, unreadOnly])
-  const listData = React.useMemo(() => {
-    const base = visible
+  const listData = React.useMemo((): ListItem[] => {
+    const base: NotificationItem[] = visible
     if (!pagination.hasNextPage) return base
-    if (notifications.length < 100) return [...base, { id: '__loader__' }]
+    if (notifications.length < 100) return [...base, { id: '__loader__' as const }]
     // After 100 items, replace loader with a stable in-list "show all" row to avoid layout shifts
-    return [...base, { id: '__show_all__' }]
+    return [...base, { id: '__show_all__' as const }]
   }, [visible, pagination.hasNextPage, notifications.length])
 
   const handleOpenChange = async (next: boolean) => {
@@ -328,35 +330,37 @@ export default function NotificationsDrawer({ open, onOpenChange, anchorRef }: N
                         </div>
                       )
                     }
+                    // Type guard: after checking loader/show_all, n must be NotificationItem
+                    const notification = n as NotificationItem
                     return (
                       <div className="py-2">
                         <div className={cn(
                           "group relative rounded-xl transition-colors",
-                          n.isRead
+                          notification.isRead
                             ? "border border-border/60 bg-muted/20 hover:bg-muted/40"
                             : "border border-primary/20 bg-primary/5 hover:bg-primary/10 shadow-sm"
                         )}>
                           <div
-                            onClick={() => handleItemClick(n)}
+                            onClick={() => handleItemClick(notification)}
                             role="button"
                             tabIndex={0}
                             className="w-full cursor-pointer text-left px-4 py-3 focus:outline-none"
                           >
                             <div className="flex items-start gap-3">
-                              <div className={cn("mt-1 h-2 w-2 rounded-full", n.isRead ? "bg-muted-foreground/30" : "bg-blue-500")} />
+                              <div className={cn("mt-1 h-2 w-2 rounded-full", notification.isRead ? "bg-muted-foreground/30" : "bg-blue-500")} />
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-start justify-between gap-3">
-                                  <div className={cn("text-sm break-words", n.isRead ? "text-muted-foreground" : "font-medium")}>{n.message}</div>
-                                  <div className="text-[11px] text-muted-foreground whitespace-nowrap flex-shrink-0">{timeAgo(n.time)}</div>
+                                  <div className={cn("text-sm break-words", notification.isRead ? "text-muted-foreground" : "font-medium")}>{notification.message}</div>
+                                  <div className="text-[11px] text-muted-foreground whitespace-nowrap flex-shrink-0">{timeAgo(notification.time)}</div>
                                 </div>
-                                {n.navigateTo && (
+                                {notification.navigateTo && (
                                   <div className="mt-1 text-xs text-primary/80 truncate">View details</div>
                                 )}
                               </div>
-                              {!n.isRead && (
+                              {!notification.isRead && (
                                 <button
                                   type="button"
-                                  onClick={async (e) => { e.stopPropagation(); await handleItemClick(n) }}
+                                  onClick={async (e) => { e.stopPropagation(); await handleItemClick(notification) }}
                                   className="opacity-0 group-hover:opacity-100 text-xs text-blue-600 hover:text-blue-800 cursor-pointer"
                                   aria-label="Mark as read"
                                 >

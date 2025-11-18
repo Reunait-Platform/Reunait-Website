@@ -160,13 +160,13 @@ export function PoliceStationAutocomplete({
         setShowDropdown(false)
       }
     } catch (error: unknown) {
-      const err = error as { name?: string; message?: string }
+      const err = error as { name?: string; message?: string; cause?: { code?: string } }
       if (err.name === 'AbortError' || err.name === 'TimeoutError') {
         console.error("Request timeout: Backend server may not be responding")
-      } else if (error.cause?.code === 'UND_ERR_CONNECT_TIMEOUT') {
+      } else if (err.cause?.code === 'UND_ERR_CONNECT_TIMEOUT') {
         console.error("Connection timeout: Make sure the backend server is running")
       } else {
-        console.error("Error searching police stations:", error.message || error)
+        console.error("Error searching police stations:", err.message || error)
       }
       setStations([])
       setShowDropdown(false)

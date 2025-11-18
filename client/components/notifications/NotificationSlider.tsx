@@ -19,7 +19,7 @@ export function NotificationSlider({ open, onClose }: { open: boolean, onClose: 
       markedRef.current = true
     }
     if (!open && markedRef.current) {
-      getToken().then(token => flushPendingReads(token))
+      getToken().then(token => flushPendingReads(token ?? undefined))
       markedRef.current = false
     }
   }, [open, setLastSeenAt, flushPendingReads, getToken])
@@ -30,7 +30,7 @@ export function NotificationSlider({ open, onClose }: { open: boolean, onClose: 
     <div className="fixed top-12 right-4 w-96 max-w-[95vw] bg-white dark:bg-zinc-900 border rounded-lg shadow-lg overflow-hidden">
       <div className="flex items-center justify-between px-3 py-2 border-b">
         <div className="font-medium">Notifications</div>
-        <button className="text-sm text-blue-600" onClick={() => getToken().then(token => markAllReadOptimistic(token))}>Mark all as read</button>
+        <button className="text-sm text-blue-600" onClick={() => getToken().then(token => markAllReadOptimistic(token ?? undefined))}>Mark all as read</button>
       </div>
       <div className="max-h-[60vh] overflow-y-auto divide-y">
         {notifications.length === 0 ? (

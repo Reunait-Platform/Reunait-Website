@@ -286,6 +286,3 @@ class LocationService {
 
 // Export singleton instance
 export const locationService = LocationService.getInstance()
-
-// Export types for external use
-export type { LocationData, LocationError }

@@ -148,6 +148,7 @@ export function VerificationsClient({ initialCountry = "all" }: { initialCountry
 
   const formatJoined = (v: string | number | Date | null | undefined) => {
     try {
+      if (v == null) return "—"
       const d = new Date(v)
       if (isNaN(d.getTime())) return "—"
       return d.toLocaleDateString()

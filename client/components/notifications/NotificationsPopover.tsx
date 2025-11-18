@@ -107,11 +107,11 @@ export default function NotificationsPopover() {
 
   const visible = React.useMemo(() => unreadOnly ? notifications.filter(n => !n.isRead) : notifications, [notifications, unreadOnly])
   React.useEffect(() => { prevVisibleLenRef.current = visible.length }, [visible.length])
-  const listData = React.useMemo(() => {
+  const listData = React.useMemo((): ListItem[] => {
     const base: ListItem[] = visible
     if (!pagination.hasNextPage) return base
-    if (notifications.length < 100) return [...base, { id: '__loader__' }]
-    return [...base, { id: '__show_all__' }]
+    if (notifications.length < 100) return [...base, { id: '__loader__' as const }]
+    return [...base, { id: '__show_all__' as const }]
   }, [visible, pagination.hasNextPage, notifications.length])
 
 
@@ -285,26 +285,28 @@ export default function NotificationsPopover() {
                         </div>
                       )
                     }
+                    // Type guard: after checking loader/show_all, n must be NotificationItem
+                    const notification = n as NotificationItem
                     return (
                       <div className="py-2">
                         <div className={cn(
                           "group relative rounded-xl transition-colors",
-                          n.isRead
+                          notification.isRead
                             ? "border border-border/60 bg-muted/20 hover:bg-muted/40"
                             : "border border-primary/20 bg-primary/5 hover:bg-primary/10 shadow-sm"
                         )}>
                           <div
-                            onClick={() => handleItemClick(n)}
+                            onClick={() => handleItemClick(notification)}
                             role="button"
                             tabIndex={0}
                             className="w-full cursor-pointer text-left px-4 py-3 focus:outline-none"
                           >
                             <div className="flex items-start gap-3">
-                              <div className={cn("mt-1 h-2 w-2 rounded-full", n.isRead ? "bg-muted-foreground/30" : "bg-blue-500")} />
+                              <div className={cn("mt-1 h-2 w-2 rounded-full", notification.isRead ? "bg-muted-foreground/30" : "bg-blue-500")} />
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-start justify-between gap-3">
-                                  <div className={cn("text-sm break-words", n.isRead ? "text-muted-foreground" : "font-medium")}>{n.message}</div>
-                                  <div className="text-[11px] text-muted-foreground whitespace-nowrap flex-shrink-0">{timeAgo(n.time)}</div>
+                                  <div className={cn("text-sm break-words", notification.isRead ? "text-muted-foreground" : "font-medium")}>{notification.message}</div>
+                                  <div className="text-[11px] text-muted-foreground whitespace-nowrap flex-shrink-0">{timeAgo(notification.time)}</div>
                                 </div>
                               </div>
                             </div>

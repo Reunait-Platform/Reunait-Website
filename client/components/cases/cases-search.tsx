@@ -38,6 +38,23 @@ interface UserSearchResult {
   _id?: string
 }
 
+// Type for user suggestions displayed in dropdown (extends Case but makes location fields optional)
+type UserSuggestion = Omit<Case, 'status' | 'city' | 'state' | 'country' | 'dateMissingFound' | 'reportedBy'> & {
+  status?: Case['status']
+  city?: string
+  state?: string
+  country?: string
+  dateMissingFound?: string
+  reportedBy?: Case['reportedBy']
+  email?: string
+  phoneNumber?: string
+  url?: string | null
+  clerkUserId?: string | null
+}
+
+// Union type for suggestions - can be either a Case or a UserSuggestion
+type SuggestionItem = Case | UserSuggestion
+
 interface CasesSearchProps {
   onSearch: (filters: SearchFilters) => void
   onClear: () => void
@@ -65,7 +82,7 @@ export function CasesSearch({ onSearch, onClear, hasCasesDisplayed = false, pres
   const [states, setStates] = useState<string[]>([])
   const [cities, setCities] = useState<string[]>([])
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false)
-  const [suggestions, setSuggestions] = useState<Case[]>([])
+  const [suggestions, setSuggestions] = useState<SuggestionItem[]>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [suggestionsLoading, setSuggestionsLoading] = useState(false)
   const debounceRef = useRef<NodeJS.Timeout | null>(null)
@@ -389,12 +406,13 @@ export function CasesSearch({ onSearch, onClear, hasCasesDisplayed = false, pres
         const data = await response.json()
         
         if (data.success && Array.isArray(data.data)) {
-          // Transform user data to match Case interface for dropdown display
-          const userSuggestions = (data.data as UserSearchResult[]).map((user) => ({
+          // Transform user data to UserSuggestion type for dropdown display
+          const userSuggestions: UserSuggestion[] = (data.data as UserSearchResult[]).map((user) => ({
             _id: user.clerkUserId || `user-${Math.random()}`, // Use clerkUserId as _id for React key compatibility
             fullName: user.fullName || user.email || "Unknown User",
-            age: user.age ?? undefined,
-            gender: user.gender ?? undefined,
+            age: user.age?.toString() || "",
+            gender: (user.gender as "male" | "female" | "other") || "other",
+            // Location fields are optional for user suggestions
             email: user.email,
             phoneNumber: user.phoneNumber,
             url: user.url || null,
@@ -466,21 +484,20 @@ export function CasesSearch({ onSearch, onClear, hasCasesDisplayed = false, pres
     }
   }, [shouldShowDropdown, updateDropdownPosition])
 
-  const handleSuggestionClick = useCallback((item: Case & { email?: string; phoneNumber?: string; url?: string | null }) => {
+  const handleSuggestionClick = useCallback((item: SuggestionItem) => {
     setShowSuggestions(false)
     
-    // For user results (have email/phoneNumber), navigate to user profile using url
-    const isUserResult = item.email || item.phoneNumber
-    if (isUserResult) {
-      const url = item.url
-      if (url) {
-        startLoading({ expectRouteChange: true })
-        router.push(url)
-      }
+    // Type guard: check if item is a UserSuggestion (has email or phoneNumber)
+    const userItem = item as UserSuggestion
+    const isUserResult = 'email' in userItem && (userItem.email || userItem.phoneNumber)
+    if (isUserResult && userItem.url) {
+      // For user results, navigate to user profile using url
+      startLoading({ expectRouteChange: true })
+      router.push(userItem.url)
     } else {
       // For case results, navigate to case detail page
       startLoading({ expectRouteChange: true })
-    router.push(`/cases/${item._id}`)
+      router.push(`/cases/${item._id}`)
     }
   }, [router, startLoading])
 

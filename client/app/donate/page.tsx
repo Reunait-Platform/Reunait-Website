@@ -83,18 +83,10 @@ interface CurrencyInfo {
     exponent?: number
 }
 
-interface IntlDisplayNamesConstructor {
-    new (locales?: string | string[], options?: { type: "currency" | "language" | "region" | "script" }): {
-        of: (code: string) => string
-    }
-}
-
-interface IntlWithDisplayNames extends Intl {
-    DisplayNames?: IntlDisplayNamesConstructor
-}
-
+// Intl.DisplayNames types are declared in types/intl.d.ts using declaration merging
+// This follows TypeScript best practices for namespace augmentation
 const currencyDisplayNames = typeof Intl !== "undefined" && "DisplayNames" in Intl
-    ? new (Intl as IntlWithDisplayNames).DisplayNames!(undefined, { type: "currency" })
+    ? new Intl.DisplayNames(undefined, { type: "currency" })
     : null
 
 const getCurrencyName = (code: string): string => {
