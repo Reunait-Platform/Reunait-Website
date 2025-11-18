@@ -7,49 +7,50 @@ import { ThemeToggle } from '@/components/theme-toggle'
 import { SignedIn, SignedOut } from '@clerk/nextjs'
 import { AccountMenu } from '@/components/account-menu'
 import NotificationsPopover from '@/components/notifications/NotificationsPopover'
-import React from 'react'
+import React, { Suspense } from 'react'
 import { cn } from '@/lib/utils'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useNavigationLoader } from '@/hooks/use-navigation-loader'
 import { createPortal } from 'react-dom'
 import { SimpleLoader } from '@/components/ui/simple-loader'
 
-export function Navbar() {
+// Component that uses useSearchParams - must be wrapped in Suspense
+function NavbarContent() {
     const [menuState, setMenuState] = React.useState(false)
     const [isScrolled, setIsScrolled] = React.useState(false)
     const expandedContainerRef = React.useRef<HTMLDivElement | null>(null)
-	const [expandedHeight, setExpandedHeight] = React.useState(0)
-	const EXPANDED_MARGIN_COMP = 20 // px to compensate internal margins (divider my-2 + row mb-3)
-const router = useRouter()
-const pathname = usePathname()
-const searchParams = useSearchParams()
-const { isLoading, mounted, startLoading, stopLoading } = useNavigationLoader()
+    const [expandedHeight, setExpandedHeight] = React.useState(0)
+    const EXPANDED_MARGIN_COMP = 20 // px to compensate internal margins (divider my-2 + row mb-3)
+    const router = useRouter()
+    const pathname = usePathname()
+    const searchParams = useSearchParams()
+    const { isLoading, mounted, startLoading, stopLoading } = useNavigationLoader()
 
-const stopAfterNextPaint = React.useCallback(() => {
-    requestAnimationFrame(() => requestAnimationFrame(() => stopLoading()))
-}, [stopLoading])
+    const stopAfterNextPaint = React.useCallback(() => {
+        requestAnimationFrame(() => requestAnimationFrame(() => stopLoading()))
+    }, [stopLoading])
 
-const handleButtonClick = React.useCallback((href: string) => {
-    const isSameRoute = pathname === href
-    const isAuthPage = pathname?.startsWith('/sign-in') || pathname?.startsWith('/sign-up')
-    const goingToRegisterCase = href === '/register-case'
-    const goingToSignIn = href === '/sign-in'
-    const currentReturnTo = searchParams?.get('returnTo') || searchParams?.get('returnBackUrl') || searchParams?.get('redirect_url')
-    const hasReturnParam = Boolean(currentReturnTo)
-    const alreadyOnAuthWithReturnToRegister = isAuthPage && goingToRegisterCase && currentReturnTo === '/register-case'
+    const handleButtonClick = React.useCallback((href: string) => {
+        const isSameRoute = pathname === href
+        const isAuthPage = pathname?.startsWith('/sign-in') || pathname?.startsWith('/sign-up')
+        const goingToRegisterCase = href === '/register-case'
+        const goingToSignIn = href === '/sign-in'
+        const currentReturnTo = searchParams?.get('returnTo') || searchParams?.get('returnBackUrl') || searchParams?.get('redirect_url')
+        const hasReturnParam = Boolean(currentReturnTo)
+        const alreadyOnAuthWithReturnToRegister = isAuthPage && goingToRegisterCase && currentReturnTo === '/register-case'
 
-    let treatAsSameRoute = isSameRoute || alreadyOnAuthWithReturnToRegister
-    if (pathname === '/sign-in' && goingToSignIn && hasReturnParam) {
-        treatAsSameRoute = false
-    }
+        let treatAsSameRoute = isSameRoute || alreadyOnAuthWithReturnToRegister
+        if (pathname === '/sign-in' && goingToSignIn && hasReturnParam) {
+            treatAsSameRoute = false
+        }
 
-    startLoading({ expectRouteChange: !treatAsSameRoute })
-    if (treatAsSameRoute) {
-        stopAfterNextPaint()
-        return
-    }
-    router.push(href)
-}, [pathname, router, searchParams, startLoading, stopAfterNextPaint])
+        startLoading({ expectRouteChange: !treatAsSameRoute })
+        if (treatAsSameRoute) {
+            stopAfterNextPaint()
+            return
+        }
+        router.push(href)
+    }, [pathname, router, searchParams, startLoading, stopAfterNextPaint])
 
     React.useEffect(() => {
         const handleScroll = () => {
@@ -58,8 +59,6 @@ const handleButtonClick = React.useCallback((href: string) => {
         window.addEventListener('scroll', handleScroll)
         return () => window.removeEventListener('scroll', handleScroll)
     }, [])
-
-    // Popover handles its own open state
 
     React.useEffect(() => {
         const measure = () => {
@@ -215,5 +214,27 @@ const handleButtonClick = React.useCallback((href: string) => {
 			{/* Spacer to push page content when expanded, without altering navbar design */}
 			<div className="lg:hidden" style={{ height: menuState ? expandedHeight + EXPANDED_MARGIN_COMP : 0 }} />
 		</header>
+    )
+}
+
+export function Navbar() {
+    return (
+        <Suspense fallback={
+            <header>
+                <nav className="fixed z-50 w-full px-2 border-b border-border/100">
+                    <div className="mx-auto mt-2 w-full md:max-w-none lg:max-w-screen-2xl px-3 sm:px-4 md:px-2 lg:px-3 xl:px-4 border border-transparent">
+                        <div className="relative flex items-center justify-between gap-6 py-3 lg:gap-0 lg:py-4">
+                            <div className="flex items-center">
+                                <Link href="/" aria-label="home" className="flex items-center space-x-2">
+                                    <Logo />
+                                </Link>
+                            </div>
+                        </div>
+                    </div>
+                </nav>
+            </header>
+        }>
+            <NavbarContent />
+        </Suspense>
     )
 }

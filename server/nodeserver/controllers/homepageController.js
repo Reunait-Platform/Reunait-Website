@@ -54,4 +54,3 @@ export const getHomepageData = async (req, res) => {
         });
     }
 };
-

@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@clerk/nextjs"
 import { useForm, useWatch } from "react-hook-form"
@@ -20,6 +20,27 @@ import { DatePicker } from "@/components/ui/date-picker"
 import { SimpleLoader } from "@/components/ui/simple-loader"
 import { createPortal } from "react-dom"
 import { useNavigationLoader } from "@/hooks/use-navigation-loader"
+
+// Component that uses useSearchParams - must be wrapped in Suspense
+function ReturnToReader({ children }: { children: (returnTo: string) => React.ReactNode }) {
+  const search = useSearchParams()
+  const rawReturnTo = (search?.get("returnTo")
+    || search?.get("returnBackUrl")
+    || search?.get("redirect_url")
+    || "/profile") as string
+  const sanitizeReturnTo = (val: string): string => {
+    try {
+      const v = (val || "/profile").trim()
+      if (!v.startsWith("/")) return "/profile"
+      if (v === "/" || v === "/profile" || v.startsWith("/cases") || v === "/register-case") return v
+      return "/profile"
+    } catch {
+      return "/profile"
+    }
+  }
+  const returnTo = sanitizeReturnTo(rawReturnTo)
+  return <>{children(returnTo)}</>
+}
 
 const schema = z
   .object({
@@ -79,24 +100,8 @@ const schema = z
 
 type FormValues = z.infer<typeof schema>
 
-export default function OnboardingPage() {
+function OnboardingPageContent({ returnTo }: { returnTo: string }) {
   const router = useRouter()
-  const search = useSearchParams()
-  const rawReturnTo = (search?.get("returnTo")
-    || search?.get("returnBackUrl")
-    || search?.get("redirect_url")
-    || "/profile") as string
-  const sanitizeReturnTo = (val: string): string => {
-    try {
-      const v = (val || "/profile").trim()
-      if (!v.startsWith("/")) return "/profile"
-      if (v === "/" || v === "/profile" || v.startsWith("/cases") || v === "/register-case") return v
-      return "/profile"
-    } catch {
-      return "/profile"
-    }
-  }
-  const returnTo = sanitizeReturnTo(rawReturnTo)
   const { getToken } = useAuth()
   const { showSuccess, showError } = useToast()
   const [submitting, setSubmitting] = useState(false)
@@ -737,6 +742,22 @@ export default function OnboardingPage() {
       </div>
     </div>
     </>
+  )
+}
+
+export default function OnboardingPage() {
+  return (
+    <Suspense fallback={
+      <div className="container mx-auto px-4 sm:px-6 md:px-4 lg:px-8 py-10 lg:py-14 max-w-7xl">
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <SimpleLoader />
+        </div>
+      </div>
+    }>
+      <ReturnToReader>
+        {(returnTo) => <OnboardingPageContent returnTo={returnTo} />}
+      </ReturnToReader>
+    </Suspense>
   )
 }
 

@@ -27,7 +27,7 @@ export const submitTestimonial = async (req, res) => {
     // Create new testimonial object
     const newTestimonial = {
       name,
-      message
+      content: message
     };
 
     // Append new testimonial to the existing testimonials array

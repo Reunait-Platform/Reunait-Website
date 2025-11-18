@@ -197,7 +197,7 @@ export function CaseDetailClient({ id, initialData, initialMeta, initialNow }: P
                   startLoading({ expectRouteChange: true })
                   // Defer to next frame to allow loader to paint before unmount
                   requestAnimationFrame(() => {
-                    router.push('/cases')
+                  router.push('/cases')
                   })
                 }}
                 className="text-primary hover:underline cursor-pointer"
@@ -307,7 +307,7 @@ export function CaseDetailClient({ id, initialData, initialMeta, initialNow }: P
                   setIsLeaving(true)
                   startLoading({ expectRouteChange: true })
                   requestAnimationFrame(() => {
-                    router.push('/cases')
+                  router.push('/cases')
                   })
                 }}
                 className="text-primary hover:underline cursor-pointer"
