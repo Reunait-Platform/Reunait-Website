@@ -206,7 +206,7 @@ export default function SignUpCatchAllPage() {
   return (
     <>
       {/* Full Screen Loader with Background Blur (Portal to body) */}
-      {(isNavigating || isAuthenticating || isVerifying) && mounted && createPortal(
+      {isVerifying && mounted && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 backdrop-blur-md">
           <SimpleLoader />
         </div>,
@@ -267,6 +267,7 @@ export default function SignUpCatchAllPage() {
                       setCode(val)
                       void verifyCode(val)
                     }}
+                    disabled={isVerifying}
                   >
                     <InputOTPGroup>
                       <InputOTPSlot index={0} />
