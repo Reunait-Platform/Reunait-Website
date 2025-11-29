@@ -136,7 +136,7 @@ export default function SignUpCatchAllPage() {
   }
 
   const verifyCode = useCallback(async () => {
-    if (!isLoaded || loading) return
+    if (!isLoaded || loading || isVerifying) return
     setError(null)
     const normalized = code.replace(/\D/g, "")
     if (normalized.length !== 6) return
@@ -155,19 +155,14 @@ export default function SignUpCatchAllPage() {
     } finally {
       setLoading(false)
     }
-  }, [isLoaded, loading, code, signUp, setActive, showSuccess, router, returnTo, showError])
+  }, [isLoaded, loading, isVerifying, code, signUp, setActive, showSuccess, router, returnTo, showError])
 
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault()
     await verifyCode()
   }
 
-  useEffect(() => {
-    const normalized = code.replace(/\D/g, "")
-    if (normalized.length === 6) {
-      void verifyCode()
-    }
-  }, [code, verifyCode])
+  // Removed auto-verification on input change to avoid duplicate API calls and rate limits.
 
   const handleGoogle = async () => {
     if (!isLoaded) return
