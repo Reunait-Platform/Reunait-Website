@@ -65,48 +65,31 @@ export default function SignUpCatchAllPage() {
   const [mounted, setMounted] = useState(false)
   const [isAuthenticating, setIsAuthenticating] = useState(false)
   const [isVerifying, setIsVerifying] = useState(false)
-  // Delayed, minimum-duration overlay to prevent flicker for short operations
-  const [showOverlay, setShowOverlay] = useState(false)
-  const [overlayStartTs, setOverlayStartTs] = useState<number | null>(null)
-  const OVERLAY_SHOW_DELAY_MS = 200
-  const OVERLAY_MIN_VISIBLE_MS = 350
 
   useEffect(() => {
     setMounted(true)
   }, [])
 
-  // Unified, delayed overlay controller to avoid split-second flashes
+  // Hide loader when route changes
   useEffect(() => {
-    const active = isNavigating || isAuthenticating || isVerifying
-    let delayId: number | undefined
-    let hideId: number | undefined
-
-    if (active) {
-      // Start a short delay before showing overlay; if action completes fast, overlay never shows
-      delayId = window.setTimeout(() => {
-        setShowOverlay(true)
-        setOverlayStartTs(Date.now())
-      }, OVERLAY_SHOW_DELAY_MS)
-    } else {
-      // Hide overlay respecting minimum visible duration
-      if (showOverlay) {
-        const elapsed = overlayStartTs ? Date.now() - overlayStartTs : OVERLAY_MIN_VISIBLE_MS
-        const remaining = Math.max(0, OVERLAY_MIN_VISIBLE_MS - elapsed)
-        hideId = window.setTimeout(() => {
-          setShowOverlay(false)
-          setOverlayStartTs(null)
-        }, remaining)
-      } else {
-        // Ensure any pending show is cancelled
-        // (no-op here since showOverlay is false, but we still clear delay below)
-      }
+    if (isNavigating) {
+      setIsNavigating(false)
     }
+  }, [pathname, isNavigating])
 
-    return () => {
-      if (delayId) window.clearTimeout(delayId)
-      if (hideId) window.clearTimeout(hideId)
+  // Hide authentication loader when route changes or verification state changes
+  useEffect(() => {
+    if (isAuthenticating) {
+      setIsAuthenticating(false)
     }
-  }, [isNavigating, isAuthenticating, isVerifying, showOverlay, overlayStartTs])
+  }, [pathname, pendingVerification, isAuthenticating])
+
+  // Hide verification loader when route changes
+  useEffect(() => {
+    if (isVerifying) {
+      setIsVerifying(false)
+    }
+  }, [pathname, isVerifying])
 
   const handleSignInClick = () => {
     setIsNavigating(true)
@@ -135,8 +118,7 @@ export default function SignUpCatchAllPage() {
       // Transition UI immediately to code step for better perceived performance
       setPendingVerification(true)
       setLoading(false)
-      // Do not immediately flip isAuthenticating off here; the overlay controller will avoid flicker.
-      setIsAuthenticating(false)
+      setIsAuthenticating(false) // Clear loader when transitioning to OTP
       // Trigger Clerk to send the email code in the background
       await signUp.prepareEmailAddressVerification({ strategy: "email_code" })
       showSuccess("We sent a verification code to your email.")
@@ -224,7 +206,7 @@ export default function SignUpCatchAllPage() {
   return (
     <>
       {/* Full Screen Loader with Background Blur (Portal to body) */}
-      {showOverlay && mounted && createPortal(
+      {(isNavigating || isAuthenticating || isVerifying) && mounted && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 backdrop-blur-md">
           <SimpleLoader />
         </div>,
@@ -285,8 +267,6 @@ export default function SignUpCatchAllPage() {
                       setCode(val)
                       void verifyCode(val)
                     }}
-                    // Disable input while verifying to prevent mid-flight edits
-                    disabled={isVerifying}
                   >
                     <InputOTPGroup>
                       <InputOTPSlot index={0} />
