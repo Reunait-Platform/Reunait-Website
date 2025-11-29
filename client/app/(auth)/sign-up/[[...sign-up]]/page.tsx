@@ -135,10 +135,10 @@ export default function SignUpCatchAllPage() {
     }
   }
 
-  const verifyCode = useCallback(async () => {
+  const verifyCode = useCallback(async (value?: string) => {
     if (!isLoaded || loading || isVerifying) return
     setError(null)
-    const normalized = code.replace(/\D/g, "")
+    const normalized = (value ?? code).replace(/\D/g, "")
     if (normalized.length !== 6) return
     setLoading(true)
     setIsVerifying(true)
@@ -257,7 +257,17 @@ export default function SignUpCatchAllPage() {
               <div className="space-y-4">
                 <Label htmlFor="code" className="block text-center text-sm font-medium">Verification code</Label>
                 <div className="flex justify-center">
-                  <InputOTP maxLength={6} pattern="[0-9]*" value={code} onChange={setCode}>
+                  <InputOTP 
+                    maxLength={6} 
+                    pattern="[0-9]*" 
+                    value={code} 
+                    onChange={setCode}
+                    onComplete={(val: string) => {
+                      // Auto-verify once all digits are entered, with guards to prevent duplicates
+                      setCode(val)
+                      void verifyCode(val)
+                    }}
+                  >
                     <InputOTPGroup>
                       <InputOTPSlot index={0} />
                       <InputOTPSlot index={1} />
