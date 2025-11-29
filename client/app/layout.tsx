@@ -10,6 +10,8 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { OnboardingGate } from "@/components/OnboardingGate";
 import { NotificationsStoreProvider } from "@/providers/notifications-store-provider";
 import { NotificationFetcher } from "@/components/notification-fetcher";
+import { Analytics } from '@vercel/analytics/next';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 import { 
   SITE_CONFIG, 
   BASE_KEYWORDS, 
@@ -120,6 +122,8 @@ export default function RootLayout({
             </NotificationsStoreProvider>
           </ThemeProvider>
         </ClerkProvider>
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
