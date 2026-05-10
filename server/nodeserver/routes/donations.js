@@ -18,16 +18,6 @@ const getCurrencyExponent = (currency) => {
     return config.razorpay.currencyExponents[currencyUpper] ?? 2; // Default to 2 (most currencies)
 };
 
-// Helper function to check if currency is zero-decimal
-const isZeroDecimalCurrency = (currency) => {
-    return getCurrencyExponent(currency) === 0;
-};
-
-// Helper function to check if currency is three-decimal
-const isThreeDecimalCurrency = (currency) => {
-    return getCurrencyExponent(currency) === 3;
-};
-
 // Helper function to convert amount to smallest currency unit
 // Razorpay requires amounts in smallest currency subunit
 // Exponent 0: 1 unit = 1 subunit (e.g., ¥1 = 1 yen)
@@ -73,15 +63,7 @@ router.post("/donations/create-order", async (req, res) => {
             });
         }
 
-        // Optional: Check if currency is in supported list (if configured)
-        // Note: Razorpay supports 100+ currencies, so this is just a UI preference
-        if (config.razorpay.supportedCurrencies.length > 0 && 
-            !config.razorpay.supportedCurrencies.includes(currencyUpper)) {
-            return res.status(400).json({
-                success: false,
-                message: `Currency ${currencyUpper} is not enabled. Supported currencies: ${config.razorpay.supportedCurrencies.join(", ")}`,
-            });
-        }
+
 
         // Validate amount
         if (!amount || typeof amount !== "number" || amount <= 0) {
@@ -129,9 +111,7 @@ router.post("/donations/create-order", async (req, res) => {
                 amount: order.amount,
                 currency: order.currency,
                 keyId: process.env.RAZORPAY_KEY_ID,
-                isZeroDecimal: isZeroDecimalCurrency(currencyUpper),
-                isThreeDecimal: isThreeDecimalCurrency(currencyUpper),
-                exponent: getCurrencyExponent(currencyUpper),
+
             },
         });
     } catch (error) {
@@ -454,50 +434,4 @@ router.post("/donations/webhook", async (req, res) => {
         return res.status(200).json({ success: false, message: "Webhook processing error" });
     }
 });
-
-// GET /api/donations/currencies
-// Get supported currencies and their display information
-// Best Practice: Dynamic currency configuration
-router.get("/donations/currencies", async (req, res) => {
-    try {
-        // Industry Standard: Top 20-25 most popular currencies (industry best practice)
-        // Major platforms (Stripe, PayPal, Shopify) show 15-30 currencies
-        // This list covers ~90% of global payment volume
-        // Users can override via SUPPORTED_CURRENCIES environment variable for more currencies
-        const defaultCurrencies = [
-            // Top 10 by global usage (most popular first - industry standard)
-            'USD', 'EUR', 'GBP', 'INR', 'JPY', 'AUD', 'CAD', 'CHF', 'CNY', 'NZD',
-            // Next 10-15 by regional importance
-            'SGD', 'HKD', 'AED', 'SAR', 'MXN', 'BRL', 'ZAR', 'KRW', 'TRY', 'RUB',
-            'THB', 'MYR', 'IDR', 'PHP', 'PKR'
-        ];
-        
-        const currencies = (config.razorpay.supportedCurrencies.length > 0
-            ? config.razorpay.supportedCurrencies
-            : defaultCurrencies) // Industry-standard curated list (25 currencies)
-            .map(code => ({
-                code,
-                isZeroDecimal: isZeroDecimalCurrency(code),
-                isThreeDecimal: isThreeDecimalCurrency(code),
-                exponent: getCurrencyExponent(code),
-            }));
-
-        return res.json({
-            success: true,
-            data: {
-                currencies,
-            },
-        });
-    } catch (error) {
-        try {
-            console.error("[GET /api/donations/currencies]", error);
-        } catch {}
-        return res.status(500).json({
-            success: false,
-            message: "Failed to fetch currency information.",
-        });
-    }
-});
-
 export default router;
-

@@ -1,4 +1,3 @@
-@"
 # Node / Next.js
 node_modules/
 .next/
@@ -87,4 +86,3 @@ uploads/
 # ML environments (large files)
 server/generateEmbeding/.deepface/
 server/generateEmbeding/deepface_env/
-"@ | Out-File -FilePath .gitignore -Encoding UTF8

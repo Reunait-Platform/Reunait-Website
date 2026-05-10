@@ -56,14 +56,19 @@ export const metadata: Metadata = {
 
 export default async function Home() {
   // Fetch homepage data from API (public endpoint, no auth required)
-  const homepageResponse = await HomepageService.getHomepageData()
-  
-  const homepageData = homepageResponse.data
+  let orderedSections: HomepageSection[] = []
+  try {
+    const homepageResponse = await HomepageService.getHomepageData()
+    const homepageData = homepageResponse.data
 
-  // Sort sections by order and filter active ones
-  const orderedSections = homepageData
-    .filter(section => section.isActive)
-    .sort((a, b) => a.order - b.order)
+    // Sort sections by order and filter active ones
+    orderedSections = homepageData
+      .filter(section => section.isActive)
+      .sort((a, b) => a.order - b.order)
+  } catch {
+    // Backend unreachable — render page with empty sections
+    console.error('[Homepage] Failed to fetch homepage data — backend may be down')
+  }
 
   // Render sections based on order
   const renderSection = (section: HomepageSection) => {

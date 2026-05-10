@@ -88,16 +88,6 @@ export const config = {
     // Razorpay Configuration
     // Official Documentation: https://razorpay.com/docs/payments/international-payments/#supported-currencies
     razorpay: {
-        // Supported currencies (ISO 4217 codes)
-        // Razorpay supports 130+ currencies. Configure via environment variable as comma-separated list
-        // Example: SUPPORTED_CURRENCIES=INR,USD,EUR,GBP,JPY,BHD
-        // Full list: https://razorpay.com/docs/payments/international-payments/#supported-currencies
-        supportedCurrencies: process.env.SUPPORTED_CURRENCIES 
-            ? process.env.SUPPORTED_CURRENCIES.split(',').map(c => c.trim().toUpperCase())
-            : [], // No restriction by default; accepts any valid ISO code Razorpay supports
-        
-        // UI display (symbols/names) should be handled on the client using Intl APIs.
-        
         // Currency exponents (decimal places)
         // Source: https://razorpay.com/docs/payments/international-payments/#supported-currencies
         // Exponent 0 = Zero-decimal currencies (1 unit = 1 subunit)

@@ -10,6 +10,17 @@ import { Sparkles, Loader2, CheckCircle2, Globe } from "lucide-react"
 import Script from "next/script"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useRouter } from "next/navigation"
+import { useUser } from "@clerk/nextjs"
+
+const isDonationsEnabled = process.env.NEXT_PUBLIC_DONATIONS_ENABLED === "true"
+
+const MAX_DONATION = 500000
+
+
+const SUPPORTED_CURRENCIES = [
+  "INR", "USD", "EUR", "GBP", "AED", "SAR",
+  "SGD", "AUD", "CAD", "JPY", "CHF", "NZD",
+]
 
 const DEFAULT_PREDEFINED_AMOUNTS: Record<string, number[]> = {
   INR: [100, 500, 1000, 2500, 5000],
@@ -20,7 +31,10 @@ const DEFAULT_PREDEFINED_AMOUNTS: Record<string, number[]> = {
   CAD: [10, 25, 50, 100, 250],
   SGD: [10, 25, 50, 100, 250],
   AED: [50, 100, 250, 500, 1000],
+  SAR: [50, 100, 250, 500, 1000],
   JPY: [1000, 2500, 5000, 10000, 25000],
+  CHF: [10, 25, 50, 100, 250],
+  NZD: [10, 25, 50, 100, 250],
 }
 
 interface RazorpayPaymentResponse {
@@ -29,13 +43,6 @@ interface RazorpayPaymentResponse {
   razorpay_signature: string
 }
 
-interface RazorpayError {
-  error?: {
-    description?: string
-    reason?: string
-  }
-  message?: string
-}
 
 interface RazorpayOptions {
   key: string
@@ -44,18 +51,29 @@ interface RazorpayOptions {
   name: string
   description: string
   order_id: string
-  callback_url?: string
-  redirect?: boolean
+  image?: string
   handler?: (response: RazorpayPaymentResponse) => void | Promise<void>
-  prefill?: Record<string, unknown>
+  prefill?: { name?: string; email?: string; contact?: string }
   theme?: { color?: string }
-  modal?: { ondismiss?: () => void }
-  handler_error?: (error: RazorpayError) => void
+  modal?: { ondismiss?: () => void; confirm_close?: boolean }
+  notes?: Record<string, string>
 }
 
 interface RazorpayInstance {
   open: () => void
   close: () => void
+  on: (event: string, handler: (response: RazorpayFailedResponse) => void) => void
+}
+
+interface RazorpayFailedResponse {
+  error: {
+    code: string
+    description: string
+    source: string
+    step: string
+    reason: string
+    metadata: { order_id: string; payment_id: string }
+  }
 }
 
 interface RazorpayConstructor {
@@ -68,12 +86,7 @@ declare global {
   }
 }
 
-interface CurrencyInfo {
-  code: string
-  isZeroDecimal: boolean
-  isThreeDecimal?: boolean
-  exponent?: number
-}
+
 
 const currencyDisplayNames =
   typeof Intl !== "undefined" && "DisplayNames" in Intl
@@ -124,39 +137,15 @@ export default function DonateClient({
   }>
 }) {
   const params = use(searchParams)
+  const { user } = useUser()
 
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null)
   const [customAmount, setCustomAmount] = useState<string>("")
   const [currency, setCurrency] = useState<string>("INR")
-  const [currencies, setCurrencies] = useState<CurrencyInfo[]>([])
-  const [isLoadingCurrencies, setIsLoadingCurrencies] = useState(true)
   const [isProcessing, setIsProcessing] = useState(false)
   const [razorpayLoaded, setRazorpayLoaded] = useState(false)
   const { showSuccess, showError } = useToast()
   const router = useRouter()
-
-  useEffect(() => {
-    const fetchCurrencies = async () => {
-      try {
-        const base = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:6001"
-        const response = await fetch(`${base}/api/donations/currencies`)
-        const data = await response.json()
-        if (data.success && data.data.currencies.length > 0) {
-          setCurrencies(data.data.currencies)
-          const currentCurrencyExists = data.data.currencies.find((c: CurrencyInfo) => c.code === currency)
-          if (!currentCurrencyExists) {
-            setCurrency(data.data.currencies[0].code)
-          }
-        }
-      } catch {
-        showError("Failed to load currencies. Using default.", "Error")
-      } finally {
-        setIsLoadingCurrencies(false)
-      }
-    }
-    void fetchCurrencies()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   useEffect(() => {
     if (typeof window !== "undefined" && window.Razorpay) {
@@ -175,15 +164,10 @@ export default function DonateClient({
     const errorCode = params.error_code
 
     if (paymentStatus === "success" && paymentId && orderId && amount && currencyParam) {
-      const donationAmount = parseFloat(amount)
-      const donationCurrency = currencyParam
-      showSuccess(
-        `Thank you for your generous donation of ${formatCurrency(donationAmount, donationCurrency)}! Your contribution helps us reunite families.`,
-        "Donation Successful"
+      // Redirect to thank you page with payment details
+      router.replace(
+        `/donate/thank-you?payment_id=${paymentId}&order_id=${orderId}&amount=${amount}&currency=${currencyParam}`
       )
-      setSelectedAmount(null)
-      setCustomAmount("")
-      router.replace("/donate")
       return
     }
 
@@ -224,8 +208,13 @@ export default function DonateClient({
 
   const handleDonate = async () => {
     const amount = getDonationAmount()
-    if (amount <= 0) {
-      showError(`Please enter a valid donation amount`, "Invalid Amount")
+    
+    if (amount < 1) {
+      showError(`Minimum donation amount is ${formatCurrency(1, currency)}`, "Invalid Amount")
+      return
+    }
+    if (amount > MAX_DONATION) {
+      showError(`Maximum online donation limit is ${formatCurrency(MAX_DONATION, currency)}. For larger amounts, please contact us for direct bank transfer.`, "Limit Exceeded")
       return
     }
     if (!razorpayLoaded) {
@@ -248,16 +237,14 @@ export default function DonateClient({
         throw new Error(orderData.message || "Failed to create donation order")
       }
       const { orderId, keyId } = orderData.data
-      const backendBase = base
       const options: RazorpayOptions = {
         key: keyId,
         amount: orderData.data.amount,
         currency: orderData.data.currency,
         name: "Reunait",
         description: `Donation of ${formatCurrency(amount, currency)}`,
+        image: `${process.env.NEXT_PUBLIC_SITE_URL || ""}/icon.svg`,
         order_id: orderId,
-        callback_url: `${backendBase}/api/donations/callback`,
-        redirect: true,
         handler: async function (response: RazorpayPaymentResponse) {
           try {
             const verifyResponse = await fetch(`${base}/api/donations/verify-payment`, {
@@ -273,9 +260,10 @@ export default function DonateClient({
             if (verifyData.success) {
               const verifiedAmount = verifyData.data.amount
               const verifiedCurrency = verifyData.data.currency
-              showSuccess(
-                `Thank you for your generous donation of ${formatCurrency(verifiedAmount, verifiedCurrency)}! Your contribution helps us reunite families.`,
-                "Donation Successful"
+              const verifiedMethod = verifyData.data.method || ""
+              // Navigate to thank you page with payment details
+              router.push(
+                `/donate/thank-you?payment_id=${response.razorpay_payment_id}&order_id=${response.razorpay_order_id}&amount=${verifiedAmount}&currency=${verifiedCurrency}&method=${verifiedMethod}`
               )
               setSelectedAmount(null)
               setCustomAmount("")
@@ -290,27 +278,39 @@ export default function DonateClient({
             setIsProcessing(false)
           }
         },
-        prefill: {},
+        prefill: {
+          name: user?.fullName || "",
+          email: user?.primaryEmailAddress?.emailAddress || "",
+          contact: user?.primaryPhoneNumber?.phoneNumber || "",
+        },
         theme: { color: "#2563EB" },
-        modal: { ondismiss: function () { setIsProcessing(false) } },
-        handler_error: function (error: RazorpayError) {
-          setIsProcessing(false)
-          const errorMessage = error?.error?.description || error?.error?.reason || error?.message || "Payment failed"
-          if (
-            errorMessage.toLowerCase().includes("international") ||
-            errorMessage.toLowerCase().includes("not supported")
-          ) {
-            showError(
-              `International payments are not enabled. Please use INR currency or enable international payments in your Razorpay dashboard. Error: ${errorMessage}`,
-              "International Payments Not Enabled"
-            )
-          } else {
-            showError(`Payment failed: ${errorMessage}. Please try again or contact support.`, "Payment Error")
-          }
+        modal: {
+          ondismiss: function () { setIsProcessing(false) },
+          confirm_close: true,
+        },
+        notes: {
+          purpose: "donation",
+          platform: "reunait",
         },
       }
-      const razorpay = new window.Razorpay(options)
-      razorpay.open()
+      const rzp = new window.Razorpay(options)
+      // Razorpay docs: use rzp.on('payment.failed') for failure handling
+      rzp.on("payment.failed", function (response: RazorpayFailedResponse) {
+        setIsProcessing(false)
+        const errorMessage = response.error?.description || "Payment failed"
+        if (
+          errorMessage.toLowerCase().includes("international") ||
+          errorMessage.toLowerCase().includes("not supported")
+        ) {
+          showError(
+            `International payments are not enabled. Please use INR currency or enable international payments in your Razorpay dashboard. Error: ${errorMessage}`,
+            "International Payments Not Enabled"
+          )
+        } else {
+          showError(`Payment failed: ${errorMessage}. Please try again or contact support.`, "Payment Error")
+        }
+      })
+      rzp.open()
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "Failed to process donation. Please try again."
       showError(errorMessage, "Donation Error")
@@ -323,8 +323,11 @@ export default function DonateClient({
     setCustomAmount("")
   }
   const handleCustomAmountChange = (value: string) => {
-    setCustomAmount(value)
-    setSelectedAmount(null)
+    // Restrict input to maximum 7 digits before decimal, and 2 digits after decimal
+    if (value === "" || /^\d{0,7}(\.\d{0,2})?$/.test(value)) {
+      setCustomAmount(value)
+      setSelectedAmount(null)
+    }
   }
   const handleCurrencyChange = (newCurrency: string) => {
     setCurrency(newCurrency)
@@ -351,12 +354,14 @@ export default function DonateClient({
             <CardTitle>Make a Donation</CardTitle>
             <CardDescription>
               Select a predefined amount or enter a custom amount.
-              <div className="block mt-3 p-3 bg-primary/10 border border-primary/20 rounded-lg">
-                <p className="text-sm font-semibold text-primary flex items-center gap-2">
-                  <Sparkles className="w-4 h-4" />
-                  We will start receiving donations soon. Thank you for your interest in supporting our mission!
-                </p>
-              </div>
+              {!isDonationsEnabled && (
+                <div className="block mt-3 p-3 bg-primary/10 border border-primary/20 rounded-lg">
+                  <p className="text-sm font-semibold text-primary flex items-center gap-2">
+                    <Sparkles className="w-4 h-4" />
+                    We will start receiving donations soon. Thank you for your interest in supporting our mission!
+                  </p>
+                </div>
+              )}
               {currency !== "INR" && (
                 <span className="block mt-2 text-xs text-amber-600 dark:text-amber-400">
                   ⚠️ Note: International payments (non-INR) require activation in your Razorpay dashboard. Use INR for testing without
@@ -366,37 +371,30 @@ export default function DonateClient({
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {isLoadingCurrencies ? (
-              <div className="flex items-center justify-center py-4">
-                <Loader2 className="w-5 h-5 animate-spin" />
-                <span className="ml-2 text-sm text-muted-foreground">Loading currencies...</span>
-              </div>
-            ) : (
-              <div>
-                <Label htmlFor="currency" className="mb-3 block">
-                  Select Currency
-                </Label>
-                <Select value={currency} onValueChange={handleCurrencyChange}>
-                  <SelectTrigger id="currency" className="w-full h-12">
-                    <SelectValue>
-                      <div className="flex items-center gap-2">
-                        <Globe className="w-4 h-4" />
-                        <span>
-                          {currency} - {getCurrencyName(currency)}
-                        </span>
-                      </div>
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {currencies.map((curr) => (
-                      <SelectItem key={curr.code} value={curr.code}>
-                        {curr.code} - {getCurrencyName(curr.code)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+            <div>
+              <Label htmlFor="currency" className="mb-3 block">
+                Select Currency
+              </Label>
+              <Select value={currency} onValueChange={handleCurrencyChange}>
+                <SelectTrigger id="currency" className="w-full h-12">
+                  <SelectValue>
+                    <div className="flex items-center gap-2">
+                      <Globe className="w-4 h-4" />
+                      <span>
+                        {currency} - {getCurrencyName(currency)}
+                      </span>
+                    </div>
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {SUPPORTED_CURRENCIES.map((code) => (
+                    <SelectItem key={code} value={code}>
+                      {code} - {getCurrencyName(code)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             {getPredefinedAmounts().length > 0 && (
               <div>
                 <Label className="mb-3 block">Choose an Amount</Label>
@@ -407,7 +405,7 @@ export default function DonateClient({
                       variant={selectedAmount === amount ? "default" : "outline"}
                       className="h-12 text-base font-semibold"
                       onClick={() => handleAmountSelect(amount)}
-                      disabled={isProcessing || isLoadingCurrencies}
+                      disabled={isProcessing}
                     >
                       {formatCurrency(amount, currency)}
                     </Button>
@@ -433,11 +431,7 @@ export default function DonateClient({
                   disabled={isProcessing}
                 />
               </div>
-              {customAmount && parseFloat(customAmount) > 0 && (
-                <p className="text-sm text-muted-foreground mt-2">
-                  You are donating {formatCurrency(parseFloat(customAmount), currency)}
-                </p>
-              )}
+
             </div>
             {getDonationAmount() > 0 && (
               <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
@@ -447,9 +441,17 @@ export default function DonateClient({
                 </div>
               </div>
             )}
-            <Button onClick={handleDonate} disabled={true} className="w-full h-12 text-base font-semibold" size="lg">
-              <Sparkles className="w-5 h-5 mr-2" />
-              Donate Now
+            <Button
+              onClick={handleDonate}
+              disabled={!isDonationsEnabled || isProcessing || !razorpayLoaded || getDonationAmount() <= 0}
+              className="w-full h-12 text-base font-semibold"
+              size="lg"
+            >
+              {isProcessing ? (
+                <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Processing...</>
+              ) : (
+                <><Sparkles className="w-5 h-5 mr-2" /> Donate Now</>
+              )}
             </Button>
             {!razorpayLoaded && <p className="text-sm text-muted-foreground text-center">Loading payment gateway...</p>}
             <div className="pt-4 border-t">

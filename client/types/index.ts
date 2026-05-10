@@ -1,6 +1,3 @@
-// Re-export location types
-export type { LocationData } from "@/lib/location"
-
 export interface User {
   _id: string
   fullName: string
