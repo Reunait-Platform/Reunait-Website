@@ -32,7 +32,7 @@ export async function closeCase(caseId: string, reason: string, reunited?: boole
     }
 
     // Invalidate granular cache: tag + page path
-    revalidateTag(`case:${caseId}`)
+    revalidateTag(`case:${caseId}`, 'max')
     revalidatePath(`/cases/${caseId}`)
     
     const payload = await response.json().catch(() => null) as { data?: unknown } | null
@@ -74,7 +74,7 @@ export async function flagCase(caseId: string, reason: string) {
     }
 
     // Invalidate granular cache: tag + page path
-    revalidateTag(`case:${caseId}`)
+    revalidateTag(`case:${caseId}`, 'max')
     revalidatePath(`/cases/${caseId}`)
     
     const payload = await response.json().catch(() => null) as { message?: string; data?: unknown } | null
@@ -114,7 +114,7 @@ export async function assignCase(caseId: string, userId: string) {
     }
 
     // Invalidate granular cache: tag + page path
-    revalidateTag(`case:${caseId}`)
+    revalidateTag(`case:${caseId}`, 'max')
     revalidatePath(`/cases/${caseId}`)
     
     const payload = await response.json().catch(() => null) as { message?: string; data?: unknown } | null
