@@ -4,7 +4,7 @@ import { Logo } from '@/components/logo'
 import { Menu, X, Plus, CupSoda } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/theme-toggle'
-import { SignedIn, SignedOut } from '@clerk/nextjs'
+import { Show } from '@clerk/nextjs';
 import { AccountMenu } from '@/components/account-menu'
 import NotificationsPopover from '@/components/notifications/NotificationsPopover'
 import React, { Suspense } from 'react'
@@ -122,10 +122,10 @@ function NavbarContent() {
 
                                 {/* Essential actions - always visible */}
                                 <div className="flex items-center gap-3">
-                                    <SignedIn>
+                                    <Show when="signed-in">
                                         <AccountMenu />
-                                    </SignedIn>
-                                    <SignedOut>
+                                    </Show>
+                                    <Show when="signed-out">
                                         <Button 
                                             onClick={() => handleButtonClick('/sign-in')}
                                             disabled={isLoading}
@@ -134,7 +134,7 @@ function NavbarContent() {
                                         >
                                             Sign in
                                         </Button>
-                                    </SignedOut>
+                                    </Show>
                                 </div>
 
                                 <button
@@ -166,15 +166,15 @@ function NavbarContent() {
                                 </Button>
                             </Link>
 
-                            <SignedIn>
+                            <Show when="signed-in">
                                 {/* Notifications Drawer trigger */}
                                 <NotificationsPopover />
 
                                 {/* Profile */}
                                 <AccountMenu />
-                            </SignedIn>
+                            </Show>
 
-                            <SignedOut>
+                            <Show when="signed-out">
                                 <Button 
                                     onClick={() => handleButtonClick('/sign-in')}
                                     disabled={isLoading}
@@ -183,7 +183,7 @@ function NavbarContent() {
                                 >
                                     Sign in
                                 </Button>
-                            </SignedOut>
+                            </Show>
 
                             <ThemeToggle />
                         </div>
@@ -202,19 +202,19 @@ function NavbarContent() {
 								</Button>
 							</Link>
 
-                            <SignedIn>
+                            <Show when="signed-in">
                                 <NotificationsPopover />
-                            </SignedIn>
+                            </Show>
 
 							<ThemeToggle />
 						</div>
 					</div>
 				</div>
 			</nav>
-			{/* Spacer to push page content when expanded, without altering navbar design */}
-			<div className="lg:hidden" style={{ height: menuState ? expandedHeight + EXPANDED_MARGIN_COMP : 0 }} />
-		</header>
-    )
+            {/* Spacer to push page content when expanded, without altering navbar design */}
+            <div className="lg:hidden" style={{ height: menuState ? expandedHeight + EXPANDED_MARGIN_COMP : 0 }} />
+        </header>
+    );
 }
 
 export function Navbar() {

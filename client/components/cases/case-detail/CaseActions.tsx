@@ -223,12 +223,11 @@ export function CaseActions({
           )}
         </div>
       </div>
-
       {/* Mobile layout */}
       <div className="flex flex-col gap-2 md:hidden">
         {!isSignedIn ? (
           // Logged out: AI Search + Share in the same row
-          <div className="flex items-center gap-2">
+          (<div className="flex items-center gap-2">
             <GradientButton 
               onClick={canAISearch ? onAiSearch : undefined}
               disabled={!canAISearch || !isAiSearchEnabled}
@@ -253,7 +252,6 @@ export function CaseActions({
                 </span>
               </div>
             </GradientButton>
-
             <Button
               variant="outline"
               onClick={onShare}
@@ -263,7 +261,7 @@ export function CaseActions({
               <Share2 className="w-4 h-4" />
               <span className="leading-none">Share</span>
             </Button>
-          </div>
+          </div>)
         ) : (
           <>
             {/* Row 1: AI Search + View Similar People (signed-in) */}
@@ -351,12 +349,11 @@ export function CaseActions({
           </>
         )}
       </div>
-
       <CaseProgressTimeline 
         open={isProgressOpen} 
         onOpenChange={setIsProgressOpen} 
         notifications={notifications}
       />
     </div>
-  )
+  );
 }

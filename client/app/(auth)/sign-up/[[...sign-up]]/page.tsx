@@ -1,7 +1,7 @@
-"use client"
-
+"use client";
 import { useState, useEffect, useCallback } from "react"
-import { useSignUp, useAuth } from "@clerk/nextjs"
+import { useAuth } from "@clerk/nextjs";
+import { useSignUp } from "@clerk/nextjs/legacy";
 import { useRouter, useSearchParams, usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"

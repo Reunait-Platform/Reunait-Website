@@ -1,7 +1,7 @@
 "use client";
-
 import React, { use, useEffect, useState } from "react";
-import { useSignIn, useAuth } from "@clerk/nextjs";
+import { useAuth } from "@clerk/nextjs";
+import { useSignIn } from "@clerk/nextjs/legacy";
 import { useRouter, usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -191,9 +191,9 @@ export default function ResetPasswordClient({ searchParams }: ResetPasswordClien
 	}, [resendCooldown]);
 
 	return (
-		<>
-			{/* Full Screen Loader with Background Blur (Portal to body) */}
-			{isProcessing &&
+        <>
+            {/* Full Screen Loader with Background Blur (Portal to body) */}
+            {isProcessing &&
 				mounted &&
 				createPortal(
 					<div className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 backdrop-blur-md">
@@ -201,8 +201,7 @@ export default function ResetPasswordClient({ searchParams }: ResetPasswordClien
 					</div>,
 					document.body
 				)}
-
-			<div className="container mx-auto px-4 sm:px-6 md:px-4 lg:px-8 py-8 sm:py-10 md:py-12 lg:py-14 flex justify-center">
+            <div className="container mx-auto px-4 sm:px-6 md:px-4 lg:px-8 py-8 sm:py-10 md:py-12 lg:py-14 flex justify-center">
 				<div className="w-full max-w-md">
 					<div className="rounded-2xl border border-border bg-card p-6 sm:p-8 shadow-lg">
 						<div className="text-center mb-6">
@@ -372,8 +371,8 @@ export default function ResetPasswordClient({ searchParams }: ResetPasswordClien
 					</div>
 				</div>
 			</div>
-		</>
-	);
+        </>
+    );
 }
 
 

@@ -113,7 +113,7 @@ const schema = z
       .refine((val) => {
         const v = (val || '').trim()
         if (v.length < 3 || v.length > 12) return false
-        return /^[A-Za-z0-9 \-]+$/.test(v)
+        return /^[A-Za-z0-9 \-]+$/.test(v);
       }, "Postal Code must be 3–12 characters (letters, numbers, spaces, hyphen)")
       .transform(normalize),
     landMark: z.string().optional().refine((val) => {
@@ -128,7 +128,7 @@ const schema = z
       if (!val) return true
       const v = (val || '').trim()
       if (v.length < 2 || v.length > 50) return false
-      return /^[A-Za-z0-9 \-]+$/.test(v)
+      return /^[A-Za-z0-9 \-]+$/.test(v);
     }, "Case Reference Number must contain only letters, numbers, dashes, and spaces (minimum 2 characters)"),
     policeStationName: z.string().optional().refine((val) => {
       if (!val) return true
@@ -142,7 +142,7 @@ const schema = z
       if (!val) return true
       const v = (val || '').trim()
       if (v.length < 3 || v.length > 12) return false
-      return /^[A-Za-z0-9 \-]+$/.test(v)
+      return /^[A-Za-z0-9 \-]+$/.test(v);
     }, "Police Station Postal Code must be 3–12 characters (letters, numbers, spaces, hyphen)"),
     policeStationId: z.string().optional(), // Selected station ID from autocomplete
     
