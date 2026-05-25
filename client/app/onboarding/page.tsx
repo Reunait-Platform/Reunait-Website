@@ -37,7 +37,7 @@ function ReturnToReader({ children }: { children: (returnTo: string) => React.Re
   const sanitizeReturnTo = (val: string): string => {
     try {
       const v = (val || "/profile").trim()
-      if (!v.startsWith("/")) return "/profile"
+      if (!v.startsWith("/") || v.startsWith("//")) return "/profile"
       if (v === "/" || v === "/profile" || v.startsWith("/cases") || v === "/register-case") return v
       return "/profile"
     } catch {

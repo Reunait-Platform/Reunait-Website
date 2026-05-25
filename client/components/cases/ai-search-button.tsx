@@ -18,7 +18,7 @@ export function AiSearchButton({ caseId, onSearchComplete, className }: AiSearch
   const [isRateLimited, setIsRateLimited] = useState(false)
   const [, setRateLimitMessage] = useState("")
   const { getToken, isLoaded, isSignedIn } = useAuth()
-  const { showError } = useToast()
+  const { showError, showRateLimit } = useToast()
 
   const handleSearch = async () => {
     if (isLoading || isRateLimited) return
@@ -38,13 +38,12 @@ export function AiSearchButton({ caseId, onSearchComplete, className }: AiSearch
         showError('Authentication token is missing. Please reload and sign in again.')
         return
       }
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://192.168.1.3:3001'
-      const response = await fetch(`${backendUrl}/api/find-matches`, {
+      
+      const response = await fetch(`/api/find-matches`, {
         method: 'POST',
-        mode: 'cors',
         headers: {
           'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({ caseId })
       })
@@ -55,16 +54,16 @@ export function AiSearchButton({ caseId, onSearchComplete, className }: AiSearch
         // Rate limit exceeded - disable button and show message
         setIsRateLimited(true)
         setRateLimitMessage(data.message || 'Rate limit exceeded. Please try again later.')
-        alert(data.message || 'Rate limit exceeded. Please try again later.')
+        showRateLimit(data.message || 'Rate limit exceeded. Please try again later.')
       } else if (response.ok) {
         onSearchComplete?.(data.data)
         // Success - button remains enabled for next search
       } else {
-        alert('Search failed. Please try again.')
+        showError(data.message || 'Search failed. Please try again.')
       }
     } catch (error) {
       console.error('AI Search error:', error)
-      alert('Search failed. Please check your connection and try again.')
+      showError('Search failed. Please check your connection and try again.')
     } finally {
       setIsLoading(false)
     }

@@ -12,6 +12,7 @@ import { NotificationsStoreProvider } from "@/providers/notifications-store-prov
 import { NotificationFetcher } from "@/components/notification-fetcher";
 import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from '@vercel/speed-insights/next';
+import MicrosoftClarity from "@/components/microsoft-clarity";
 import { 
   SITE_CONFIG, 
   BASE_KEYWORDS, 
@@ -23,11 +24,13 @@ import {
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
+  display: "swap",
 });
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  display: "swap",
 });
 
 // Handwritten/accent font close to "Rockybilly" vibe
@@ -35,6 +38,7 @@ const accent = Rock_Salt({
   variable: "--font-accent",
   weight: "400",
   subsets: ["latin"],
+  display: "swap",
 });
 
 // SEO-optimized metadata for maximum search engine visibility
@@ -124,6 +128,7 @@ export default function RootLayout({
         </ClerkProvider>
         <Analytics />
         <SpeedInsights />
+        <MicrosoftClarity />
       </body>
     </html>
   );

@@ -10,7 +10,7 @@ interface HeroSectionProps {
 const transitionVariants = {
     item: {
         hidden: {
-            opacity: 0,
+            opacity: 0.01,
             filter: 'blur(12px)',
             y: 12,
         },

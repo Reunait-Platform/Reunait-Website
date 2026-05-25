@@ -240,6 +240,28 @@ export const registerCase = async (req, res) => {
             $push: { timelines: caseCreationTimeline }
         });
 
+        // Generate embeddings for the images (now that we have the case ID)
+        let embeddings;
+        try {
+            embeddings = await generateEmbeddings(req.files[0], req.files[1], !bypassVerification, savedCase._id, req.body.country);
+        } catch (embeddingError) {
+            // Rollback: Delete the saved case since embedding generation failed
+            await Case.findByIdAndDelete(savedCase._id);
+            
+            // Check for specific technical error messages and convert to user-friendly ones
+            const errorMessage = embeddingError.message;
+            if (errorMessage.includes('MTCNN') && errorMessage.includes('Retinaface')) {
+                throw new Error('Unable to detect face in both images. Please upload clear photos showing the person\'s face.');
+            } else if (errorMessage.includes('face verification failed')) {
+                throw new Error('Face detection failed. Please upload clear photos showing the person\'s face.');
+            } else if (errorMessage.includes('MTCNN') || errorMessage.includes('Retinaface')) {
+                throw new Error('Unable to detect face in the images. Please upload clear photos showing the person\'s face.');
+            } else {
+                // Use the Lambda error message directly for other cases
+                throw new Error(errorMessage);
+            }
+        }
+
         // Add notification to the user's notification array
         const auth = req.auth();
         if (auth?.userId) {
@@ -301,28 +323,6 @@ export const registerCase = async (req, res) => {
                     console.error('Error sending email notification (non-blocking):', error);
                     // Don't fail the request if email fails
                 }
-            }
-        }
-
-        // Generate embeddings for the images (now that we have the case ID)
-        let embeddings;
-        try {
-            embeddings = await generateEmbeddings(req.files[0], req.files[1], !bypassVerification, savedCase._id, req.body.country);
-        } catch (embeddingError) {
-            // Rollback: Delete the saved case since embedding generation failed
-            await Case.findByIdAndDelete(savedCase._id);
-            
-            // Check for specific technical error messages and convert to user-friendly ones
-            const errorMessage = embeddingError.message;
-            if (errorMessage.includes('MTCNN') && errorMessage.includes('Retinaface')) {
-                throw new Error('Unable to detect face in both images. Please upload clear photos showing the person\'s face.');
-            } else if (errorMessage.includes('face verification failed')) {
-                throw new Error('Face detection failed. Please upload clear photos showing the person\'s face.');
-            } else if (errorMessage.includes('MTCNN') || errorMessage.includes('Retinaface')) {
-                throw new Error('Unable to detect face in the images. Please upload clear photos showing the person\'s face.');
-            } else {
-                // Use the Lambda error message directly for other cases
-                throw new Error(errorMessage);
             }
         }
 

@@ -201,6 +201,18 @@ export function AccountMenu() {
                                         </div>
                                         <button onClick={() => setIsManageOpen(false)} className="h-8 w-8 rounded-md border hover:bg-muted cursor-pointer">✕</button>
                                     </header>
+                                    <div className="block md:hidden border-b px-4 py-3 bg-muted/20">
+                                        <label htmlFor="mobile-settings-tab" className="sr-only">Select settings section</label>
+                                        <select
+                                            id="mobile-settings-tab"
+                                            value={activeTab}
+                                            onChange={(e) => setActiveTab(e.target.value as 'profile' | 'security')}
+                                            className="w-full h-10 rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none"
+                                        >
+                                            <option value="profile">Profile Details</option>
+                                            <option value="security">Security Settings</option>
+                                        </select>
+                                    </div>
                                     <div className="p-4 md:p-6">
                                         {activeTab === 'profile' ? (
                                             <div className="space-y-4">

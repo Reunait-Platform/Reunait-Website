@@ -45,7 +45,7 @@ const defaultStaggerTimes: Record<PerType, number> = {
 };
 
 const defaultContainerVariants: Variants = {
-  hidden: { opacity: 0 },
+  hidden: { opacity: 0.01 },
   visible: {
     opacity: 1,
     transition: {
@@ -58,11 +58,11 @@ const defaultContainerVariants: Variants = {
 };
 
 const defaultItemVariants: Variants = {
-  hidden: { opacity: 0 },
+  hidden: { opacity: 0.01 },
   visible: {
     opacity: 1,
   },
-  exit: { opacity: 0 },
+  exit: { opacity: 0.01 },
 };
 
 const presetVariants: Record<
@@ -72,41 +72,41 @@ const presetVariants: Record<
   blur: {
     container: defaultContainerVariants,
     item: {
-      hidden: { opacity: 0, filter: 'blur(12px)' },
+      hidden: { opacity: 0.01, filter: 'blur(12px)' },
       visible: { opacity: 1, filter: 'blur(0px)' },
-      exit: { opacity: 0, filter: 'blur(12px)' },
+      exit: { opacity: 0.01, filter: 'blur(12px)' },
     },
   },
   'fade-in-blur': {
     container: defaultContainerVariants,
     item: {
-      hidden: { opacity: 0, y: 20, filter: 'blur(12px)' },
+      hidden: { opacity: 0.01, y: 20, filter: 'blur(12px)' },
       visible: { opacity: 1, y: 0, filter: 'blur(0px)' },
-      exit: { opacity: 0, y: 20, filter: 'blur(12px)' },
+      exit: { opacity: 0.01, y: 20, filter: 'blur(12px)' },
     },
   },
   scale: {
     container: defaultContainerVariants,
     item: {
-      hidden: { opacity: 0, scale: 0 },
+      hidden: { opacity: 0.01, scale: 0 },
       visible: { opacity: 1, scale: 1 },
-      exit: { opacity: 0, scale: 0 },
+      exit: { opacity: 0.01, scale: 0 },
     },
   },
   fade: {
     container: defaultContainerVariants,
     item: {
-      hidden: { opacity: 0 },
+      hidden: { opacity: 0.01 },
       visible: { opacity: 1 },
-      exit: { opacity: 0 },
+      exit: { opacity: 0.01 },
     },
   },
   slide: {
     container: defaultContainerVariants,
     item: {
-      hidden: { opacity: 0, y: 20 },
+      hidden: { opacity: 0.01, y: 20 },
       visible: { opacity: 1, y: 0 },
-      exit: { opacity: 0, y: 20 },
+      exit: { opacity: 0.01, y: 20 },
     },
   },
 };

@@ -36,7 +36,7 @@ const defaultContainerVariants: Variants = {
 };
 
 const defaultItemVariants: Variants = {
-  hidden: { opacity: 0 },
+  hidden: { opacity: 0.01 },
   visible: { opacity: 1 },
 };
 

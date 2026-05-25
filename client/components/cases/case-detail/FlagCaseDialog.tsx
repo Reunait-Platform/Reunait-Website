@@ -31,7 +31,7 @@ export function FlagCaseDialog({
   const [selectedReason, setSelectedReason] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const { showSuccess, showError } = useToast()
+  const { showSuccess, showError, showWarning } = useToast()
 
   const handleFlagCase = async () => {
     if (!selectedReason) {
@@ -53,7 +53,7 @@ export function FlagCaseDialog({
       } else {
         // Check if it's a duplicate flag error
         if (result.message.includes('already flagged')) {
-          showSuccess('Case already flagged', 'You have already reported this case. Thank you for your concern!')
+          showWarning('Case already flagged', 'You have already reported this case. Thank you for your concern!')
           setIsOpen(false)
           setSelectedReason('')
         } else {
