@@ -6,7 +6,7 @@ const isProtectedRoute = createRouteMatcher(['/profile(.*)', '/register-case(.*)
 const isAuthRoute = createRouteMatcher(['/sign-in(.*)', '/sign-up(.*)'])
 const isOnboardingRoute = createRouteMatcher(['/onboarding(.*)'])
 
-export default clerkMiddleware(async (auth, req) => {
+const middlewareHandler = clerkMiddleware(async (auth, req) => {
   // Check maintenance mode first
   if (process.env.MAINTENANCE_MODE === 'true') {
     // Rewrite all requests to the maintenance page
@@ -74,6 +74,9 @@ export default clerkMiddleware(async (auth, req) => {
   // Allow the request to proceed
   return NextResponse.next()
 })
+
+export const proxy = middlewareHandler
+export default middlewareHandler
 
 export const config = {
   matcher: [
