@@ -6,6 +6,7 @@ import { ArrowRight } from 'lucide-react'
 import { SimpleLoader } from '@/components/ui/simple-loader'
 import { createPortal } from 'react-dom'
 import { useNavigationLoader } from '@/hooks/use-navigation-loader'
+import { SITE_CONFIG } from '@/lib/seo-config'
 
 interface HeroSectionButtonProps {
   casesRoute?: string
@@ -29,7 +30,7 @@ export default function HeroSectionButton({ casesRoute = '/cases' }: HeroSection
         const stored = window.localStorage.getItem('userLocation')
         if (stored) {
           const loc = JSON.parse(stored)
-          const country = loc?.country || 'India'
+          const country = loc?.country || SITE_CONFIG.region
           const state = loc?.state && loc.state !== 'Unknown' ? loc.state : null
           const city = loc?.city && loc.city !== 'Unknown' ? loc.city : null
           const sp = new URLSearchParams()
@@ -41,7 +42,7 @@ export default function HeroSectionButton({ casesRoute = '/cases' }: HeroSection
         } else {
           const sp = new URLSearchParams()
           sp.set('page', '1')
-          sp.set('country', 'India')
+          sp.set('country', SITE_CONFIG.region)
           destination = `${casesRoute}?${sp.toString()}`
         }
       }

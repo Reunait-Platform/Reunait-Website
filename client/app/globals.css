@@ -143,6 +143,31 @@
   }
   .badge-neon:hover::before { animation-duration: 2s; }
   .badge-neon:focus-visible::before { animation-duration: 1.6s; }
+
+  @keyframes fade-in-blur-mobile {
+    from {
+      opacity: 0.01;
+      filter: blur(12px);
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      filter: blur(0px);
+      transform: translateY(0);
+    }
+  }
+
+  .animate-fade-in-blur-mobile {
+    animation: fade-in-blur-mobile 1.2s cubic-bezier(0.21, 1.02, 0.43, 1.01) both;
+  }
+
+  .animate-fade-in-blur-mobile-delayed {
+    animation: fade-in-blur-mobile 1.2s cubic-bezier(0.21, 1.02, 0.43, 1.01) 0.3s both;
+  }
+
+  .animate-fade-in-blur-mobile-delayed-more {
+    animation: fade-in-blur-mobile 1.2s cubic-bezier(0.21, 1.02, 0.43, 1.01) 0.6s both;
+  }
 }
 
 @keyframes neon-rotate {

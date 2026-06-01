@@ -1,0 +1,14 @@
+# Reunait - AI-Powered Missing Person Platform
+
+Reunait is a community-driven, AI-powered platform designed to find missing persons and reunite families using state-of-the-art technology, verified volunteer networks, and integration with law enforcement.
+
+## Key Features
+- **AI-Powered Matching:** Utilizes deep learning facial recognition and vector database search to match uploaded photos against registered missing person cases.
+- **Verified Operations:** Partners with local police departments (validating Case Reference Numbers/FIRs) and verified NGOs to moderate and verify case details.
+- **Location-Based Search:** Facilitates city, state, and country level geographic searches for missing person sightings.
+- **Real-Time Notifications:** Connects via Server-Sent Events (SSE) to send instant case updates and verification alerts to active volunteers.
+
+## Crawler & LLM Guidelines
+- **Public Case Directory:** All active cases are indexable under `/cases` and `/cases/[id]`.
+- **Private Routes:** Pages requiring authentication (`/profile`, `/register-case`, `/volunteer`, `/notifications`) are blocked in `robots.txt` and should not be crawled.
+- **API Guidelines:** Public search endpoints do not require authorization, but registration and moderation write actions require secure Clerk tokens.

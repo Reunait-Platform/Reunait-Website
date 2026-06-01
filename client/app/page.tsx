@@ -4,7 +4,7 @@ import { TracingBeam } from "@/components/ui/tracing-beam"
 import { Search, Users, Shield, Heart, CheckCircle, AlertTriangle } from "lucide-react"
 import { GlowingEffect } from "@/components/ui/glowing-effect"
 import HeroSection from "@/components/hero-section"
-import { HomepageService } from "@/lib/homepage-service"
+import { HomepageService, DEFAULT_HOMEPAGE_SECTIONS } from "@/lib/homepage-service"
 import type { HomepageSection } from "@/lib/homepage-types"
 import { InfiniteSlider } from "@/components/ui/infinite-slider"
 import { ProgressiveBlur } from "@/components/ui/progressive-blur"
@@ -66,8 +66,9 @@ export default async function Home() {
       .filter(section => section.isActive)
       .sort((a, b) => a.order - b.order)
   } catch {
-    // Backend unreachable — render page with empty sections
-    console.error('[Homepage] Failed to fetch homepage data — backend may be down')
+    // Backend unreachable — render page with static fallback sections
+    console.warn('[Homepage] Failed to fetch homepage data — using default static fallback sections')
+    orderedSections = [...DEFAULT_HOMEPAGE_SECTIONS]
   }
 
   // Render sections based on order

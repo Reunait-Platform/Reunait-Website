@@ -13,13 +13,16 @@ import { NotificationFetcher } from "@/components/notification-fetcher";
 import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import MicrosoftClarity from "@/components/microsoft-clarity";
+import GoogleAnalytics from "@/components/google-analytics";
 import { 
   SITE_CONFIG, 
   BASE_KEYWORDS, 
   OPEN_GRAPH_DEFAULTS, 
   TWITTER_DEFAULTS,
-  METADATA_TEMPLATES
+  METADATA_TEMPLATES,
+  STRUCTURED_DATA
 } from "@/lib/seo-config";
+
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -100,6 +103,15 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} ${accent.variable} antialiased`}>
+        {/* Schema.org Structured Data */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(STRUCTURED_DATA.website) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(STRUCTURED_DATA.organization) }}
+        />
         <ClerkProvider>
           <ThemeProvider
             attribute="class"
@@ -129,6 +141,7 @@ export default function RootLayout({
         <Analytics />
         <SpeedInsights />
         <MicrosoftClarity />
+        <GoogleAnalytics />
       </body>
     </html>
   );

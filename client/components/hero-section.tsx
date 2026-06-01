@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { Suspense } from 'react'
 import { TextEffect } from '@/components/ui/text-effect'
 import { AnimatedGroup } from '@/components/ui/animated-group'
 import HeroSectionButton from './hero-section-button'
@@ -38,38 +38,58 @@ export default function HeroSection({ casesRoute = '/cases' }: HeroSectionProps)
                         <div className="mx-auto max-w-7xl px-6">
                             <div className="text-center sm:mx-auto lg:mr-auto lg:mt-0">
 
-                                <TextEffect
-                                    preset="fade-in-blur"
-                                    speedSegment={0.3}
-                                    as="h1"
-                                    className="mx-auto mt-8 max-w-4xl text-balance text-5xl max-md:font-semibold md:text-7xl lg:mt-12 xl:text-[5.25rem]">
-                                    Reuniting Families Through Technology
-                                </TextEffect>
-                                <TextEffect
-                                    per="line"
-                                    preset="fade-in-blur"
-                                    speedSegment={0.3}
-                                    delay={0.5}
-                                    as="p"
-                                    className="mx-auto mt-8 max-w-2xl text-balance text-lg">
-                                    Join thousands of volunteers using AI-powered facial recognition to help find missing persons and bring families back together.
-                                </TextEffect>
+                                {/* Desktop & Tablet Layout (Animated with framer-motion/TextEffect/AnimatedGroup) */}
+                                <div className="hidden md:block">
+                                    <TextEffect
+                                        preset="fade-in-blur"
+                                        speedSegment={0.3}
+                                        as="h1"
+                                        className="mx-auto mt-8 max-w-4xl text-balance text-5xl md:text-7xl lg:mt-12 xl:text-[5.25rem]">
+                                        Reuniting Families Through Technology
+                                    </TextEffect>
+                                    <TextEffect
+                                        per="line"
+                                        preset="fade-in-blur"
+                                        speedSegment={0.3}
+                                        delay={0.5}
+                                        as="p"
+                                        className="mx-auto mt-8 max-w-2xl text-balance text-lg">
+                                        Join thousands of volunteers using AI-powered facial recognition to help find missing persons and bring families back together.
+                                    </TextEffect>
 
-                                <AnimatedGroup
-                                    variants={{
-                                        container: {
-                                            visible: {
-                                                transition: {
-                                                    staggerChildren: 0.05,
-                                                    delayChildren: 0.75,
+                                    <AnimatedGroup
+                                        variants={{
+                                            container: {
+                                                visible: {
+                                                    transition: {
+                                                        staggerChildren: 0.05,
+                                                        delayChildren: 0.75,
+                                                    },
                                                 },
                                             },
-                                        },
-                                        ...transitionVariants,
-                                    }}
-                                    className="mt-12 flex flex-col items-center justify-center">
-                                    <HeroSectionButton casesRoute={casesRoute} />
-                                </AnimatedGroup>
+                                            ...transitionVariants,
+                                        }}
+                                        className="mt-12 flex flex-col items-center justify-center">
+                                        <Suspense fallback={<div className="h-12 w-48 bg-muted/50 animate-pulse rounded-full" />}>
+                                            <HeroSectionButton casesRoute={casesRoute} />
+                                        </Suspense>
+                                    </AnimatedGroup>
+                                </div>
+
+                                {/* Mobile Layout (Static / Pure CSS animated for immediate Paint & LCP optimization) */}
+                                <div className="md:hidden">
+                                    <h1 className="mx-auto mt-8 max-w-4xl text-balance text-5xl font-semibold animate-fade-in-blur-mobile">
+                                        Reuniting Families Through Technology
+                                    </h1>
+                                    <p className="mx-auto mt-8 max-w-2xl text-balance text-lg animate-fade-in-blur-mobile-delayed">
+                                        Join thousands of volunteers using AI-powered facial recognition to help find missing persons and bring families back together.
+                                    </p>
+                                    <div className="mt-12 flex flex-col items-center justify-center animate-fade-in-blur-mobile-delayed-more">
+                                        <Suspense fallback={<div className="h-12 w-48 bg-muted/50 animate-pulse rounded-full" />}>
+                                            <HeroSectionButton casesRoute={casesRoute} />
+                                        </Suspense>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 

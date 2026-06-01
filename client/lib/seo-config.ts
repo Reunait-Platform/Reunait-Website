@@ -5,15 +5,19 @@
  * following industry best practices for maintainability and consistency.
  */
 
-// Base site information
+// Base site information from env variables for global portability
+const region = process.env.NEXT_PUBLIC_SITE_REGION || "Global"
+const locale = process.env.NEXT_PUBLIC_SITE_LOCALE || "en"
+const regionSuffix = region.toLowerCase() === "global" ? "" : ` across ${region}`
+
 export const SITE_CONFIG = {
   name: "Reunait",
   tagline: "Reuniting Families Through Technology",
-  description: "AI-powered missing person search platform helping reunite families across India",
+  description: `AI-powered missing person search platform helping reunite families${regionSuffix}`,
   url: process.env.NEXT_PUBLIC_SITE_URL || "https://reunait.com",
-  locale: "en_IN",
-  region: "India",
-} as const
+  locale,
+  region,
+}
 
 // Base keywords - Common across all pages
 export const BASE_KEYWORDS = [
@@ -33,16 +37,18 @@ export const BASE_KEYWORDS = [
   "similar case matching",
   
   // Location
-  "missing person India",
-  "find missing person India",
-  "missing person search India",
+  ...(region.toLowerCase() !== "global" ? [
+    `missing person ${region}`,
+    `find missing person ${region}`,
+    `missing person search ${region}`,
+  ] : []),
   
   // Community
   "community support",
   "volunteer network",
   "help find missing persons",
   "reunite families",
-] as const
+]
 
 // Feature-specific keywords
 export const FEATURE_KEYWORDS = {
@@ -165,7 +171,7 @@ export const PAGE_KEYWORDS = {
     ...BASE_KEYWORDS,
     ...FEATURE_KEYWORDS.ai,
     ...FEATURE_KEYWORDS.search,
-    "missing person platform India",
+    ...(region.toLowerCase() !== "global" ? [`missing person platform ${region}`] : []),
     "AI-powered family reunification",
     "technology for finding missing persons",
   ],
@@ -216,23 +222,23 @@ export const PAGE_KEYWORDS = {
     "fund missing person search",
     "donate to reunite families",
   ],
-} as const
+}
 
 // Metadata templates for different page types
 export const METADATA_TEMPLATES = {
   home: {
-    title: "Reunait - AI-Powered Missing Person Search Platform | Find Missing Persons",
-    description: "Find missing persons faster with Reunait's AI-powered search platform. Report missing persons, search cases by location, age, gender, and help reunite families. Trusted by police, NGOs, and thousands of volunteers across India.",
+    title: "Reunait | AI-Powered Missing Person Search Platform",
+    description: "Find missing persons faster with Reunait's AI-powered search platform. Report cases, search by age or location, and help volunteers reunite families.",
   },
   
   cases: {
     title: "Missing Person Cases - Search & Browse All Cases | Reunait",
-    description: "Browse and search missing person cases by location, age, gender, and status. Help find missing persons and reunite families. Search cases across India with AI-powered matching.",
+    description: `Browse and search missing person cases by location, age, gender, and status. Help find missing persons and reunite families. Search cases${regionSuffix} with AI-powered matching.`,
   },
   
   registerCase: {
     title: "Report Missing Person - Register Case | Reunait",
-    description: "Report a missing person case on Reunait. Register missing person details, upload photos, and get help from our AI-powered search platform. Trusted by police and NGOs across India.",
+    description: `Report a missing person case on Reunait. Register missing person details, upload photos, and get help from our AI-powered search platform. Trusted by police and NGOs${regionSuffix}.`,
   },
   
   caseDetail: {

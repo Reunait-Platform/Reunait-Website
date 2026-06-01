@@ -1,38 +1,20 @@
-"use client"
-
-import { useEffect } from "react"
+import React from "react"
 
 interface StructuredDataProps {
   data: object
 }
 
 /**
- * Component to inject JSON-LD structured data for SEO
- * Helps search engines understand the content and enables rich snippets
+ * Component to inject JSON-LD structured data for SEO/GEO
+ * Renders statically on the server so that LLM crawlers and search engines
+ * can read the entity structure in the raw HTML payload.
  */
 export function StructuredData({ data }: StructuredDataProps) {
-  useEffect(() => {
-    const script = document.createElement("script")
-    script.type = "application/ld+json"
-    script.text = JSON.stringify(data)
-    script.id = "structured-data"
-    
-    // Remove existing structured data if present
-    const existing = document.getElementById("structured-data")
-    if (existing) {
-      existing.remove()
-    }
-    
-    document.head.appendChild(script)
-    
-    return () => {
-      const scriptToRemove = document.getElementById("structured-data")
-      if (scriptToRemove) {
-        scriptToRemove.remove()
-      }
-    }
-  }, [data])
-
-  return null
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
+    />
+  )
 }
 
