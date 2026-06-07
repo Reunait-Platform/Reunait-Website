@@ -15,45 +15,45 @@ import { useRouter } from "next/navigation"
 import { useUser, useAuth } from "@clerk/nextjs"
 import { useNavigationLoader } from "@/hooks/use-navigation-loader"
 import { SimpleLoader } from "@/components/ui/simple-loader"
+import { SITE_CONFIG } from "@/lib/seo-config"
+
+const defaultCountry = SITE_CONFIG.region.toLowerCase() === "global" ? "India" : SITE_CONFIG.region
 
 export interface SearchFilters {
   keyword: string
   country: string
   state: string
   city: string
-  status: "all" | "missing" | "found" | "closed" | undefined
-  gender: string | undefined
+  status: "missing" | "found" | "all" | undefined
+  gender: "male" | "female" | "other" | "all" | undefined
   dateFrom: Date | undefined
   dateTo: Date | undefined
 }
 
+interface SuggestionItem {
+  _id: string
+  fullName: string
+  age?: string | number
+  gender?: "male" | "female" | "other"
+}
+
 interface UserSearchResult {
-  clerkUserId?: string
+  clerkUserId: string
   fullName?: string
   email?: string
   phoneNumber?: string
-  age?: string | number
+  age?: number
   gender?: string
-  url?: string | null
-  _id?: string
+  url?: string
 }
 
 // Type for user suggestions displayed in dropdown (extends Case but makes location fields optional)
 type UserSuggestion = Omit<Case, 'status' | 'city' | 'state' | 'country' | 'dateMissingFound' | 'reportedBy'> & {
-  status?: Case['status']
-  city?: string
-  state?: string
-  country?: string
-  dateMissingFound?: string
-  reportedBy?: Case['reportedBy']
   email?: string
   phoneNumber?: string
-  url?: string | null
-  clerkUserId?: string | null
+  url: string | null
+  clerkUserId: string | null
 }
-
-// Union type for suggestions - can be either a Case or a UserSuggestion
-type SuggestionItem = Case | UserSuggestion
 
 interface CasesSearchProps {
   onSearch: (filters: SearchFilters) => void
@@ -66,7 +66,7 @@ interface CasesSearchProps {
 // Initial filter state
 const INITIAL_FILTERS: SearchFilters = {
   keyword: "",
-  country: "India",
+  country: defaultCountry,
   state: "all",
   city: "all",
   status: undefined,
@@ -130,7 +130,7 @@ export function CasesSearch({ onSearch, onClear, hasCasesDisplayed = false, pres
   // Memoized active filters count (excludes status since it has dedicated buttons)
   const activeFiltersCount = useMemo(() => {
     let count = 0
-    if (filters.country !== "India") count++
+    if (filters.country !== defaultCountry) count++
     if (filters.state !== "all") count++
     if (filters.city !== "all") count++
     if (filters.gender && filters.gender !== "all") count++
@@ -162,8 +162,8 @@ export function CasesSearch({ onSearch, onClear, hasCasesDisplayed = false, pres
     const initializeData = () => {
       // Initialize countries and states
       const allCountries = CountriesStatesService.getCountries()
-      const defaultStates = CountriesStatesService.getStates("India")
-      const defaultCities = CountriesStatesService.getCities("India", "Bihar")
+      const defaultStates = CountriesStatesService.getStates(defaultCountry)
+      const defaultCities = defaultStates.length > 0 ? CountriesStatesService.getCities(defaultCountry, defaultStates[0]) : []
       
       setCountries(allCountries)
       setStates(defaultStates)
@@ -227,44 +227,25 @@ export function CasesSearch({ onSearch, onClear, hasCasesDisplayed = false, pres
     }
   }, [presetFilters])
 
-  // Update states when country changes
-  useEffect(() => {
-    if (filters.country) {
-      const newStates = CountriesStatesService.getStates(filters.country)
-      setStates(newStates)
-      if (skipNormalizeOnceRef.current) {
-        skipNormalizeOnceRef.current = false
-      } else {
-        setFilters(prev => ({
-          ...prev,
-          state: "all",
-          city: "all"
-        }))
-      }
-    }
-  }, [filters.country])
+  const handleCountryChange = useCallback((value: string) => {
+    setFilters(prev => ({
+      ...prev,
+      country: value,
+      state: "all",
+      city: "all"
+    }))
+    setStates(CountriesStatesService.getStates(value))
+    setCities([])
+  }, [])
 
-  // Update cities when state changes
-  useEffect(() => {
-    if (filters.country && filters.state && filters.state !== "all") {
-      const newCities = CountriesStatesService.getCities(filters.country, filters.state)
-      setCities(newCities)
-      if (skipNormalizeOnceRef.current) {
-        skipNormalizeOnceRef.current = false
-      } else {
-        setFilters(prev => ({
-          ...prev,
-          city: "all"
-        }))
-      }
-    } else {
-      setCities([])
-      setFilters(prev => ({
-        ...prev,
-        city: "all"
-      }))
-    }
-  }, [filters.country, filters.state])
+  const handleStateChange = useCallback((value: string) => {
+    setFilters(prev => ({
+      ...prev,
+      state: value,
+      city: "all"
+    }))
+    setCities(value !== "all" ? CountriesStatesService.getCities(filters.country, value) : [])
+  }, [filters.country])
 
   // Memoized handlers
 
@@ -289,7 +270,7 @@ export function CasesSearch({ onSearch, onClear, hasCasesDisplayed = false, pres
   const getActiveFilters = useCallback(() => {
     const active: Array<{ key: string; label: string; value: string }> = []
     
-    if (filters.country !== "India") {
+    if (filters.country !== defaultCountry) {
       active.push({ key: "country", label: "Country", value: filters.country })
     }
     if (filters.state !== "all") {
@@ -315,7 +296,7 @@ export function CasesSearch({ onSearch, onClear, hasCasesDisplayed = false, pres
       const newFilters = { ...prev }
       switch (key) {
         case "country":
-          newFilters.country = "India"
+          newFilters.country = defaultCountry
           break
         case "state":
           newFilters.state = "all"
@@ -714,7 +695,7 @@ export function CasesSearch({ onSearch, onClear, hasCasesDisplayed = false, pres
                 Country
               </Label>
               {mounted ? (
-                <Select value={filters.country} onValueChange={(value) => createFilterChangeHandler("country")(value)}>
+                <Select value={filters.country} onValueChange={handleCountryChange}>
                   <SelectTrigger className="h-10 w-full min-w-0 border-2 border-border bg-background/80 focus:bg-background transition-all duration-300 hover:bg-background/90 rounded-lg text-sm focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-0 focus-visible:border-ring cursor-pointer">
                     <SelectValue placeholder="Select country" className="truncate" />
                   </SelectTrigger>
@@ -735,7 +716,7 @@ export function CasesSearch({ onSearch, onClear, hasCasesDisplayed = false, pres
             <div className="space-y-1.5 min-w-0">
               <Label className="text-xs sm:text-sm font-semibold text-foreground text-center block">State</Label>
               {mounted ? (
-                <Select value={filters.state} onValueChange={(value) => createFilterChangeHandler("state")(value)}>
+                <Select value={filters.state} onValueChange={handleStateChange}>
                   <SelectTrigger className="h-10 w-full min-w-0 border-2 border-border bg-background/80 focus:bg-background transition-all duration-300 hover:bg-background/90 rounded-lg text-sm focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-0 focus-visible:border-ring cursor-pointer">
                     <SelectValue placeholder="Select state" className="truncate" />
                   </SelectTrigger>

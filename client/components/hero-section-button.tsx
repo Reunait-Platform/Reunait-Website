@@ -8,6 +8,14 @@ import { createPortal } from 'react-dom'
 import { useNavigationLoader } from '@/hooks/use-navigation-loader'
 import { SITE_CONFIG } from '@/lib/seo-config'
 
+const defaultCountry = SITE_CONFIG.region.toLowerCase() === "global" ? "India" : SITE_CONFIG.region
+
+declare global {
+  interface Window {
+    __locationPromise?: Promise<void>
+  }
+}
+
 interface HeroSectionButtonProps {
   casesRoute?: string
 }
@@ -21,16 +29,29 @@ export default function HeroSectionButton({ casesRoute = '/cases' }: HeroSection
     requestAnimationFrame(() => requestAnimationFrame(() => stopLoading()))
   }, [stopLoading])
 
-  const handleClick = (e: React.MouseEvent) => {
+  const handleClick = async (e: React.MouseEvent) => {
     e.preventDefault()
+    startLoading({ expectRouteChange: pathname !== casesRoute })
+
     // Build destination with location query params from localStorage to avoid extra fetches
     let destination = casesRoute
     try {
       if (typeof window !== 'undefined') {
-        const stored = window.localStorage.getItem('userLocation')
+        let stored = window.localStorage.getItem('userLocation')
+
+        // If location query is in flight (not in localStorage yet, but promise exists), await it with a 1.5s timeout
+        if (!stored && window.__locationPromise) {
+          await Promise.race([
+            window.__locationPromise,
+            new Promise((resolve) => setTimeout(resolve, 1500))
+          ])
+          // Re-check localStorage after promise completes or times out
+          stored = window.localStorage.getItem('userLocation')
+        }
+
         if (stored) {
           const loc = JSON.parse(stored)
-          const country = loc?.country || SITE_CONFIG.region
+          const country = loc?.country && loc.country.toLowerCase() !== "global" ? loc.country : defaultCountry
           const state = loc?.state && loc.state !== 'Unknown' ? loc.state : null
           const city = loc?.city && loc.city !== 'Unknown' ? loc.city : null
           const sp = new URLSearchParams()
@@ -42,13 +63,12 @@ export default function HeroSectionButton({ casesRoute = '/cases' }: HeroSection
         } else {
           const sp = new URLSearchParams()
           sp.set('page', '1')
-          sp.set('country', SITE_CONFIG.region)
+          sp.set('country', defaultCountry)
           destination = `${casesRoute}?${sp.toString()}`
         }
       }
     } catch {}
 
-    startLoading({ expectRouteChange: pathname !== casesRoute })
     if (pathname === casesRoute) {
       // Same-route click: show loader briefly, then clear after next paint
       stopAfterNextPaint()

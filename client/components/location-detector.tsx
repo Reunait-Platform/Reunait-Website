@@ -7,6 +7,12 @@
 
 import { useEffect } from 'react'
 
+declare global {
+  interface Window {
+    __locationPromise?: Promise<void>
+  }
+}
+
 export function LocationDetector() {
   useEffect(() => {
     // Only run in browser (client-side)
@@ -38,18 +44,19 @@ export function LocationDetector() {
         return
       }
 
+      // Initialize the shared location promise
+      let resolvePromise: () => void = () => {}
+      window.__locationPromise = new Promise<void>((resolve) => {
+        resolvePromise = resolve
+      })
+
       // Direct use of navigator.geolocation API
       navigator.geolocation.getCurrentPosition(
         async (position) => {
           try {
-            // Get location details using reverse geocoding
+            // Get location details using BigDataCloud reverse geocoding client
             const response = await fetch(
-              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${position.coords.latitude}&lon=${position.coords.longitude}&addressdetails=1`,
-              {
-                headers: {
-                  'User-Agent': 'MissingPersonsApp/1.0'
-                }
-              }
+              `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${position.coords.latitude}&longitude=${position.coords.longitude}&localityLanguage=en`
             )
             
             if (response.ok) {
@@ -59,14 +66,14 @@ export function LocationDetector() {
               const locationData = {
                 latitude: position.coords.latitude,
                 longitude: position.coords.longitude,
-                country: data.address?.country || 'India',
-                state: data.address?.state || data.address?.region || 'Karnataka',
-                city: data.address?.city || data.address?.town || data.address?.village || 'Bangalore',
+                country: data.countryName || 'India',
+                state: data.principalSubdivision || 'Karnataka',
+                city: data.city || data.locality || 'Bangalore',
                 timestamp: Date.now()
               }
               
               localStorage.setItem('userLocation', JSON.stringify(locationData))
-            setLocationCookie({ country: locationData.country, state: locationData.state, city: locationData.city })
+              setLocationCookie({ country: locationData.country, state: locationData.state, city: locationData.city })
               // Notify any listeners (e.g., /cases page) immediately
               window.dispatchEvent(new CustomEvent('location:updated', { detail: locationData }))
             } else {
@@ -80,7 +87,7 @@ export function LocationDetector() {
                 timestamp: Date.now()
               }
               localStorage.setItem('userLocation', JSON.stringify(fallback))
-            setLocationCookie({ country: fallback.country, state: fallback.state, city: fallback.city })
+              setLocationCookie({ country: fallback.country, state: fallback.state, city: fallback.city })
               window.dispatchEvent(new CustomEvent('location:updated', { detail: fallback }))
             }
           } catch {
@@ -94,12 +101,15 @@ export function LocationDetector() {
               timestamp: Date.now()
             }
             localStorage.setItem('userLocation', JSON.stringify(fallback))
-          setLocationCookie({ country: fallback.country, state: fallback.state, city: fallback.city })
+            setLocationCookie({ country: fallback.country, state: fallback.state, city: fallback.city })
             window.dispatchEvent(new CustomEvent('location:updated', { detail: fallback }))
+          } finally {
+            resolvePromise()
           }
         },
         () => {
           // Silently handle errors
+          resolvePromise()
         },
         {
           enableHighAccuracy: true,

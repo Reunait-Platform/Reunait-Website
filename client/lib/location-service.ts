@@ -147,14 +147,9 @@ class LocationService {
     }
 
     try {
-      // Using OpenStreetMap Nominatim API (free, no API key required)
+      // Using BigDataCloud Geocoding API (free, fast, unlimited client geocoding)
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`,
-        {
-          headers: {
-            'User-Agent': 'MissingPersonsApp/1.0'
-          }
-        }
+        `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`
       )
 
       if (!response.ok) {
@@ -166,9 +161,9 @@ class LocationService {
       const locationData: LocationData = {
         latitude: lat,
         longitude: lng,
-        country: data.address?.country || 'Unknown',
-        state: data.address?.state || data.address?.region || 'Unknown',
-        city: data.address?.city || data.address?.town || data.address?.village || 'Unknown',
+        country: data.countryName || 'Unknown',
+        state: data.principalSubdivision || 'Unknown',
+        city: data.city || data.locality || 'Unknown',
         timestamp: Date.now()
       }
 

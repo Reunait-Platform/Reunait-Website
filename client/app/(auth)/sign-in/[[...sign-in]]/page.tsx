@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useSignIn } from "@clerk/nextjs/legacy"
+import { useSignIn, useAuth } from "@clerk/nextjs"
 import { useRouter, useSearchParams, usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -45,10 +45,11 @@ export default function SignInCatchAllPage() {
   const origin = search?.get("origin") || ""
   const isFromRegisterCase = returnTo === "/register-case"
   const isFromFlagCase = origin === "flag" && returnTo.startsWith("/cases/")
-  const { isLoaded: isSignInLoaded, signIn, setActive } = useSignIn()
-
+  const { signIn } = useSignIn()
+  const { isSignedIn } = useAuth()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [code, setCode] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [showPassword, setShowPassword] = useState(false)
   const [isNavigating, setIsNavigating] = useState(false)
@@ -70,20 +71,56 @@ export default function SignInCatchAllPage() {
     router.push(`/reset-password?returnTo=${encodeURIComponent(returnTo)}`)
   }
 
-  // After sign-in, just navigate to returnTo.
-  // Middleware is the single source of truth for onboarding and will redirect
-  // to /onboarding or /profile as needed based on Clerk metadata.
+  // Helper to finalize sign-in session and redirect.
+  const handleFinalize = async () => {
+    if (!signIn) return
+    const { error: finalizeError } = await signIn.finalize({
+      navigate: ({ session, decorateUrl }) => {
+        if (session?.currentTask) {
+          console.log(session?.currentTask)
+          return
+        }
+
+        const url = decorateUrl(returnTo)
+        if (url.startsWith('http')) {
+          window.location.href = url
+        } else {
+          router.replace(url)
+        }
+      },
+    })
+    if (finalizeError) {
+      setError(finalizeError.message || "Failed to finalize sign in.")
+      setIsAuthenticating(false)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!isSignInLoaded) return
+    if (!signIn) return
     setError(null)
     setIsAuthenticating(true)
     try {
-      const res = await signIn.create({ identifier: email, password })
-      if (res.status === "complete") {
-        await setActive({ session: res.createdSessionId })
-        router.replace(returnTo)
+      const { error: createError } = await signIn.create({ identifier: email, password })
+      if (createError) {
+        setError(createError.message || "Sign in failed. Check your credentials.")
+        setIsAuthenticating(false)
+        return
+      }
+
+      if (signIn.status === "complete") {
+        await handleFinalize()
+      } else if (signIn.status === "needs_client_trust" || signIn.status === "needs_second_factor") {
+        const emailCodeFactor = signIn.supportedSecondFactors?.find(
+          (factor) => factor.strategy === 'email_code'
+        )
+        if (emailCodeFactor) {
+          const { error: mfaError } = await signIn.mfa.sendEmailCode()
+          if (mfaError) {
+            setError(mfaError.message || "Failed to send verification code.")
+          }
+        }
+        setIsAuthenticating(false)
       } else {
         setError("Additional steps required. Please use the default sign-in.")
         setIsAuthenticating(false)
@@ -95,20 +132,90 @@ export default function SignInCatchAllPage() {
     }
   }
 
-  const handleGoogle = async () => {
-    if (!isSignInLoaded) return
+  const handleVerify = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!signIn) return
+    setError(null)
     setIsAuthenticating(true)
     try {
-      await signIn.authenticateWithRedirect({
+      const { error: verifyError } = await signIn.mfa.verifyEmailCode({ code })
+      if (verifyError) {
+        setError(verifyError.message || "Verification failed. Check your code.")
+        setIsAuthenticating(false)
+        return
+      }
+
+      if (signIn.status === "complete") {
+        await handleFinalize()
+      } else {
+        setError("Sign in attempt not complete. Status: " + signIn.status)
+        setIsAuthenticating(false)
+      }
+    } catch (err: unknown) {
+      const errorObj = err as { errors?: Array<{ message?: string }> }
+      setError(errorObj?.errors?.[0]?.message || "Verification failed. Check your code.")
+      setIsAuthenticating(false)
+    }
+  }
+
+  const handleResendCode = async () => {
+    if (!signIn) return
+    setError(null)
+    setIsAuthenticating(true)
+    try {
+      const { error: mfaError } = await signIn.mfa.sendEmailCode()
+      if (mfaError) {
+        setError(mfaError.message || "Failed to resend code.")
+      }
+      setIsAuthenticating(false)
+    } catch (err: unknown) {
+      const errorObj = err as { errors?: Array<{ message?: string }> }
+      setError(errorObj?.errors?.[0]?.message || "Failed to resend code.")
+      setIsAuthenticating(false)
+    }
+  }
+
+  const handleStartOver = async () => {
+    if (!signIn) return
+    setError(null)
+    try {
+      const { error: resetError } = await signIn.reset()
+      if (resetError) {
+        setError(resetError.message || "Failed to reset sign in.")
+      }
+      setCode("")
+    } catch (err: unknown) {
+      const errorObj = err as { errors?: Array<{ message?: string }> }
+      setError(errorObj?.errors?.[0]?.message || "Failed to reset sign in.")
+    }
+  }
+
+  const handleGoogle = async () => {
+    if (!signIn) return
+    setIsAuthenticating(true)
+    try {
+      const { error: ssoError } = await signIn.sso({
         strategy: "oauth_google",
-        redirectUrl: "/sso-callback",
-        redirectUrlComplete: `/sso-complete?returnTo=${encodeURIComponent(returnTo)}`,
+        redirectCallbackUrl: "/sso-callback",
+        redirectUrl: `/sso-complete?returnTo=${encodeURIComponent(returnTo)}`,
       })
+      if (ssoError) {
+        setError(ssoError.message || "Google sign-in failed.")
+        setIsAuthenticating(false)
+      }
     } catch (err: unknown) {
       const errorObj = err as { errors?: Array<{ message?: string }> }
       setError(errorObj?.errors?.[0]?.message || "Google sign-in failed.")
       setIsAuthenticating(false)
     }
+  }
+
+  if (isSignedIn) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 backdrop-blur-md">
+        <SimpleLoader />
+      </div>
+    )
   }
 
   return (
@@ -124,85 +231,140 @@ export default function SignInCatchAllPage() {
       <div className="container mx-auto px-4 sm:px-6 md:px-4 lg:px-8 py-8 sm:py-10 md:py-12 lg:py-14 flex justify-center">
       <div className="w-full max-w-md">
         <div className="rounded-xl border border-border bg-card p-6 sm:p-8 shadow-sm">
-          <div className="text-center mb-6">
-            <h1 className="text-2xl font-semibold tracking-tight">Welcome back</h1>
-            <p className="text-sm text-muted-foreground mt-2">Sign in to continue</p>
-          </div>
-          
-          {(isFromRegisterCase || isFromFlagCase) && (
-            <div className="mb-8 p-5 rounded-lg bg-blue-50 border border-blue-200 dark:bg-blue-950/20 dark:border-blue-800">
-              <div className="flex items-start gap-3">
-                <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-blue-600 dark:text-blue-400" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200">{isFromRegisterCase ? 'Sign in to report a missing person' : 'Sign in to flag a case'}</h3>
-                  <p className="mt-1 text-sm text-blue-700 dark:text-blue-300">{isFromRegisterCase ? 'Please sign in to access the missing person reporting form and help reunite families.' : 'Please sign in to report this case. Your report helps keep the platform safe.'}</p>
-                </div>
+          {signIn && (signIn.status === 'needs_client_trust' || signIn.status === 'needs_second_factor') ? (
+            <>
+              <div className="text-center mb-6">
+                <h1 className="text-2xl font-semibold tracking-tight">Verify your account</h1>
+                <p className="text-sm text-muted-foreground mt-2">We sent a verification code to your email</p>
               </div>
-            </div>
-          )}
 
-          {error && (
-            <div role="alert" aria-live="polite" className="mb-6 text-sm rounded-md border border-destructive/40 bg-destructive/10 text-destructive px-4 py-3">
-              {error}
-            </div>
-          )}
+              {error && (
+                <div role="alert" aria-live="polite" className="mb-6 text-sm rounded-md border border-destructive/40 bg-destructive/10 text-destructive px-4 py-3">
+                  {error}
+                </div>
+              )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-3">
-              <Label htmlFor="email" className="text-sm font-medium">Email</Label>
-              <Input id="email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required className="h-11" />
-            </div>
-            <div className="space-y-3">
-              <Label htmlFor="password" className="text-sm font-medium">Password</Label>
-              <div className="relative">
-                <Input id="password" type={showPassword ? "text" : "password"} autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required className="pr-10 h-11" />
-                <button type="button" aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword((v) => !v)} className="absolute inset-y-0 right-3 flex items-center text-muted-foreground hover:text-foreground cursor-pointer">
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-              <div className="flex justify-end pt-1">
+              <form onSubmit={handleVerify} className="space-y-4">
+                <div className="space-y-3">
+                  <Label htmlFor="code" className="text-sm font-medium">Verification Code</Label>
+                  <Input 
+                    id="code" 
+                    type="text" 
+                    value={code} 
+                    onChange={(e) => setCode(e.target.value)} 
+                    required 
+                    className="h-11 text-center tracking-[0.25em] font-semibold text-lg" 
+                    placeholder="------" 
+                    maxLength={6} 
+                  />
+                </div>
+                <Button type="submit" className="w-full h-12 cursor-pointer text-base font-medium" disabled={isAuthenticating} aria-busy={isAuthenticating}>
+                  Verify
+                </Button>
+              </form>
+
+              <div className="mt-6 flex flex-col gap-2 text-center text-sm">
                 <button 
-                  type="button"
-                  onClick={handleForgotPasswordClick}
-                  disabled={isNavigatingToReset}
-                  className="text-sm text-primary hover:underline cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
+                  type="button" 
+                  onClick={handleResendCode}
+                  disabled={isAuthenticating}
+                  className="text-primary hover:underline cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed font-medium"
                 >
-                  Forgot password?
+                  Resend code
+                </button>
+                <button 
+                  type="button" 
+                  onClick={handleStartOver}
+                  disabled={isAuthenticating}
+                  className="text-muted-foreground hover:underline cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
+                >
+                  Start over
                 </button>
               </div>
-            </div>
-            <Button type="submit" className="w-full h-12 cursor-pointer text-base font-medium" disabled={isAuthenticating} aria-busy={isAuthenticating}>
-              Sign In
-            </Button>
-          </form>
+            </>
+          ) : (
+            <>
+              <div className="text-center mb-6">
+                <h1 className="text-2xl font-semibold tracking-tight">Welcome back</h1>
+                <p className="text-sm text-muted-foreground mt-2">Sign in to continue</p>
+              </div>
+              
+              {(isFromRegisterCase || isFromFlagCase) && (
+                <div className="mb-8 p-5 rounded-lg bg-blue-50 border border-blue-200 dark:bg-blue-950/20 dark:border-blue-800">
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-blue-600 dark:text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200">{isFromRegisterCase ? 'Sign in to report a missing person' : 'Sign in to flag a case'}</h3>
+                      <p className="mt-1 text-sm text-blue-700 dark:text-blue-300">{isFromRegisterCase ? 'Please sign in to access the missing person reporting form and help reunite families.' : 'Please sign in to report this case. Your report helps keep the platform safe.'}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
-          <CaptchaRegion className="mt-4 mb-3" />
+              {error && (
+                <div role="alert" aria-live="polite" className="mb-6 text-sm rounded-md border border-destructive/40 bg-destructive/10 text-destructive px-4 py-3">
+                  {error}
+                </div>
+              )}
 
-          <div className="my-4 flex items-center gap-3">
-            <div className="h-px w-full bg-border" />
-            <span className="text-sm uppercase text-muted-foreground font-medium">or</span>
-            <div className="h-px w-full bg-border" />
-          </div>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-3">
+                  <Label htmlFor="email" className="text-sm font-medium">Email</Label>
+                  <Input id="email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required className="h-11" />
+                </div>
+                <div className="space-y-3">
+                  <Label htmlFor="password" className="text-sm font-medium">Password</Label>
+                  <div className="relative">
+                    <Input id="password" type={showPassword ? "text" : "password"} autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required className="pr-10 h-11" />
+                    <button type="button" aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword((v) => !v)} className="absolute inset-y-0 right-3 flex items-center text-muted-foreground hover:text-foreground cursor-pointer">
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                  <div className="flex justify-end pt-1">
+                    <button 
+                      type="button"
+                      onClick={handleForgotPasswordClick}
+                      disabled={isNavigatingToReset}
+                      className="text-sm text-primary hover:underline cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
+                    >
+                      Forgot password?
+                    </button>
+                  </div>
+                </div>
+                <Button type="submit" className="w-full h-12 cursor-pointer text-base font-medium" disabled={isAuthenticating} aria-busy={isAuthenticating}>
+                  Sign In
+                </Button>
+              </form>
 
-          <Button variant="outline" className="w-full h-12 gap-3 cursor-pointer text-base font-medium" onClick={handleGoogle} disabled={isAuthenticating}>
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" className="h-4 w-4"><path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12 s5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C33.64,6.053,29.084,4,24,4C12.955,4,4,12.955,4,24 s8.955,20,20,20s20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"/><path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,16.108,18.961,14,24,14c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657 C33.64,6.053,29.084,4,24,4C16.318,4,9.656,8.347,6.306,14.691z"/><path fill="#4CAF50" d="M24,44c5.136,0,9.747-1.971,13.261-5.188l-6.106-5.162C29.066,35.091,26.671,36,24,36 c-5.202,0-9.619-3.317-11.283-7.941l-6.49,5.002C9.627,39.556,16.315,44,24,44z"/><path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.236-2.231,4.166-4.106,5.65c0,0,0.001,0,0.001,0 l6.106,5.162C35.91,40.188,44,35,44,24C44,22.659,43.862,21.35,43.611,20.083z"/></svg>
-            Continue with Google
-          </Button>
+              <CaptchaRegion className="mt-4 mb-3" />
 
-          <p className="mt-6 text-center text-sm text-muted-foreground">
-            Don&apos;t have an account? {" "}
-            <button 
-              onClick={handleSignUpClick}
-              disabled={isNavigating}
-              className="text-primary hover:underline cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed font-medium"
-            >
-              Sign up
-            </button>
-          </p>
+              <div className="my-4 flex items-center gap-3">
+                <div className="h-px w-full bg-border" />
+                <span className="text-sm uppercase text-muted-foreground font-medium">or</span>
+                <div className="h-px w-full bg-border" />
+              </div>
+
+              <Button variant="outline" className="w-full h-12 gap-3 cursor-pointer text-base font-medium" onClick={handleGoogle} disabled={isAuthenticating}>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" className="h-4 w-4"><path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12 s5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C33.64,6.053,29.084,4,24,4C12.955,4,4,12.955,4,24 s8.955,20,20,20s20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"/><path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,16.108,18.961,14,24,14c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657 C33.64,6.053,29.084,4,24,4C16.318,4,9.656,8.347,6.306,14.691z"/><path fill="#4CAF50" d="M24,44c5.136,0,9.747-1.971,13.261-5.188l-6.106-5.162C29.066,35.091,26.671,36,24,36 c-5.202,0-9.619-3.317-11.283-7.941l-6.49,5.002C9.627,39.556,16.315,44,24,44z"/><path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.236-2.231,4.166-4.106,5.65c0,0,0.001,0,0.001,0 l6.106,5.162C35.91,40.188,44,35,44,24C44,22.659,43.862,21.35,43.611,20.083z"/></svg>
+                Continue with Google
+              </Button>
+
+              <p className="mt-6 text-center text-sm text-muted-foreground">
+                Don&apos;t have an account? {" "}
+                <button 
+                  onClick={handleSignUpClick}
+                  disabled={isNavigating}
+                  className="text-primary hover:underline cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed font-medium"
+                >
+                  Sign up
+                </button>
+              </p>
+            </>
+          )}
         </div>
       </div>
     </div>

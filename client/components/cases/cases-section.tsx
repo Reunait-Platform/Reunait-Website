@@ -7,6 +7,9 @@ import { CasesGrid } from "./cases-grid"
 import { Pagination } from "@/components/ui/pagination"
 import { Toast } from "@/components/ui/toast"
 import { fetchCases, type Case, type CasesParams } from "@/lib/api"
+import { SITE_CONFIG } from "@/lib/seo-config"
+
+const defaultCountry = SITE_CONFIG.region.toLowerCase() === "global" ? "India" : SITE_CONFIG.region
 
 // Initial state constants
 const INITIAL_PAGINATION = {
@@ -20,7 +23,7 @@ const INITIAL_PAGINATION = {
 
 const INITIAL_FILTERS: SearchFilters = {
   keyword: "",
-  country: "India",
+  country: defaultCountry,
   state: "all",
   city: "all",
   status: undefined,
@@ -116,7 +119,7 @@ export function CasesSection({ initialCases, initialPagination, initialFilters }
         setSearchFilters(prev => ({ ...prev, ...initialFilters }))
       }
       // Prime the last fetch key to match the SSR params so the effect won't immediately refetch
-      const initCountry = (initialFilters && initialFilters.country) ? initialFilters.country : "India"
+      const initCountry = (initialFilters && initialFilters.country) ? initialFilters.country : defaultCountry
       const initState = (initialFilters && typeof initialFilters.state === 'string' && initialFilters.state !== 'all') ? initialFilters.state : null
       const initCity = (initialFilters && typeof initialFilters.city === 'string' && initialFilters.city !== 'all') ? initialFilters.city : null
       const initStatus = (initialFilters && initialFilters.status && initialFilters.status !== 'all') ? initialFilters.status : undefined
@@ -168,7 +171,7 @@ export function CasesSection({ initialCases, initialPagination, initialFilters }
           const loc = JSON.parse(stored)
           const params: CasesParams = {
             page: 1,
-            country: loc.country || 'India',
+            country: loc.country || defaultCountry,
             state: loc.state && loc.state !== 'Unknown' ? loc.state : null,
             city: loc.city && loc.city !== 'Unknown' ? loc.city : null
           }
@@ -178,8 +181,8 @@ export function CasesSection({ initialCases, initialPagination, initialFilters }
           return
         }
 
-        // 3) Default India
-        await fetchData({ page: 1, country: 'India', state: null, city: null }, true)
+        // 3) Default country fallback
+        await fetchData({ page: 1, country: defaultCountry, state: null, city: null }, true)
         setHasAppliedLocationFilters(true)
         
         setHasInitialized(true)
@@ -231,8 +234,77 @@ export function CasesSection({ initialCases, initialPagination, initialFilters }
 
     window.addEventListener('storage', handleStorageChange)
     window.addEventListener('location:updated', handleCustomEvent as EventListener)
-    return () => window.removeEventListener('storage', handleStorageChange)
+    return () => {
+      window.removeEventListener('storage', handleStorageChange)
+      window.removeEventListener('location:updated', handleCustomEvent as EventListener)
+    }
   }, [hasAppliedLocationFilters, fetchData])
+
+  // Self-healing geolocation effect: if permission is already granted and state/city filters are empty, automatically resolve location
+  useEffect(() => {
+    const autoRefineLocation = async () => {
+      if (typeof window === 'undefined' || !navigator.permissions || !navigator.geolocation) return
+
+      try {
+        const permission = await navigator.permissions.query({ name: 'geolocation' as PermissionName })
+        if (permission.state === 'granted') {
+          const qState = searchParams.get('state')
+          const qCity = searchParams.get('city')
+          
+          // Only auto-refine if we don't already have state or city search parameters in the URL
+          if (!qState && !qCity) {
+            navigator.geolocation.getCurrentPosition(async (position) => {
+              try {
+                const response = await fetch(
+                  `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${position.coords.latitude}&longitude=${position.coords.longitude}&localityLanguage=en`
+                )
+                if (response.ok) {
+                  const data = await response.json()
+                  const locationData = {
+                    country: data.countryName || 'India',
+                    state: data.principalSubdivision || 'Karnataka',
+                    city: data.city || data.locality || 'Bangalore'
+                  }
+                  
+                  // Save resolved location to localStorage
+                  localStorage.setItem('userLocation', JSON.stringify({
+                    latitude: position.coords.latitude,
+                    longitude: position.coords.longitude,
+                    ...locationData,
+                    timestamp: Date.now()
+                  }))
+
+                  // Sync local states
+                  setSearchFilters(prev => ({
+                    ...prev,
+                    country: locationData.country,
+                    state: locationData.state,
+                    city: locationData.city
+                  }))
+                  
+                  setHasAppliedLocationFilters(true)
+
+                  // Fetch cases for the refined location
+                  await fetchData({
+                    page: 1,
+                    country: locationData.country,
+                    state: locationData.state !== 'Unknown' ? locationData.state : null,
+                    city: locationData.city !== 'Unknown' ? locationData.city : null
+                  }, true)
+                }
+              } catch (err) {
+                console.warn('Silent geolocation reverse-geocoding failed:', err)
+              }
+            }, () => {}, { enableHighAccuracy: true, timeout: 5000 })
+          }
+        }
+      } catch (err) {
+        console.warn('Geolocation permission query failed:', err)
+      }
+    }
+
+    autoRefineLocation()
+  }, [searchParams, fetchData])
 
   // Debounced search handler – coalesce rapid filter updates into a single URL update + state change
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -267,7 +339,7 @@ export function CasesSection({ initialCases, initialPagination, initialFilters }
     setSearchFilters(INITIAL_FILTERS)
     const sp = new URLSearchParams()
     sp.set('page', '1')
-    sp.set('country', 'India')
+    sp.set('country', defaultCountry)
     router.replace(`${pathname}?${sp.toString()}`)
   }, [router, pathname])
 
@@ -322,8 +394,8 @@ export function CasesSection({ initialCases, initialPagination, initialFilters }
   const getResultsSummary = useCallback(() => {
     const parts: string[] = []
     
-    // Always show country (default is India)
-    const country = searchFilters.country || "India"
+    // Always show country
+    const country = searchFilters.country || defaultCountry
     parts.push(`in ${country}`)
     
     // Add state if not "all"

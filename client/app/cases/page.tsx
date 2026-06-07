@@ -81,8 +81,11 @@ export default async function CasesPage({ searchParams }: PageProps) {
     }
   }
 
-  // Final fallbacks
-  country = country || SITE_CONFIG.region
+  // Final fallbacks - If site region is 'Global' or country query param is 'Global', fall back to 'India' for DB search default
+  const defaultCountry = SITE_CONFIG.region.toLowerCase() === "global" ? "India" : SITE_CONFIG.region
+  if (!country || country.toLowerCase() === "global") {
+    country = defaultCountry
+  }
 
   const params: CasesParams = { page, country, state, city }
   const initial = await fetchCases(params)
