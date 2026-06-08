@@ -39,7 +39,6 @@ export default function NotificationsDrawer({ open, onOpenChange, anchorRef }: N
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const [unreadOnly, setUnreadOnly] = React.useState(false)
-  const [atBottom, setAtBottom] = React.useState(true)
   const virtuosoRef = React.useRef<VirtuosoHandle | null>(null)
   const shouldStickAfterAppendRef = React.useRef(false)
   const prevLenRef = React.useRef(0)
@@ -64,55 +63,7 @@ export default function NotificationsDrawer({ open, onOpenChange, anchorRef }: N
   // Compute visible notifications (declared before useEffect hooks that use it)
   const visible = React.useMemo(() => unreadOnly ? notifications.filter(n => !n.isRead) : notifications, [notifications, unreadOnly])
 
-  // Eager prefetch page 2 on open to eliminate first-append gap under fast scroll
-  React.useEffect(() => {
-    const prefetch = async () => {
-      if (!open) return
-      // Only prefetch when we're on page 1 and next page exists
-      if (pagination.currentPage === 1 && pagination.hasNextPage && notifications.length <= 20 && !isFetching && !inFlightRef.current) {
-        try {
-          inFlightRef.current = true
-          shouldStickAfterAppendRef.current = true
-          const token = await getToken()
-          if (token) {
-            await fetchNotifications(token, 2)
-          }
-        } finally {
-          // Let the length-change effect clear inFlight after reveal
-        }
-      }
-    }
-    prefetch()
-  }, [open, pagination.currentPage, pagination.hasNextPage, notifications.length, isFetching, getToken, fetchNotifications])
 
-  // Force reveal immediately after the first append (page 1 -> 2), even if not at bottom
-  React.useEffect(() => {
-    const prev = prevPageRef.current
-    const curr = pagination.currentPage
-    if (prev === 1 && curr === 2 && visible.length > prevDataLenRef.current) {
-      try {
-        virtuosoRef.current?.scrollToIndex({ index: visible.length - 1, align: 'end' })
-      } catch {}
-      shouldStickAfterAppendRef.current = false
-      inFlightRef.current = false
-    }
-    prevPageRef.current = curr
-  }, [pagination.currentPage, visible.length])
-
-  // When data length grows after a fetch while near bottom, stick to the end
-  React.useEffect(() => {
-    const dataLen = visible.length
-    const grew = dataLen > prevDataLenRef.current
-    if (grew && shouldStickAfterAppendRef.current) {
-      try {
-        virtuosoRef.current?.scrollToIndex({ index: dataLen - 1, align: 'end' })
-      } catch {}
-      shouldStickAfterAppendRef.current = false
-      inFlightRef.current = false
-    }
-    prevLenRef.current = notifications.length
-    prevDataLenRef.current = dataLen
-  }, [notifications.length, visible.length])
 
   const listData = React.useMemo((): ListItem[] => {
     const base: NotificationItem[] = visible
@@ -256,8 +207,6 @@ export default function NotificationsDrawer({ open, onOpenChange, anchorRef }: N
                   increaseViewportBy={{ top: 200, bottom: 1200 }}
                   computeItemKey={(_index, item: ListItem) => item.id}
                   atBottomThreshold={200}
-                  atBottomStateChange={setAtBottom}
-                  followOutput={atBottom ? 'auto' : false}
                   defaultItemHeight={88}
                   rangeChanged={async ({ endIndex }) => {
                     // Trigger fetch when the loader row comes into view

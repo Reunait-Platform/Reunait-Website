@@ -6,9 +6,12 @@ import PoliceStation from "../model/policeStationModel.js";
 import { clerkClient } from '@clerk/express';
 import { generateEmbeddings } from "../services/lambdaService.js";
 import { storeEmbeddings } from "../services/pineconeService.js";
-import { uploadToS3 } from "../services/s3Service.js";
+import { uploadToS3, copyS3Object, deleteS3Object } from "../services/s3Service.js";
 import { generateEnglishCaseSummary } from "../services/googleAiService.js";
 import { moderateImage } from "../services/contentSafetyService.js";
+import { config } from "../config/config.js";
+import { broadcastNotification } from "../services/notificationBroadcast.js";
+import { sendEmailNotificationAsync } from "../services/emailService.js";
 
 // Increment Cases Registered using model helper (numeric-safe)
 const incrementImpactCounter = async () => {
@@ -18,6 +21,18 @@ const incrementImpactCounter = async () => {
         console.error('Error updating impact counter:', error);
     }
 };
+
+// Helper for simple retries with backoff
+const retry = async (fn, retries = 2, delay = 300) => {
+    try {
+        return await fn();
+    } catch (error) {
+        if (retries <= 0) throw error;
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return retry(fn, retries - 1, delay);
+    }
+};
+
 
 export const registerCase = async (req, res) => {
     try {
@@ -249,91 +264,111 @@ export const registerCase = async (req, res) => {
             await Case.findByIdAndDelete(savedCase._id);
             
             // Check for specific technical error messages and convert to user-friendly ones
-            const errorMessage = embeddingError.message;
+            const errorMessage = embeddingError.message || '';
             if (errorMessage.includes('MTCNN') && errorMessage.includes('Retinaface')) {
-                throw new Error('Unable to detect face in both images. Please upload clear photos showing the person\'s face.');
+                return res.status(400).json({
+                    status: false,
+                    message: "Unable to detect face in both images. Please upload clear photos showing the person's face."
+                });
             } else if (errorMessage.includes('face verification failed')) {
-                throw new Error('Face detection failed. Please upload clear photos showing the person\'s face.');
+                return res.status(400).json({
+                    status: false,
+                    message: "Face detection failed. Please upload clear photos showing the person's face."
+                });
             } else if (errorMessage.includes('MTCNN') || errorMessage.includes('Retinaface')) {
-                throw new Error('Unable to detect face in the images. Please upload clear photos showing the person\'s face.');
+                return res.status(400).json({
+                    status: false,
+                    message: "Unable to detect face in the images. Please upload clear photos showing the person's face."
+                });
+            } else if (
+                errorMessage.toLowerCase().includes('timeout') ||
+                errorMessage.toLowerCase().includes('timed out') ||
+                errorMessage.toLowerCase().includes('etimedout') ||
+                errorMessage.toLowerCase().includes('hang up') ||
+                errorMessage.toLowerCase().includes('econnreset')
+            ) {
+                return res.status(500).json({
+                    status: false,
+                    message: "Our AI facial verification system is taking a moment to warm up. Please click 'Submit' again in a few seconds."
+                });
             } else {
-                // Use the Lambda error message directly for other cases
-                throw new Error(errorMessage);
+                return res.status(500).json({
+                    status: false,
+                    message: errorMessage || 'Failed to generate image embeddings.'
+                });
             }
         }
 
-        // Add notification to the user's notification array
-        const auth = req.auth();
-        if (auth?.userId) {
-            const notificationData = {
-                message: `Case for ${req.body.fullName} has been successfully registered and is now live on the platform`,
-                time: new Date(),
-                isRead: false,
-                isClickable: true,
-                navigateTo: `/cases/${String(savedCase._id)}`
-            };
+        // Prepare keys for S3-to-S3 copy
+        const countryPath = req.body.country.replace(/\s+/g, '_').toLowerCase();
+        const key1 = `${countryPath}/${savedCase._id}_1.jpg`;
+        const key2 = `${countryPath}/${savedCase._id}_2.jpg`;
 
-            const updatedUser = await User.findOneAndUpdate(
-                { clerkUserId: auth.userId },
-                { $push: { notifications: notificationData } },
-                { new: true }
-            ).select('notifications email').lean();
-
-            // Broadcast notification via SSE
-            if (updatedUser && updatedUser.notifications && updatedUser.notifications.length > 0) {
-                const newNotification = updatedUser.notifications[updatedUser.notifications.length - 1];
-                const unreadCount = (updatedUser.notifications || []).filter(n => !n.isRead).length;
-                try {
-                    const { broadcastNotification } = await import('../services/notificationBroadcast.js');
-                    broadcastNotification(auth.userId, {
-                        id: String(newNotification._id),
-                        message: newNotification.message || '',
-                        isRead: Boolean(newNotification.isRead),
-                        isClickable: newNotification.isClickable !== false,
-                        navigateTo: newNotification.navigateTo || null,
-                        time: newNotification.time || null,
-                        unreadCount,
-                    });
-                } catch (error) {
-                    console.error('Error broadcasting notification:', error);
-                    // Don't fail the request if broadcast fails
-                }
-            }
-
-            // Send email notification (non-blocking)
-            if (updatedUser && updatedUser.email) {
-                try {
-                    const { sendEmailNotificationAsync } = await import('../services/emailService.js');
-                    await sendEmailNotificationAsync(
-                        updatedUser.email,
-                        'Case Registered Successfully',
-                        `Case for ${req.body.fullName} has been successfully registered and is now live on the platform.`,
-                        {
-                            notificationType: 'case_registered',
-                            userId: auth.userId,
-                            caseId: String(savedCase._id),
-                            navigateTo: `/cases/${String(savedCase._id)}`,
-                            fullName: req.body.fullName,
-                            age: req.body.age,
-                            gender: req.body.gender,
-                            lastSeenLocation: req.body.lastSeenLocation,
-                        }
-                    );
-                } catch (error) {
-                    console.error('Error sending email notification (non-blocking):', error);
-                    // Don't fail the request if email fails
-                }
-            }
+        // Step 3: Perform S3-to-S3 Copy from Temp bucket to Production bucket with retries (2 retries, 300ms delay)
+        try {
+            await retry(() => copyS3Object(key1, key1), 2, 300);
+            await retry(() => copyS3Object(key2, key2), 2, 300);
+        } catch (copyError) {
+            console.error('S3 copy failed:', copyError);
+            // Rollback MongoDB case draft
+            await Case.findByIdAndDelete(savedCase._id);
+            // Rollback S3 production copies (in case one was copied successfully before the failure)
+            try { await deleteS3Object(key1, config.awsBucketName); } catch (_) {}
+            try { await deleteS3Object(key2, config.awsBucketName); } catch (_) {}
+            // Cleanup temp S3 files
+            try { await deleteS3Object(key1, config.awsTempImageBucket); } catch (_) {}
+            try { await deleteS3Object(key2, config.awsTempImageBucket); } catch (_) {}
+            return res.status(500).json({
+                status: false,
+                message: 'Failed to secure images in production storage. Please check your network and try again.'
+            });
         }
 
-        // Add case ID to user's cases array
+        // Prepare metadata for Pinecone
+        const metadata = {
+            caseId: savedCase._id.toString(),
+            gender: savedCase.gender,
+            country: savedCase.country,
+            status: savedCase.status,
+            dateMissingFoundTs: new Date(savedCase.dateMissingFound).getTime()
+        };
+
+        // Step 4: Store embeddings in Pinecone with retries (2 retries, 300ms delay)
+        try {
+            await retry(() => storeEmbeddings(embeddings, metadata), 2, 300);
+        } catch (pineconeError) {
+            console.error('Pinecone indexing failed:', pineconeError);
+            // Rollback MongoDB case draft
+            await Case.findByIdAndDelete(savedCase._id);
+            // Rollback S3 production copies
+            try { await deleteS3Object(key1, config.awsBucketName); } catch (_) {}
+            try { await deleteS3Object(key2, config.awsBucketName); } catch (_) {}
+            // Cleanup temp S3 files
+            try { await deleteS3Object(key1, config.awsTempImageBucket); } catch (_) {}
+            try { await deleteS3Object(key2, config.awsTempImageBucket); } catch (_) {}
+            return res.status(500).json({
+                status: false,
+                message: 'Failed to index case search parameters. Please try again.'
+            });
+        }
+
+        // Step 5: Clean up temp S3 files (best effort, no need to fail request if deletion fails)
+        try {
+            await deleteS3Object(key1, config.awsTempImageBucket);
+            await deleteS3Object(key2, config.awsTempImageBucket);
+        } catch (cleanupError) {
+            console.warn('Silent cleanup of temp S3 files failed:', cleanupError.message || cleanupError);
+        }
+
+        // Step 6: Database Associations (User's cases array)
         const clerkUserId = req.auth()?.userId;
+        let updatedUser = null;
         if (clerkUserId) {
-            await User.findOneAndUpdate(
+            updatedUser = await User.findOneAndUpdate(
                 { clerkUserId: clerkUserId },
                 { $addToSet: { cases: savedCase._id } },
-                { upsert: true }
-            );
+                { new: true, upsert: true }
+            ).select('notifications email').lean();
         }
 
         // Tag case to police station if policeStationId is provided
@@ -365,12 +400,11 @@ export const registerCase = async (req, res) => {
                         { new: true }
                     ).select('notifications').lean();
 
-                    // Broadcast notification via SSE
+                    // Broadcast notification to police via SSE
                     if (updatedPoliceUser && updatedPoliceUser.notifications && updatedPoliceUser.notifications.length > 0) {
                         const newNotification = updatedPoliceUser.notifications[updatedPoliceUser.notifications.length - 1];
                         const unreadCount = (updatedPoliceUser.notifications || []).filter(n => !n.isRead).length;
                         try {
-                            const { broadcastNotification } = await import('../services/notificationBroadcast.js');
                             broadcastNotification(policeUserClerkId, {
                                 id: String(newNotification._id),
                                 message: newNotification.message || '',
@@ -382,44 +416,73 @@ export const registerCase = async (req, res) => {
                             });
                         } catch (error) {
                             console.error('Error broadcasting police notification:', error);
-                            // Don't fail the request if broadcast fails
                         }
                     }
                 }
             } catch (error) {
-                // Log error but don't fail case registration if police tagging fails
                 console.error('Error tagging case to police station:', error.message || error);
             }
         }
 
-        // Prepare metadata for Pinecone
-        const metadata = {
-            caseId: savedCase._id.toString(),
-            gender: savedCase.gender,
-            country: savedCase.country,
-            status: savedCase.status,
-            dateMissingFoundTs: new Date(savedCase.dateMissingFound).getTime()
-        };
+        // Step 7: Send notifications and emails (Non-reversible side effects)
+        const auth = req.auth();
+        if (auth?.userId && updatedUser) {
+            const notificationData = {
+                message: `Case for ${req.body.fullName} has been successfully registered and is now live on the platform`,
+                time: new Date(),
+                isRead: false,
+                isClickable: true,
+                navigateTo: `/cases/${String(savedCase._id)}`
+            };
 
-        // Upload images to S3
-        try {
-            const uploadPromises = req.files.map((file, index) => 
-                uploadToS3(file, savedCase._id, index + 1, req.body.country)
-            );
-            await Promise.all(uploadPromises);
-        } catch (uploadError) {
-            // Rollback: Delete the saved case since S3 upload failed
-            await Case.findByIdAndDelete(savedCase._id);
-            throw uploadError;
-        }
+            // Push notification to user
+            const userWithNotification = await User.findOneAndUpdate(
+                { clerkUserId: auth.userId },
+                { $push: { notifications: notificationData } },
+                { new: true }
+            ).select('notifications email').lean();
 
-        // Store embeddings in Pinecone
-        try {
-            await storeEmbeddings(embeddings, metadata);
-        } catch (pineconeError) {
-            // Rollback: Delete the saved case since Pinecone storage failed
-            await Case.findByIdAndDelete(savedCase._id);
-            throw pineconeError;
+            // Broadcast notification via SSE
+            if (userWithNotification && userWithNotification.notifications && userWithNotification.notifications.length > 0) {
+                const newNotification = userWithNotification.notifications[userWithNotification.notifications.length - 1];
+                const unreadCount = (userWithNotification.notifications || []).filter(n => !n.isRead).length;
+                try {
+                    broadcastNotification(auth.userId, {
+                        id: String(newNotification._id),
+                        message: newNotification.message || '',
+                        isRead: Boolean(newNotification.isRead),
+                        isClickable: newNotification.isClickable !== false,
+                        navigateTo: newNotification.navigateTo || null,
+                        time: newNotification.time || null,
+                        unreadCount,
+                    });
+                } catch (error) {
+                    console.error('Error broadcasting notification:', error);
+                }
+            }
+
+            // Send email notification (non-blocking)
+            if (userWithNotification && userWithNotification.email) {
+                try {
+                    await sendEmailNotificationAsync(
+                        userWithNotification.email,
+                        'Case Registered Successfully',
+                        `Case for ${req.body.fullName} has been successfully registered and is now live on the platform.`,
+                        {
+                            notificationType: 'case_registered',
+                            userId: auth.userId,
+                            caseId: String(savedCase._id),
+                            navigateTo: `/cases/${String(savedCase._id)}`,
+                            fullName: req.body.fullName,
+                            age: req.body.age,
+                            gender: req.body.gender,
+                            lastSeenLocation: req.body.lastSeenLocation,
+                        }
+                    );
+                } catch (error) {
+                    console.error('Error sending email notification (non-blocking):', error);
+                }
+            }
         }
 
         // All downstream steps succeeded → increment homepage counter and invalidate cache
@@ -431,7 +494,6 @@ export const registerCase = async (req, res) => {
         }
 
         // Fire-and-forget: generate concise English summary and save to description with retries
-        // Use the savedCase snapshot + originalDescription to avoid an extra DB read
         ;(async () => {
             const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
             const attempts = [0, 5000, 15000];
@@ -458,7 +520,6 @@ export const registerCase = async (req, res) => {
                         return; // success; stop retries
                     }
                 } catch (e) {
-                    // On final failure, log and leave placeholder in place
                     if (i === attempts.length - 1) {
                         try { console.error('[registerCase] AI summary generation failed after retries:', e?.message || e); } catch {}
                     }

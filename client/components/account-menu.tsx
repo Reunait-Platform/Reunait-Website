@@ -111,7 +111,7 @@ export function AccountMenu() {
                 </div>,
                 document.body
             )}
-            <DropdownMenu>
+            <DropdownMenu modal={false}>
                 <DropdownMenuTrigger asChild>
                     <Button 
                         variant="outline" 

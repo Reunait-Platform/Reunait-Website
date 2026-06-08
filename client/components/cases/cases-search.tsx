@@ -800,7 +800,7 @@ export function CasesSearch({ onSearch, onClear, hasCasesDisplayed = false, pres
           {/* Active Filter Chips */}
           {getActiveFilters().length > 0 && (
             <div className="px-1">
-              <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap sm:flex-wrap sm:overflow-visible sm:whitespace-normal">
+              <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap sm:flex-wrap sm:overflow-visible sm:whitespace-normal no-scrollbar">
                 <span className="text-sm text-muted-foreground font-medium flex-shrink-0">Active filters:</span>
                 {getActiveFilters().map((filter) => (
                   <div

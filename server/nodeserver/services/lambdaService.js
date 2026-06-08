@@ -34,6 +34,17 @@ const deleteFromS3 = async (key) => {
     }
 };
 
+// Helper for simple retries with backoff
+const retry = async (fn, retries = 2, delay = 300) => {
+    try {
+        return await fn();
+    } catch (error) {
+        if (retries <= 0) throw error;
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return retry(fn, retries - 1, delay);
+    }
+};
+
 // Generate embeddings using AWS Lambda
 const generateEmbeddings = async (image1, image2, doVerify = true, caseId = 'default', country = 'default') => {
     // image1, image2: { buffer, originalname, mimetype }
@@ -41,9 +52,9 @@ const generateEmbeddings = async (image1, image2, doVerify = true, caseId = 'def
     // caseId, country: for S3 path uniqueness
     let key1, key2;
     try {
-        // Upload both images to S3 (uploadToS3 now generates keys with extensions)
-        await uploadToS3(image1, caseId, 1, country, config.awsTempImageBucket);
-        await uploadToS3(image2, caseId, 2, country, config.awsTempImageBucket);
+        // Upload both images to S3 with retries (2 retries, 300ms delay) (uploadToS3 now generates keys with extensions)
+        await retry(() => uploadToS3(image1, caseId, 1, country, config.awsTempImageBucket), 2, 300);
+        await retry(() => uploadToS3(image2, caseId, 2, country, config.awsTempImageBucket), 2, 300);
         
         // Generate the correct keys (standardized to .jpg) to match what uploadToS3 creates
         const countryPath = country.replace(/\s+/g, '_').toLowerCase();
@@ -81,8 +92,8 @@ const generateEmbeddings = async (image1, image2, doVerify = true, caseId = 'def
             InvocationType: 'RequestResponse' // Synchronous invocation
         });
         
-        // Invoke Lambda function
-        const result = await lambdaClient.send(command);
+        // Invoke Lambda function with retries (2 retries, 500ms delay to absorb cold starts)
+        const result = await retry(() => lambdaClient.send(command), 2, 500);
         
         // Parse the response
         const rawResponse = new TextDecoder().decode(result.Payload);
@@ -102,15 +113,17 @@ const generateEmbeddings = async (image1, image2, doVerify = true, caseId = 'def
             // Direct response format
             embeddings = [responseData.embedding1, responseData.embedding2];
         }
-        // Delete images from S3 after Lambda response
-        await deleteFromS3(key1);
-        await deleteFromS3(key2);
+        // NOTE: Temp S3 images are kept for S3-to-S3 copy in the controller success path
         return embeddings;
     } catch (error) {
         console.error('Error generating embeddings via Lambda:', error);
         // Attempt cleanup if upload succeeded but error occurred
-        if (key1) await deleteFromS3(key1);
-        if (key2) await deleteFromS3(key2);
+        if (key1) {
+            try { await deleteFromS3(key1); } catch (e) { console.error('Error in error-cleanup deleteFromS3 (key1):', e); }
+        }
+        if (key2) {
+            try { await deleteFromS3(key2); } catch (e) { console.error('Error in error-cleanup deleteFromS3 (key2):', e); }
+        }
         throw error;
     }
 };

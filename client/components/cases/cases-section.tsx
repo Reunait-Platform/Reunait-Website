@@ -51,6 +51,7 @@ export function CasesSection({ initialCases, initialPagination, initialFilters }
   const [hasAppliedLocationFilters, setHasAppliedLocationFilters] = useState(false)
   const [hasInitialized, setHasInitialized] = useState(false)
   const lastFetchKeyRef = useRef<string>("")
+  const initialLocationCheckDone = useRef(false)
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
@@ -242,6 +243,9 @@ export function CasesSection({ initialCases, initialPagination, initialFilters }
 
   // Self-healing geolocation effect: if permission is already granted and state/city filters are empty, automatically resolve location
   useEffect(() => {
+    if (initialLocationCheckDone.current) return
+    initialLocationCheckDone.current = true
+
     const autoRefineLocation = async () => {
       if (typeof window === 'undefined' || !navigator.permissions || !navigator.geolocation) return
 

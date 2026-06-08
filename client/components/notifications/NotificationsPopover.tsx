@@ -34,28 +34,13 @@ export default function NotificationsPopover() {
   const [open, setOpen] = React.useState(false)
   const [unreadOnly, setUnreadOnly] = React.useState(false)
   const [isMobile, setIsMobile] = React.useState(false)
-  const [atBottom, setAtBottom] = React.useState(true)
   const virtuosoRef = React.useRef<VirtuosoHandle | null>(null)
   const shouldStickAfterAppendRef = React.useRef(false)
   const inFlightRef = React.useRef(false)
   const prevPageRef = React.useRef(pagination.currentPage)
   const prevVisibleLenRef = React.useRef(0)
 
-  // Prevent background scrolling when drawer is open
-  React.useEffect(() => {
-    if (open) {
-      // Lock body scroll
-      document.body.style.overflow = 'hidden'
-    } else {
-      // Restore body scroll
-      document.body.style.overflow = 'unset'
-    }
 
-    // Cleanup on unmount
-    return () => {
-      document.body.style.overflow = 'unset'
-    }
-  }, [open])
   const paginationRef = React.useRef(pagination)
   const isFetchingRef = React.useRef(isFetching)
 
@@ -70,40 +55,7 @@ export default function NotificationsPopover() {
   React.useEffect(() => { paginationRef.current = pagination }, [pagination])
   React.useEffect(() => { isFetchingRef.current = isFetching }, [isFetching])
 
-  // Eager prefetch page 2 on open to avoid first-append timing
-  React.useEffect(() => {
-    const prefetch = async () => {
-      if (!open) return
-      if (pagination.currentPage === 1 && pagination.hasNextPage && notifications.length <= 20 && !isFetching && !inFlightRef.current) {
-        try {
-          inFlightRef.current = true
-          shouldStickAfterAppendRef.current = true
-          const token = await getToken()
-          if (token) {
-            await fetchNotifications(token, 2)
-          }
-        } finally {
-          // cleared after reveal
-        }
-      }
-    }
-    prefetch()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, pagination.currentPage, pagination.hasNextPage, notifications.length, isFetching])
 
-  // After first append (page 1 -> 2), reveal last real item immediately
-  React.useEffect(() => {
-    const prev = prevPageRef.current
-    const curr = pagination.currentPage
-    if (open && prev === 1 && curr === 2 && notifications.length > prevVisibleLenRef.current) {
-      try {
-        virtuosoRef.current?.scrollToIndex({ index: notifications.length - 1, align: 'end' })
-      } catch {}
-      shouldStickAfterAppendRef.current = false
-      inFlightRef.current = false
-    }
-    prevPageRef.current = curr
-  }, [open, pagination.currentPage, notifications.length])
 
   const visible = React.useMemo(() => unreadOnly ? notifications.filter(n => !n.isRead) : notifications, [notifications, unreadOnly])
   React.useEffect(() => { prevVisibleLenRef.current = visible.length }, [visible.length])
@@ -165,7 +117,7 @@ export default function NotificationsPopover() {
         </div>,
         document.body
       )}
-      <Popover open={open} onOpenChange={(v) => { if (v) setLastSeenAt(); setOpen(v) }}>
+      <Popover modal={false} open={open} onOpenChange={(v) => { if (v) setLastSeenAt(); setOpen(v) }}>
         <PopoverTrigger asChild>
         <Button variant="outline" size="icon" className="h-9 w-9 cursor-pointer hover:bg-accent hover:text-accent-foreground transition-all duration-300 relative focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0" aria-label="Notifications">
           <Bell className="h-4 w-4" />
@@ -236,8 +188,6 @@ export default function NotificationsPopover() {
                   defaultItemHeight={88}
                   increaseViewportBy={{ top: 200, bottom: 1200 }}
                   atBottomThreshold={200}
-                  atBottomStateChange={setAtBottom}
-                  followOutput={atBottom ? 'auto' : false}
                   rangeChanged={async ({ endIndex }) => {
                     const nearEnd = endIndex >= listData.length - 2
                     if (nearEnd && listData[listData.length - 1]?.id === '__loader__') {

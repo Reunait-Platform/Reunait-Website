@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, GetObjectCommand, CopyObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { config } from '../config/config.js';
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import axios from "axios";
@@ -73,4 +73,37 @@ const getPresignedGetUrl = async (bucket, key, expiresIn = PRESIGNED_URL_EXPIRY.
     return await getSignedUrl(s3Client, command, { expiresIn: expiry });
 };
 
-export { uploadToS3, getPresignedGetUrl }; 
+/**
+ * Copy object within S3 (internal AWS network copy)
+ */
+const copyS3Object = async (sourceKey, targetKey, sourceBucket = config.awsTempImageBucket, targetBucket = config.awsBucketName) => {
+    try {
+        const command = new CopyObjectCommand({
+            Bucket: targetBucket,
+            CopySource: encodeURI(`${sourceBucket}/${sourceKey}`),
+            Key: targetKey
+        });
+        await s3Client.send(command);
+    } catch (error) {
+        console.error('Error copying S3 object:', error);
+        throw error;
+    }
+};
+
+/**
+ * Delete object from S3
+ */
+const deleteS3Object = async (key, bucket = config.awsBucketName) => {
+    try {
+        const command = new DeleteObjectCommand({
+            Bucket: bucket,
+            Key: key
+        });
+        await s3Client.send(command);
+    } catch (error) {
+        console.error('Error deleting S3 object:', error);
+        throw error;
+    }
+};
+
+export { uploadToS3, getPresignedGetUrl, copyS3Object, deleteS3Object }; 

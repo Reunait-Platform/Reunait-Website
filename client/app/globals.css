@@ -432,6 +432,14 @@
 /* Accent font utility mapped to next/font variable */
 @layer utilities {
   .font-accent { font-family: var(--font-accent), var(--font-sans); }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;  /* Chrome, Safari, and Opera */
+  }
 }
 
 :root {
@@ -465,4 +473,9 @@
 --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
 --color-sidebar-border: var(--sidebar-border);
 --color-sidebar-ring: var(--sidebar-ring);
+}
+
+/* Prevent layout shift of the fixed navbar when body scroll is locked by Radix/Clerk */
+body[data-scroll-locked] header nav {
+  padding-right: calc(0.5rem + var(--removed-body-scroll-bar-size)) !important;
 }
