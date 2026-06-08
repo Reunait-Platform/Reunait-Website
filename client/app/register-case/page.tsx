@@ -283,7 +283,6 @@ export default function RegisterCasePage() {
   const { showSuccess, showError } = useToast()
   const [isPending, startTransition] = useTransition()
   const [submitting, setSubmitting] = useState(false)
-  const [userProfile, setUserProfile] = useState<{ phoneNumber: string; role: string } | null>(null)
   const [loading, setLoading] = useState(false)
   const [isNavigatingToCase, setIsNavigatingToCase] = useState(false)
 
@@ -346,17 +345,7 @@ export default function RegisterCasePage() {
     return value !== undefined && value !== null && String(value).length > 0
   }
 
-  // Set basic user data from Clerk
-  useEffect(() => {
-    if (user) {
-      const basicProfile = {
-        phoneNumber: user.phoneNumbers?.[0]?.phoneNumber || "",
-        role: ((user.publicMetadata as { role?: string })?.role) || "general_user"
-      }
-      setUserProfile(basicProfile)
-      form.setValue("contactNumber", basicProfile.phoneNumber)
-    }
-  }, [user, form])
+
 
   // Load countries
   useEffect(() => {
@@ -530,7 +519,13 @@ export default function RegisterCasePage() {
     form.setValue("policeStationCity", "", { shouldValidate: true, shouldTouch: true })
     form.trigger("policeStationCity")
   }, [watchedPoliceCountry, watchedPoliceState, form])
-
+  // Reset reward when status changes to 'found'
+  useEffect(() => {
+    if (watchedStatus === "found") {
+      form.setValue("reward", "")
+      setRewardHint("")
+    }
+  }, [watchedStatus, form])
 
 
   const onSubmit = async (values: FormValues) => {
@@ -577,7 +572,7 @@ export default function RegisterCasePage() {
       // User ID will be automatically extracted from Clerk auth context on backend
 
       // Add reportedBy based on user role
-      const userRole = userProfile?.role || 'general_user'
+      const userRole = (user?.publicMetadata as { role?: string })?.role || 'general_user'
       formData.append('reportedBy', userRole)
 
       const base = process.env.NEXT_PUBLIC_BACKEND_URL as string
@@ -869,7 +864,11 @@ export default function RegisterCasePage() {
                         {watchedStatus === "missing" ? "Date Missing *" : "Date Found *"}
                       </Label>
                       {(() => {
-                        const date = watchedDateMissingFound ? new Date(watchedDateMissingFound) : undefined
+                        let date: Date | undefined = undefined
+                        if (watchedDateMissingFound) {
+                          const [year, month, day] = watchedDateMissingFound.split('-').map(Number)
+                          date = new Date(year, month - 1, day)
+                        }
                         return (
                           <DatePicker
                             date={date}
@@ -900,12 +899,12 @@ export default function RegisterCasePage() {
                           step="0.01"
                           min="0"
                           placeholder="Enter reward amount (e.g., 1000)" 
-                          {...form.register("reward")}
+                          {...form.register("reward", {
+                            onChange: (e) => {
+                              setRewardHint(computeRewardHint(e.target.value))
+                            }
+                          })}
                           aria-invalid={!!form.formState.errors.reward}
-                          onChange={(e) => {
-                            form.setValue("reward", e.target.value, { shouldValidate: true })
-                            setRewardHint(computeRewardHint(e.target.value))
-                          }}
                         />
                         {(shouldShowError("reward") || rewardHint) && (
                           <p className="text-xs text-destructive">{(form.formState.errors.reward?.message) || rewardHint}</p>
@@ -1186,10 +1185,6 @@ export default function RegisterCasePage() {
                           placeholder="Enter postal code" 
                           {...form.register("policeStationPostalCode")}
                           aria-invalid={shouldShowError("policeStationPostalCode")}
-                          onChange={(e) => {
-                            form.setValue("policeStationPostalCode", e.target.value, { shouldValidate: true, shouldTouch: true })
-                            form.trigger("policeStationPostalCode")
-                          }}
                         />
                         {shouldShowError("policeStationPostalCode") && (
                           <p className="text-xs text-destructive">{form.formState.errors.policeStationPostalCode?.message}</p>
