@@ -163,6 +163,9 @@ export const createNotificationsStore = (
 
         enqueueRead: (id: string) => {
           set((state) => {
+            const currentNotif = state.notifications.find(n => n.id === id)
+            if (currentNotif?.isRead) return {}
+            
             const pending = new Set(state.pendingReadIds)
             pending.add(id)
             const updated = state.notifications.map(n => n.id === id ? { ...n, isRead: true } : n)

@@ -179,13 +179,13 @@ export function AllNotificationsView() {
         n.id === notification.id ? { ...n, isRead: true } : n
       ))
       setUnreadCount(prev => Math.max(0, prev - 1))
-    }
-    
-    // Also update the store for consistency
-    enqueueRead(notification.id)
-    const token = await getToken()
-    if (token) {
-      await flushPendingReads(token)
+      
+      // Also update the store for consistency
+      enqueueRead(notification.id)
+      const token = await getToken()
+      if (token) {
+        await flushPendingReads(token)
+      }
     }
 
     if (notification.isClickable && notification.navigateTo) {

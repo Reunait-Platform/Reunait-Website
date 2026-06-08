@@ -68,9 +68,11 @@ export default function NotificationsPopover() {
 
 
   const handleItemClick = async (n: NotificationItem) => {
-    enqueueRead(n.id)
-    const token = await getToken()
-    if (token) flushPendingReads(token)
+    if (!n.isRead) {
+      enqueueRead(n.id)
+      const token = await getToken()
+      if (token) flushPendingReads(token)
+    }
     if (n.isClickable && n.navigateTo) {
       // Close the popover immediately
       setOpen(false)
