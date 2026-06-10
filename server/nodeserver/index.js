@@ -1,4 +1,6 @@
 import 'dotenv/config';
+import './instrument.js';
+import * as Sentry from "@sentry/node";
 import express from "express";
 import helmet from "helmet";
 import morgan from "morgan";
@@ -78,6 +80,8 @@ app.use("/api", notificationsRoutes);
 app.use("/api/police-stations", policeStationsRoutes);
 app.use("/api", donationsRoutes);
 
+// Sentry error handler must be registered after all controllers/routes and before other error handlers
+Sentry.setupExpressErrorHandler(app);
 
 /*  START SERVER  */
 const PORT = process.env.PORT || 6001;

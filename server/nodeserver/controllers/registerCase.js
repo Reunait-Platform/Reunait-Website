@@ -12,6 +12,7 @@ import { moderateImage } from "../services/contentSafetyService.js";
 import { config } from "../config/config.js";
 import { broadcastNotification } from "../services/notificationBroadcast.js";
 import { sendEmailNotificationAsync } from "../services/emailService.js";
+import { triggerRevalidation } from "../services/revalidationService.js";
 
 // Increment Cases Registered using model helper (numeric-safe)
 const incrementImpactCounter = async () => {
@@ -157,27 +158,18 @@ export const registerCase = async (req, res) => {
                 });
             }
 
-            try {
-                const clerkUser = await clerkClient.users.getUser(clerkUserId);
-                const userRole = clerkUser.publicMetadata?.role || 'general_user';
-                
-                // Only police and volunteer can bypass verification
-                if (userRole !== 'police' && userRole !== 'volunteer') {
-                    return res.status(403).json({
-                        status: false,
-                        message: 'Access denied. Only police and volunteer users can bypass AI verification.'
-                    });
-                }
-
-                // User is authorized, allow bypass
-                bypassVerification = true;
-            } catch (error) {
-                console.error('Error verifying user role for bypass verification:', error);
-                return res.status(500).json({
+            const userRole = req.auth()?.sessionClaims?.metadata?.role || 'general_user';
+            
+            // Only police and volunteer can bypass verification
+            if (userRole !== 'police' && userRole !== 'volunteer') {
+                return res.status(403).json({
                     status: false,
-                    message: 'Failed to verify user authorization. Please try again.'
+                    message: 'Access denied. Only police and volunteer users can bypass AI verification.'
                 });
             }
+
+            // User is authorized, allow bypass
+            bypassVerification = true;
         }
 
         // Create new case in MongoDB with default values for missing fields
@@ -488,7 +480,10 @@ export const registerCase = async (req, res) => {
         // All downstream steps succeeded → increment homepage counter and invalidate cache
         try {
             await incrementImpactCounter();
-            try { await redis.set('homepage:cache:enabled', 'false') } catch {}
+            try { 
+                await redis.set('homepage:cache:enabled', 'false');
+                triggerRevalidation('homepage');
+            } catch {}
         } catch (e) {
             console.error('Increment Cases Registered failed (non-blocking):', e?.message || e)
         }

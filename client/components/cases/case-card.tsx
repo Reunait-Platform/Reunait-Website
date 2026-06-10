@@ -40,6 +40,8 @@ interface CaseCardProps {
   highlightQuery?: string
   muted?: boolean
   showMutedHint?: boolean
+  priority?: boolean
+  aspectRatio?: string
 }
 
 // Using shadcn's default theming
@@ -51,7 +53,7 @@ const STATUS_INFO = {
   default: { icon: Clock, colorLight: "text-slate-700", colorDark: "dark:text-slate-300", bg: "bg-slate-500/10 dark:bg-slate-400/10", ring: "ring-slate-500/20" }
 } as const
 
-export const CaseCard = memo(({ case: caseData, index = 0, highlightQuery = "", muted = false, showMutedHint = false }: CaseCardProps) => {
+export const CaseCard = memo(({ case: caseData, index = 0, highlightQuery = "", muted = false, showMutedHint = false, priority = false, aspectRatio = "aspect-[4/5]" }: CaseCardProps) => {
   const [imageError, setImageError] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
@@ -279,7 +281,7 @@ export const CaseCard = memo(({ case: caseData, index = 0, highlightQuery = "", 
     return (
       <div className="animate-pulse">
         <Card className="overflow-hidden rounded-2xl border">
-          <div className="h-80 bg-gradient-to-r from-neutral-200 via-neutral-100 to-neutral-200 dark:from-slate-700 dark:via-slate-600 dark:to-slate-700 animate-shimmer bg-[length:200%_100%]"></div>
+          <div className={`relative w-full ${aspectRatio} bg-gradient-to-r from-neutral-200 via-neutral-100 to-neutral-200 dark:from-slate-700 dark:via-slate-600 dark:to-slate-700 animate-shimmer bg-[length:200%_100%]`}></div>
           <CardContent className="px-5 py-4 space-y-3">
             <div className="space-y-2">
               <div className="h-6 bg-gradient-to-r from-neutral-200 via-neutral-100 to-neutral-200 dark:from-slate-700 dark:via-slate-600 dark:to-slate-700 animate-shimmer bg-[length:200%_100%] rounded"></div>
@@ -326,7 +328,7 @@ export const CaseCard = memo(({ case: caseData, index = 0, highlightQuery = "", 
       <div className={`absolute top-0 left-0 right-0 h-0.5 ${statusInfo.bg}`} />
       
       {/* Hero Image Section - moved outside CardContent to align with top border */}
-      <div className="relative h-80 bg-gradient-to-br from-slate-100 to-slate-50 dark:from-slate-800 dark:to-slate-900 overflow-hidden">
+      <div className={`relative w-full ${aspectRatio} bg-gradient-to-br from-slate-100 to-slate-50 dark:from-slate-800 dark:to-slate-900 overflow-hidden`}>
           {muted && showMutedHint && (
             <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
               <div className="px-3 py-1.5 rounded-full bg-background/80 backdrop-blur-sm text-foreground text-sm font-semibold shadow-sm ring-1 ring-border/60">
@@ -363,7 +365,7 @@ export const CaseCard = memo(({ case: caseData, index = 0, highlightQuery = "", 
                         fill
                         className="object-cover object-top transition-transform duration-200 group-hover:scale-105"
                         onError={(e) => handleImageError(e, imageIndex)}
-                        priority={idx < 2}
+                        priority={priority && idx === 0}
                         sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
                         unoptimized={imageUrl?.includes('X-Amz-Signature')}
                       />

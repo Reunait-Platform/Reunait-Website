@@ -15,18 +15,8 @@ export const getCaseOwnerProfile = async (req, res) => {
       });
     }
 
-    // Extract user role from Clerk public metadata
-    let userRole = 'general_user';
-    try {
-      const user = await clerkClient.users.getUser(userId);
-      userRole = user.publicMetadata?.role || 'general_user';
-    } catch (error) {
-      console.error('Failed to get user from Clerk:', error);
-      return res.status(500).json({ 
-        success: false, 
-        message: "Failed to verify user authentication." 
-      });
-    }
+    // Extract user role from Clerk session claims metadata
+    const userRole = req.auth()?.sessionClaims?.metadata?.role || 'general_user';
 
     // Only allow police and volunteer users to access this endpoint
     if (userRole !== 'police' && userRole !== 'volunteer') {

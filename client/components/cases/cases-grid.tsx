@@ -12,15 +12,16 @@ interface CasesGridProps {
   highlightQuery?: string
   getMuted?: (c: Case) => boolean
   showMutedHint?: boolean
+  aspectRatio?: string
 }
 
 // Optimized loading skeleton - matches actual case card dimensions
-const LoadingSkeleton = memo(() => (
+const LoadingSkeleton = memo(({ aspectRatio = "aspect-[4/5]" }: { aspectRatio?: string }) => (
     <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-8 animate-in fade-in-0 duration-300">
     {Array.from({ length: 6 }).map((_, index) => (
       <div key={index} className="overflow-hidden rounded-2xl border">
-        {/* Image section - matches h-80 from actual case card */}
-        <div className="h-80 bg-gradient-to-r from-neutral-200 via-neutral-100 to-neutral-200 dark:from-slate-700 dark:via-slate-600 dark:to-slate-700 animate-shimmer bg-[length:200%_100%]"></div>
+        {/* Image section - matches dynamic aspect ratio from actual case card */}
+        <div className={`relative w-full ${aspectRatio} bg-gradient-to-r from-neutral-200 via-neutral-100 to-neutral-200 dark:from-slate-700 dark:via-slate-600 dark:to-slate-700 animate-shimmer bg-[length:200%_100%]`}></div>
         
         {/* Content section - matches actual case card content */}
         <div className="px-6 -mt-2 pb-5 space-y-2">
@@ -69,10 +70,11 @@ export const CasesGrid = memo(({
   emptyMessage = "No cases found",
   highlightQuery = "",
   getMuted,
-  showMutedHint = false
+  showMutedHint = false,
+  aspectRatio = "aspect-[4/5]"
 }: CasesGridProps) => {
   if (loading) {
-    return <LoadingSkeleton />
+    return <LoadingSkeleton aspectRatio={aspectRatio} />
   }
 
   if (cases.length === 0) {
@@ -91,6 +93,8 @@ export const CasesGrid = memo(({
           highlightQuery={highlightQuery}
           muted={getMuted ? getMuted(caseData) : false}
           showMutedHint={showMutedHint}
+          priority={index < 4}
+          aspectRatio={aspectRatio}
         />)
       })}
     </div>

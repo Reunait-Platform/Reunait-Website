@@ -29,8 +29,8 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Heart: Heart,
 }
 
-// ISR Configuration - Regenerate page every 1 minute (60 seconds)
-export const revalidate = 60
+// ISR Configuration - Regenerate page with a 24-hour safety net (on-demand revalidation handles updates)
+export const revalidate = 86400
 
 // SEO-optimized metadata for homepage
 export const metadata: Metadata = {

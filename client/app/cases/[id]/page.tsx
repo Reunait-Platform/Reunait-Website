@@ -37,7 +37,9 @@ export default async function CaseDetailPage({ params }: PageProps) {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { id } = await params
   try {
-    const res = await fetchCaseById(id)
+    const { getToken } = await auth()
+    const token = getToken ? await getToken() : undefined
+    const res = await fetchCaseById(id, token || undefined)
     const data = res?.data
     const name = data?.fullName || 'Missing Person Case'
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || ''

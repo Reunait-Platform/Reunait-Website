@@ -13,8 +13,10 @@ export class HomepageService {
       headers: {
         'Content-Type': 'application/json',
       },
-        // Always fetch fresh homepage data
-        cache: 'no-store'
+      next: {
+        revalidate: 86400,
+        tags: ['homepage']
+      }
     })
 
     if (!response.ok) {

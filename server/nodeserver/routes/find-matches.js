@@ -39,17 +39,11 @@ router.post('/find-matches', requireAuth(), async (req, res) => {
       });
     }
 
-    // Extract user role from Clerk public metadata
+    // Extract user role from Clerk session claims metadata
     let userRole = 'general_user';
     const auth = req.auth();
     if (auth?.userId) {
-      try {
-        const user = await clerkClient.users.getUser(auth.userId);
-        userRole = user.publicMetadata?.role || 'general_user';
-      } catch (error) {
-        console.error('Failed to get user from Clerk:', error);
-        userRole = 'general_user';
-      }
+      userRole = auth.sessionClaims?.metadata?.role || 'general_user';
     }
 
     // Check rate limiting (4-hour cooldown) - skip for police, NGO, and volunteer users

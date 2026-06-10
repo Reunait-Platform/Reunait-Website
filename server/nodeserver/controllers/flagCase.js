@@ -80,16 +80,10 @@ export const flagCase = async (req, res) => {
       });
     }
 
-    // Get user role if authenticated
+    // Get user role from session claims (zero latency)
     let userRole = "general_user";
     if (userId) {
-      try {
-        const user = await clerkClient.users.getUser(userId);
-        userRole = user.publicMetadata?.role || "general_user";
-      } catch (error) {
-        console.error('Failed to get user role from Clerk:', error);
-        // Continue with default role
-      }
+      userRole = auth.sessionClaims?.metadata?.role || "general_user";
     }
 
     // Create flag object

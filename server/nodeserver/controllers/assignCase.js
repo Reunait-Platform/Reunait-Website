@@ -30,18 +30,8 @@ export const assignCase = async (req, res) => {
       });
     }
 
-    // Get requester's role from Clerk
-    let requesterRole = 'general_user';
-    try {
-      const requester = await clerkClient.users.getUser(requesterId);
-      requesterRole = requester.publicMetadata?.role || 'general_user';
-    } catch (error) {
-      console.error('Failed to get requester from Clerk:', error);
-      return res.status(500).json({
-        success: false,
-        message: "Failed to verify user authentication."
-      });
-    }
+    // Get requester's role from session claims (zero latency)
+    const requesterRole = req.auth()?.sessionClaims?.metadata?.role || 'general_user';
 
     // Only police and volunteer can assign cases
     if (requesterRole !== 'police' && requesterRole !== 'volunteer') {

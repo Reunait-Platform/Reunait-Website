@@ -3,6 +3,7 @@ import HomepageSection from "../model/homepageModel.js";
 import redis from "../services/redisClient.js";
 import { clerkClient } from "@clerk/express";
 import { deleteEmbeddings } from "../services/pineconeService.js";
+import { triggerRevalidation } from "../services/revalidationService.js";
 import User from "../model/userModel.js";
 
 /**
@@ -87,14 +88,8 @@ export const updateCaseStatus = async (req, res) => {
       // Continue execution - don't fail the request
     }
 
-    // Get user role for timeline entry
-    let userRole = 'general_user';
-    try {
-      const user = await clerkClient.users.getUser(userId);
-      userRole = user.publicMetadata?.role || 'general_user';
-    } catch (error) {
-      console.error('Failed to get user from Clerk:', error);
-    }
+    // Get user role from session claims (zero latency)
+    const userRole = req.auth()?.sessionClaims?.metadata?.role || 'general_user';
 
     // Determine who is closing the case based on actual user role
     const roleDisplayName = userRole === 'police' ? 'Police Station' : 
@@ -191,7 +186,10 @@ export const updateCaseStatus = async (req, res) => {
     try {
       if (reunited === true) {
         await HomepageSection.incrementReunionsCount(1);
-        try { await redis.set('homepage:cache:enabled', 'false'); } catch {}
+        try { 
+          await redis.set('homepage:cache:enabled', 'false');
+          triggerRevalidation('homepage');
+        } catch {}
       }
     } catch (metricErr) {
       console.error('Failed to increment reunions count (non-blocking):', metricErr);

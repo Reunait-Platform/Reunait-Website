@@ -17,17 +17,11 @@ export const getCaseById = async (req, res) => {
       });
     }
 
-    // Extract user role from Clerk public metadata (if authenticated)
+    // Extract user role from Clerk session claims metadata (if authenticated)
     let userRole = 'general_user';
     const auth = req.auth();
     if (auth?.userId) {
-      try {
-        const user = await clerkClient.users.getUser(auth.userId);
-        userRole = user.publicMetadata?.role || 'general_user';
-      } catch (error) {
-        console.error('Failed to get user from Clerk:', error);
-        userRole = 'general_user';
-      }
+      userRole = auth.sessionClaims?.metadata?.role || 'general_user';
     }
     // If not authenticated, default to general_user (public access)
     
