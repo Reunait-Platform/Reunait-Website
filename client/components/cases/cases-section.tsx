@@ -427,8 +427,13 @@ export function CasesSection({ initialCases, initialPagination, initialFilters }
     
     // Add date range with proper formatting
     if (searchFilters.dateFrom || searchFilters.dateTo) {
-      const fromDate = searchFilters.dateFrom?.toLocaleDateString() || "any date"
-      const toDate = searchFilters.dateTo?.toLocaleDateString() || "present"
+      const dateFormatter = new Intl.DateTimeFormat("en-GB", {
+        day: "numeric",
+        month: "short",
+        year: "numeric"
+      })
+      const fromDate = searchFilters.dateFrom instanceof Date ? dateFormatter.format(searchFilters.dateFrom) : "any date"
+      const toDate = searchFilters.dateTo instanceof Date ? dateFormatter.format(searchFilters.dateTo) : "present"
       parts.push(`reported between ${fromDate} and ${toDate}`)
     }
     
@@ -503,6 +508,7 @@ export function CasesSection({ initialCases, initialPagination, initialFilters }
           loading={isDisplayLoading}
           emptyMessage="No cases found for the selected criteria"
           highlightQuery={searchFilters.keyword}
+          onResetFilters={handleClear}
         />
       </div>
 

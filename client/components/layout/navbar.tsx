@@ -4,7 +4,7 @@ import { Logo } from '@/components/logo'
 import { Menu, X, Plus, CupSoda } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/theme-toggle'
-import { Show } from '@clerk/nextjs';
+import { useAuth } from '@clerk/nextjs';
 import { AccountMenu } from '@/components/account-menu'
 import NotificationsPopover from '@/components/notifications/NotificationsPopover'
 import React, { Suspense } from 'react'
@@ -16,6 +16,7 @@ import { SimpleLoader } from '@/components/ui/simple-loader'
 
 // Component that uses useSearchParams - must be wrapped in Suspense
 function NavbarContent() {
+    const { isLoaded, isSignedIn } = useAuth()
     const [menuState, setMenuState] = React.useState(false)
     const [isScrolled, setIsScrolled] = React.useState(false)
     const expandedContainerRef = React.useRef<HTMLDivElement | null>(null)
@@ -85,10 +86,15 @@ function NavbarContent() {
             )}
             <nav
                 data-state={menuState && 'active'}
-                className={cn("fixed z-50 w-full px-2", !isScrolled && "border-b border-border/100")}>
+                className={cn(
+                    "fixed z-50 w-full px-2 transition-all duration-300 ease-in-out border-b",
+                    isScrolled ? "border-transparent" : "border-border/100"
+                )}>
                 <div className={cn(
-                    'mx-auto mt-2 w-full md:max-w-none lg:max-w-screen-2xl px-3 sm:px-4 md:px-2 lg:px-3 xl:px-4 border',
-                    isScrolled ? 'bg-background/50 rounded-2xl backdrop-blur-lg' : 'border-transparent'
+                    'mx-auto mt-2 w-full md:max-w-none lg:max-w-screen-2xl px-3 sm:px-4 md:px-2 lg:px-3 xl:px-4 border transition-all duration-300 ease-in-out',
+                    isScrolled 
+                        ? 'bg-background/50 rounded-2xl backdrop-blur-lg border-border' 
+                        : 'bg-transparent rounded-none backdrop-blur-none border-transparent'
                 )}>
                     {/* Main navbar content */}
                     <div className="relative flex items-center justify-between gap-6 py-3 lg:gap-0 lg:py-4">
@@ -121,11 +127,12 @@ function NavbarContent() {
                             </Button>
 
                                 {/* Essential actions - always visible */}
-                                <div className="flex items-center gap-3">
-                                    <Show when="signed-in">
+                                <div className="flex items-center gap-3 min-w-[74px] justify-end">
+                                    {!isLoaded ? (
+                                        <div className="h-9 w-[74px] bg-muted/20 animate-pulse rounded-lg" />
+                                    ) : isSignedIn ? (
                                         <AccountMenu />
-                                    </Show>
-                                    <Show when="signed-out">
+                                    ) : (
                                         <Button 
                                             onClick={() => handleButtonClick('/sign-in')}
                                             disabled={isLoading}
@@ -134,7 +141,7 @@ function NavbarContent() {
                                         >
                                             Sign in
                                         </Button>
-                                    </Show>
+                                    )}
                                 </div>
 
                                 <button
@@ -160,30 +167,34 @@ function NavbarContent() {
                                 <span className="md:hidden">Report</span>
                             </Button>
                             {/* Mobile buttons - always visible */}
-						<Link href="/donate" className="cursor-pointer" onClick={() => startLoading({ expectRouteChange: pathname !== '/donate' })}>
+						<Link href="/donate" prefetch={false} className="cursor-pointer" onClick={() => startLoading({ expectRouteChange: pathname !== '/donate' })}>
                                 <Button variant="outline" size="icon" className="h-9 w-9 cursor-pointer hover:bg-accent hover:text-accent-foreground hover:shadow-lg transition-all duration-300 ease-in-out group" aria-label="Buy me a coffee">
-                                    <CupSoda className="h-5 w-5 transition-transform duration-300 group-hover:rotate-12" />
+                                    <CupSoda className="h-5 w-5 transition-all duration-300 ease-out transform-gpu group-hover:-translate-y-0.5 group-hover:scale-105" />
                                 </Button>
                             </Link>
 
-                            <Show when="signed-in">
-                                {/* Notifications Drawer trigger */}
-                                <NotificationsPopover />
+                            <div className="flex items-center gap-3 min-w-[80px] justify-end">
+                                {!isLoaded ? (
+                                    <div className="h-10 w-[80px] bg-muted/20 animate-pulse rounded-lg" />
+                                ) : isSignedIn ? (
+                                    <>
+                                        {/* Notifications Drawer trigger */}
+                                        <NotificationsPopover />
 
-                                {/* Profile */}
-                                <AccountMenu />
-                            </Show>
-
-                            <Show when="signed-out">
-                                <Button 
-                                    onClick={() => handleButtonClick('/sign-in')}
-                                    disabled={isLoading}
-                                    variant="outline" 
-                                    className="h-10 px-4 text-sm cursor-pointer hover:bg-accent hover:text-accent-foreground transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed"
-                                >
-                                    Sign in
-                                </Button>
-                            </Show>
+                                        {/* Profile */}
+                                        <AccountMenu />
+                                    </>
+                                ) : (
+                                    <Button 
+                                        onClick={() => handleButtonClick('/sign-in')}
+                                        disabled={isLoading}
+                                        variant="outline" 
+                                        className="h-10 px-4 text-sm cursor-pointer hover:bg-accent hover:text-accent-foreground transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed"
+                                    >
+                                        Sign in
+                                    </Button>
+                                )}
+                            </div>
 
                             <ThemeToggle />
                         </div>
@@ -196,15 +207,15 @@ function NavbarContent() {
 						<div className="h-px w-full bg-border/60 my-2" />
 						{/* Centered actions */}
 						<div className="w-full items-center justify-center gap-4 mb-3 flex">
-                        <Link href="/donate" className="cursor-pointer" onClick={() => { setMenuState(false); startLoading({ expectRouteChange: pathname !== '/donate' }) }}>
+                        <Link href="/donate" prefetch={false} className="cursor-pointer" onClick={() => { setMenuState(false); startLoading({ expectRouteChange: pathname !== '/donate' }) }}>
 								<Button variant="outline" size="icon" className="h-10 w-10 cursor-pointer hover:bg-accent hover:text-accent-foreground hover:shadow-lg transition-all duration-300 ease-in-out group" aria-label="Buy me a coffee">
-									<CupSoda className="h-5 w-5 transition-transform duration-300 group-hover:rotate-12" />
+									<CupSoda className="h-5 w-5 transition-all duration-300 ease-out transform-gpu group-hover:-translate-y-0.5 group-hover:scale-105" />
 								</Button>
 							</Link>
 
-                            <Show when="signed-in">
+                            {isLoaded && isSignedIn && (
                                 <NotificationsPopover />
-                            </Show>
+                            )}
 
 							<ThemeToggle />
 						</div>
