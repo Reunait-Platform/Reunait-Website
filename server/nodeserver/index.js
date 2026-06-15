@@ -18,6 +18,7 @@ import notificationsRoutes from "./routes/notifications.js"
 import policeStationsRoutes from "./routes/police-stations.js"
 import donationsRoutes from "./routes/donations.js"
 import healthRoutes from "./routes/health.js"
+import policiesRoutes from "./routes/policies.js"
 import { clerkMiddleware } from "@clerk/express";
 import { rateLimiter } from "./middleware/rateLimiter.js";
 import { skipJsonForWebhooks, bodyParserMiddleware } from "./middleware/bodyParser.js";
@@ -44,17 +45,22 @@ app.use(privateNetworkAccess);
 app.use(corsMiddleware);
 // Explicitly handle preflight
 app.options(/.*/, cors());
-// Clerk middleware: mark webhook route as public so it bypasses auth
-app.use(clerkMiddleware({
-    publishableKey: process.env.CLERK_PUBLISHABLE_KEY,
-    secretKey: process.env.CLERK_SECRET_KEY,
-    // Public routes (no auth) for payment callbacks and webhooks
-    publicRoutes: [
-        '/api/webhooks/clerk',
-        '/api/donations/webhook',
-        '/api/donations/callback',
-    ],
-}));
+// Clerk middleware: bypass middleware completely for payment callbacks/webhooks and policy routes to prevent redirect loops
+const EXCLUDED_CLERK_ROUTES = [
+    '/api/webhooks/clerk',
+    '/api/donations/webhook',
+    '/api/donations/callback',
+];
+
+app.use((req, res, next) => {
+    if (EXCLUDED_CLERK_ROUTES.includes(req.path) || req.path.startsWith('/api/policies')) {
+        return next();
+    }
+    return clerkMiddleware({
+        publishableKey: process.env.CLERK_PUBLISHABLE_KEY,
+        secretKey: process.env.CLERK_SECRET_KEY,
+    })(req, res, next);
+});
 
 // Create uploads directory if it doesn't exist
 if (!fs.existsSync('uploads')) {
@@ -79,6 +85,18 @@ app.use("/api/volunteer", volunteerRoutes);
 app.use("/api", notificationsRoutes);
 app.use("/api/police-stations", policeStationsRoutes);
 app.use("/api", donationsRoutes);
+app.use("/api/policies", policiesRoutes);
+
+// Custom error handler for CORS violations (placed before Sentry to prevent noise in dashboard)
+app.use((err, req, res, next) => {
+    if (err && err.message === 'Not allowed by CORS') {
+        return res.status(403).json({
+            success: false,
+            message: 'CORS policy violation: Origin not allowed.'
+        });
+    }
+    next(err);
+});
 
 // Sentry error handler must be registered after all controllers/routes and before other error handlers
 Sentry.setupExpressErrorHandler(app);

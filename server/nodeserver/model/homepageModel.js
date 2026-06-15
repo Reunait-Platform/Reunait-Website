@@ -6,7 +6,7 @@ const homepageSectionSchema = new mongoose.Schema({
         type: String,
         required: true,
         unique: true,
-        enum: ['hero', 'impact', 'features', 'guidance', 'testimonials']
+        enum: ['hero', 'impact', 'features', 'guidance', 'testimonials', 'privacy', 'terms', 'refunds']
     },
     title: {
         type: String,
@@ -51,9 +51,12 @@ homepageSectionSchema.pre('save', function(next) {
     next();
 });
 
-// Static method to get all active sections ordered
+// Static method to get all active sections ordered (excluding policies)
 homepageSectionSchema.statics.getActiveSections = function() {
-    return this.find({ isActive: true }).sort({ order: 1 });
+    return this.find({ 
+        isActive: true, 
+        section: { $nin: ['privacy', 'terms', 'refunds'] } 
+    }).sort({ order: 1 });
 };
 
 // Static method to get homepage data in the required format

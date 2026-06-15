@@ -4,9 +4,12 @@ import { nodeProfilingIntegration } from "@sentry/profiling-node";
 
 Sentry.init({
   dsn: process.env.SENTRY_DSN,
-  debug: true,
+  debug: false,
   release: process.env.SENTRY_RELEASE || "reunite-backend@1.0.0",
   environment: process.env.NODE_ENV || "development",
+  ignoreErrors: [
+    'Not allowed by CORS',
+  ],
   integrations: [
     nodeProfilingIntegration(),
   ],

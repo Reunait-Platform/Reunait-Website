@@ -1,16 +1,16 @@
 "use client"
 
-import React, { useEffect, useState, use } from "react"
+import React, { useEffect, useState, use, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/contexts/toast-context"
 import { Sparkles, Loader2, CheckCircle2, Globe } from "lucide-react"
-import Script from "next/script"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useRouter } from "next/navigation"
 import { useUser } from "@clerk/nextjs"
+import { DodoPayments } from "dodopayments-checkout"
 
 const isDonationsEnabled = process.env.NEXT_PUBLIC_DONATIONS_ENABLED === "true"
 
@@ -37,54 +37,7 @@ const DEFAULT_PREDEFINED_AMOUNTS: Record<string, number[]> = {
   NZD: [10, 25, 50, 100, 250],
 }
 
-interface RazorpayPaymentResponse {
-  razorpay_order_id: string
-  razorpay_payment_id: string
-  razorpay_signature: string
-}
-
-
-interface RazorpayOptions {
-  key: string
-  amount: number
-  currency: string
-  name: string
-  description: string
-  order_id: string
-  image?: string
-  handler?: (response: RazorpayPaymentResponse) => void | Promise<void>
-  prefill?: { name?: string; email?: string; contact?: string }
-  theme?: { color?: string }
-  modal?: { ondismiss?: () => void; confirm_close?: boolean }
-  notes?: Record<string, string>
-}
-
-interface RazorpayInstance {
-  open: () => void
-  close: () => void
-  on: (event: string, handler: (response: RazorpayFailedResponse) => void) => void
-}
-
-interface RazorpayFailedResponse {
-  error: {
-    code: string
-    description: string
-    source: string
-    step: string
-    reason: string
-    metadata: { order_id: string; payment_id: string }
-  }
-}
-
-interface RazorpayConstructor {
-  new (options: RazorpayOptions): RazorpayInstance
-}
-
-declare global {
-  interface Window {
-    Razorpay: RazorpayConstructor
-  }
-}
+// Dodo Payments type declarations not needed since SDK exports them
 
 
 
@@ -143,17 +96,67 @@ export default function DonateClient({
   const [customAmount, setCustomAmount] = useState<string>("")
   const [currency, setCurrency] = useState<string>("INR")
   const [isProcessing, setIsProcessing] = useState(false)
-  const [razorpayLoaded, setRazorpayLoaded] = useState(false)
   const { showSuccess, showError } = useToast()
   const router = useRouter()
+  const verifyPaymentRef = useRef<((paymentId: string) => Promise<void>) | null>(null)
 
-  useEffect(() => {
-    if (typeof window !== "undefined" && window.Razorpay) {
-      setRazorpayLoaded(true)
+  const verifyPayment = async (paymentId: string) => {
+    setIsProcessing(true)
+    try {
+      const base = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:6001"
+      const verifyResponse = await fetch(`${base}/api/donations/verify-payment`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ payment_id: paymentId }),
+      })
+      const verifyData = await verifyResponse.json()
+      if (verifyData.success) {
+        const verifiedAmount = verifyData.data.amount
+        const verifiedCurrency = verifyData.data.currency
+        router.push(
+          `/donate/thank-you?payment_id=${paymentId}&order_id=${paymentId}&amount=${verifiedAmount}&currency=${verifiedCurrency}`
+        )
+        setSelectedAmount(null)
+        setCustomAmount("")
+      } else {
+        throw new Error(verifyData.message || "Payment verification failed")
+      }
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Payment verification failed. Please contact support if the amount was deducted."
+      showError(errorMessage, "Verification Error")
+    } finally {
+      setIsProcessing(false)
     }
+  }
+
+  // Update validation ref to avoid stale closures
+  useEffect(() => {
+    verifyPaymentRef.current = verifyPayment
+  })
+
+  // Initialize Dodo Payments SDK
+  useEffect(() => {
+    DodoPayments.Initialize({
+      mode: process.env.NEXT_PUBLIC_DODO_PAYMENTS_MODE === "live" ? "live" : "test",
+      displayType: "overlay",
+      onEvent: (event) => {
+        if (event.event_type === "checkout.status") {
+          const status = event.data?.status
+          if (status === "succeeded" || status === "completed") {
+            const paymentId = String(event.data?.payment_id || event.data?.id || "")
+            if (paymentId && verifyPaymentRef.current) {
+              verifyPaymentRef.current(paymentId)
+            }
+          }
+        } else if (event.event_type === "checkout.closed") {
+          setIsProcessing(false)
+        }
+      }
+    })
   }, [])
 
-  // Handle Razorpay callback redirect (from backend callback endpoint) using server-provided params
+  // Handle Dodo callback redirect (from backend callback endpoint) using server-provided params
   useEffect(() => {
     const paymentStatus = params.payment_status
     const paymentId = params.payment_id
@@ -193,10 +196,6 @@ export default function DonateClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const handleRazorpayLoad = () => {
-    setRazorpayLoaded(true)
-  }
-
   const getDonationAmount = (): number => {
     if (selectedAmount !== null) return selectedAmount
     if (customAmount.trim()) {
@@ -217,10 +216,6 @@ export default function DonateClient({
       showError(`Maximum online donation limit is ${formatCurrency(MAX_DONATION, currency)}. For larger amounts, please contact us for direct bank transfer.`, "Limit Exceeded")
       return
     }
-    if (!razorpayLoaded) {
-      showError("Payment gateway is loading. Please wait a moment and try again.", "Loading")
-      return
-    }
     setIsProcessing(true)
     try {
       const base = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:6001"
@@ -236,81 +231,10 @@ export default function DonateClient({
       if (!orderData.success) {
         throw new Error(orderData.message || "Failed to create donation order")
       }
-      const { orderId, keyId } = orderData.data
-      const options: RazorpayOptions = {
-        key: keyId,
-        amount: orderData.data.amount,
-        currency: orderData.data.currency,
-        name: "Reunait",
-        description: `Donation of ${formatCurrency(amount, currency)}`,
-        image: `${process.env.NEXT_PUBLIC_SITE_URL || ""}/icon.svg`,
-        order_id: orderId,
-        handler: async function (response: RazorpayPaymentResponse) {
-          try {
-            const verifyResponse = await fetch(`${base}/api/donations/verify-payment`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                razorpay_order_id: response.razorpay_order_id,
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_signature: response.razorpay_signature,
-              }),
-            })
-            const verifyData = await verifyResponse.json()
-            if (verifyData.success) {
-              const verifiedAmount = verifyData.data.amount
-              const verifiedCurrency = verifyData.data.currency
-              const verifiedMethod = verifyData.data.method || ""
-              // Navigate to thank you page with payment details
-              router.push(
-                `/donate/thank-you?payment_id=${response.razorpay_payment_id}&order_id=${response.razorpay_order_id}&amount=${verifiedAmount}&currency=${verifiedCurrency}&method=${verifiedMethod}`
-              )
-              setSelectedAmount(null)
-              setCustomAmount("")
-            } else {
-              throw new Error(verifyData.message || "Payment verification failed")
-            }
-          } catch (error: unknown) {
-            const errorMessage =
-              error instanceof Error ? error.message : "Payment verification failed. Please contact support if the amount was deducted."
-            showError(errorMessage, "Verification Error")
-          } finally {
-            setIsProcessing(false)
-          }
-        },
-        prefill: {
-          name: user?.fullName || "",
-          email: user?.primaryEmailAddress?.emailAddress || "",
-          contact: user?.primaryPhoneNumber?.phoneNumber || "",
-        },
-        theme: { color: "#2563EB" },
-        modal: {
-          ondismiss: function () { setIsProcessing(false) },
-          confirm_close: true,
-        },
-        notes: {
-          purpose: "donation",
-          platform: "reunait",
-        },
-      }
-      const rzp = new window.Razorpay(options)
-      // Razorpay docs: use rzp.on('payment.failed') for failure handling
-      rzp.on("payment.failed", function (response: RazorpayFailedResponse) {
-        setIsProcessing(false)
-        const errorMessage = response.error?.description || "Payment failed"
-        if (
-          errorMessage.toLowerCase().includes("international") ||
-          errorMessage.toLowerCase().includes("not supported")
-        ) {
-          showError(
-            `International payments are not enabled. Please use INR currency or enable international payments in your Razorpay dashboard. Error: ${errorMessage}`,
-            "International Payments Not Enabled"
-          )
-        } else {
-          showError(`Payment failed: ${errorMessage}. Please try again or contact support.`, "Payment Error")
-        }
-      })
-      rzp.open()
+      const { checkoutUrl } = orderData.data
+
+      // Open Dodo Payments overlay checkout modal
+      DodoPayments.Checkout.open({ checkoutUrl })
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "Failed to process donation. Please try again."
       showError(errorMessage, "Donation Error")
@@ -340,7 +264,6 @@ export default function DonateClient({
 
   return (
     <div className="min-h-screen bg-background py-12 px-4 sm:px-6 lg:px-8">
-      <Script src="https://checkout.razorpay.com/v1/checkout.js" onLoad={handleRazorpayLoad} strategy="lazyOnload" />
       <div className="max-w-2xl mx-auto">
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold mb-3">Support Our Mission</h1>
@@ -363,9 +286,8 @@ export default function DonateClient({
                 </div>
               )}
               {currency !== "INR" && (
-                <span className="block mt-2 text-xs text-amber-600 dark:text-amber-400">
-                  ⚠️ Note: International payments (non-INR) require activation in your Razorpay dashboard. Use INR for testing without
-                  activation.
+                <span className="block mt-2 text-xs text-muted-foreground">
+                  Note: Dodo Payments handles international currency conversion automatically.
                 </span>
               )}
             </CardDescription>
@@ -443,7 +365,7 @@ export default function DonateClient({
             )}
             <Button
               onClick={handleDonate}
-              disabled={!isDonationsEnabled || isProcessing || !razorpayLoaded || getDonationAmount() <= 0}
+              disabled={!isDonationsEnabled || isProcessing || getDonationAmount() <= 0}
               className="w-full h-12 text-base font-semibold"
               size="lg"
             >
@@ -453,10 +375,9 @@ export default function DonateClient({
                 <><Sparkles className="w-5 h-5 mr-2" /> Donate Now</>
               )}
             </Button>
-            {!razorpayLoaded && <p className="text-sm text-muted-foreground text-center">Loading payment gateway...</p>}
             <div className="pt-4 border-t">
               <p className="text-xs text-muted-foreground text-center">
-                Your payment is secured by Razorpay. All transactions are encrypted and secure.
+                Your payment is secured by Dodo Payments. All transactions are encrypted and secure.
               </p>
             </div>
           </CardContent>
