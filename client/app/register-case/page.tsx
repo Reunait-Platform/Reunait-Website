@@ -151,6 +151,11 @@ const schema = z
     
     // Police bypass option
     bypassVerification: z.boolean().optional(),
+
+    // Consent checkbox
+    consent: z.boolean().refine((val) => val === true, {
+      message: "Consent to secure automated matching technology and transient pattern comparison is required to register a case."
+    }),
   })
   .superRefine((val, ctx) => {
     
@@ -327,6 +332,7 @@ export default function RegisterCasePage() {
       policeStationId: "",
       images: [],
       bypassVerification: false,
+      consent: false,
     },
   })
 
@@ -1242,6 +1248,31 @@ export default function RegisterCasePage() {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Biometric consent checkmark */}
+              <div className="flex items-start gap-3 p-4 rounded-md border bg-card">
+                <input
+                  type="checkbox"
+                  id="consent"
+                  checked={form.watch("consent") || false}
+                  onChange={(e) => form.setValue("consent", e.target.checked, { shouldValidate: true, shouldTouch: true })}
+                  className="mt-1 h-4 w-4 rounded border-primary text-primary focus:ring-primary cursor-pointer"
+                />
+                <div className="space-y-1 select-none">
+                  <label
+                    htmlFor="consent"
+                    className="text-sm font-medium cursor-pointer"
+                  >
+                    I consent to secure automated matching technology and transient pattern comparison
+                  </label>
+                  <p className="text-xs text-muted-foreground">
+                    I authorize the platform to analyze the uploaded visual features and process the transient patterns of the images solely for the purpose of searching and identifying matching records within the database.
+                  </p>
+                  {shouldShowError("consent") && (
+                    <p className="text-xs text-destructive">{form.formState.errors.consent?.message}</p>
+                  )}
+                </div>
+              </div>
 
               {/* Submit Button */}
               <div className="space-y-3 pt-4">
