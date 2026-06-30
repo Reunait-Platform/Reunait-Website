@@ -154,7 +154,7 @@ const schema = z
 
     // Consent checkbox
     consent: z.boolean().refine((val) => val === true, {
-      message: "Consent to secure automated matching technology and transient pattern comparison is required to register a case."
+      message: "Please consent to the secure use of photo matching to register this case."
     }),
   })
   .superRefine((val, ctx) => {
@@ -1263,10 +1263,10 @@ export default function RegisterCasePage() {
                     htmlFor="consent"
                     className="text-sm font-medium cursor-pointer"
                   >
-                    I consent to secure automated matching technology and transient pattern comparison
+                    I consent to the secure use of facial recognition technology to compare photos and help match this case with registered reports.
                   </label>
                   <p className="text-xs text-muted-foreground">
-                    I authorize the platform to analyze the uploaded visual features and process the transient patterns of the images solely for the purpose of searching and identifying matching records within the database.
+                    We only analyze the facial features in your uploaded photos to search for matching records in our database. Your data is encrypted and never used for any other purpose.
                   </p>
                   {shouldShowError("consent") && (
                     <p className="text-xs text-destructive">{form.formState.errors.consent?.message}</p>

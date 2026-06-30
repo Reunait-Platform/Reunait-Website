@@ -12,10 +12,9 @@ import { useRouter } from "next/navigation"
 import { useUser } from "@clerk/nextjs"
 import { DodoPayments } from "dodopayments-checkout"
 
-const isDonationsEnabled = process.env.NEXT_PUBLIC_DONATIONS_ENABLED === "true"
+const isSupportEnabled = process.env.NEXT_PUBLIC_DONATIONS_ENABLED === "true"
 
-const MAX_DONATION = 500000
-
+const MAX_SUPPORT_LIMIT = 500000
 
 const SUPPORTED_CURRENCIES = [
   "INR", "USD", "EUR", "GBP", "AED", "SAR",
@@ -36,10 +35,6 @@ const DEFAULT_PREDEFINED_AMOUNTS: Record<string, number[]> = {
   CHF: [10, 25, 50, 100, 250],
   NZD: [10, 25, 50, 100, 250],
 }
-
-// Dodo Payments type declarations not needed since SDK exports them
-
-
 
 const currencyDisplayNames =
   typeof Intl !== "undefined" && "DisplayNames" in Intl
@@ -76,7 +71,7 @@ const getCurrencySymbol = (code: string): string => {
   }
 }
 
-export default function DonateClient({
+export default function SupportClient({
   searchParams,
 }: {
   searchParams: Promise<{
@@ -104,7 +99,7 @@ export default function DonateClient({
     setIsProcessing(true)
     try {
       const base = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:6001"
-      const verifyResponse = await fetch(`${base}/api/donations/verify-payment`, {
+      const verifyResponse = await fetch(`${base}/api/support/verify-payment`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ payment_id: paymentId }),
@@ -114,7 +109,7 @@ export default function DonateClient({
         const verifiedAmount = verifyData.data.amount
         const verifiedCurrency = verifyData.data.currency
         router.push(
-          `/donate/thank-you?payment_id=${paymentId}&order_id=${paymentId}&amount=${verifiedAmount}&currency=${verifiedCurrency}`
+          `/support/thank-you?payment_id=${paymentId}&order_id=${paymentId}&amount=${verifiedAmount}&currency=${verifiedCurrency}`
         )
         setSelectedAmount(null)
         setCustomAmount("")
@@ -167,9 +162,8 @@ export default function DonateClient({
     const errorCode = params.error_code
 
     if (paymentStatus === "success" && paymentId && orderId && amount && currencyParam) {
-      // Redirect to thank you page with payment details
       router.replace(
-        `/donate/thank-you?payment_id=${paymentId}&order_id=${orderId}&amount=${amount}&currency=${currencyParam}`
+        `/support/thank-you?payment_id=${paymentId}&order_id=${orderId}&amount=${amount}&currency=${currencyParam}`
       )
       return
     }
@@ -180,7 +174,7 @@ export default function DonateClient({
         errorMessage || "Payment failed. Please try again or contact support if the amount was deducted.",
         errorCode === "PAYMENT_FAILED" ? "Payment Failed" : "Payment Error"
       )
-      router.replace("/donate")
+      router.replace("/support")
       return
     }
 
@@ -190,13 +184,11 @@ export default function DonateClient({
         errorMessage || "An error occurred during payment processing. Please contact support if the amount was deducted.",
         "Payment Error"
       )
-      router.replace("/donate")
+      router.replace("/support")
     }
-    // Only run once on mount since params come from server
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const getDonationAmount = (): number => {
+  const getSupportAmount = (): number => {
     if (selectedAmount !== null) return selectedAmount
     if (customAmount.trim()) {
       const parsed = parseFloat(customAmount)
@@ -205,15 +197,15 @@ export default function DonateClient({
     return 0
   }
 
-  const handleDonate = async () => {
-    const amount = getDonationAmount()
+  const handleSupport = async () => {
+    const amount = getSupportAmount()
     
     if (amount < 1) {
-      showError(`Minimum donation amount is ${formatCurrency(1, currency)}`, "Invalid Amount")
+      showError(`Minimum contribution amount is ${formatCurrency(1, currency)}`, "Invalid Amount")
       return
     }
-    if (amount > MAX_DONATION) {
-      showError(`Maximum online donation limit is ${formatCurrency(MAX_DONATION, currency)}. For larger amounts, please contact us for direct bank transfer.`, "Limit Exceeded")
+    if (amount > MAX_SUPPORT_LIMIT) {
+      showError(`Maximum online contribution limit is ${formatCurrency(MAX_SUPPORT_LIMIT, currency)}. For larger amounts, please contact us for direct bank transfer.`, "Limit Exceeded")
       return
     }
     setIsProcessing(true)
@@ -222,22 +214,21 @@ export default function DonateClient({
       if (!base) {
         throw new Error("Backend URL is not configured")
       }
-      const orderResponse = await fetch(`${base}/api/donations/create-order`, {
+      const orderResponse = await fetch(`${base}/api/support/create-order`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ amount, currency }),
       })
       const orderData = await orderResponse.json()
       if (!orderData.success) {
-        throw new Error(orderData.message || "Failed to create donation order")
+        throw new Error(orderData.message || "Failed to create support order")
       }
       const { checkoutUrl } = orderData.data
 
-      // Open Dodo Payments overlay checkout modal
       DodoPayments.Checkout.open({ checkoutUrl })
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to process donation. Please try again."
-      showError(errorMessage, "Donation Error")
+      const errorMessage = error instanceof Error ? error.message : "Failed to process contribution. Please try again."
+      showError(errorMessage, "Support Error")
       setIsProcessing(false)
     }
   }
@@ -246,18 +237,20 @@ export default function DonateClient({
     setSelectedAmount(amount)
     setCustomAmount("")
   }
+  
   const handleCustomAmountChange = (value: string) => {
-    // Restrict input to maximum 7 digits before decimal, and 2 digits after decimal
     if (value === "" || /^\d{0,7}(\.\d{0,2})?$/.test(value)) {
       setCustomAmount(value)
       setSelectedAmount(null)
     }
   }
+  
   const handleCurrencyChange = (newCurrency: string) => {
     setCurrency(newCurrency)
     setSelectedAmount(null)
     setCustomAmount("")
   }
+  
   const getPredefinedAmounts = (): number[] => {
     return DEFAULT_PREDEFINED_AMOUNTS[currency] || []
   }
@@ -268,20 +261,20 @@ export default function DonateClient({
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold mb-3">Support Our Mission</h1>
           <p className="text-lg text-muted-foreground max-w-xl mx-auto text-center">
-            Your generous donation helps us reunite families and bring hope to those searching for their loved ones.
+            Your support helps us keep the servers running and maintain the AI-powered search tool. 
             Every contribution makes a difference.
           </p>
         </div>
         <Card>
           <CardHeader>
-            <CardTitle>Make a Donation</CardTitle>
+            <CardTitle>Contribute to Hosting Costs</CardTitle>
             <CardDescription>
               Select a predefined amount or enter a custom amount.
-              {!isDonationsEnabled && (
+              {!isSupportEnabled && (
                 <div className="block mt-3 p-3 bg-primary/10 border border-primary/20 rounded-lg">
                   <p className="text-sm font-semibold text-primary flex items-center gap-2">
                     <Sparkles className="w-4 h-4" />
-                    We will start receiving donations soon. Thank you for your interest in supporting our mission!
+                    We will start accepting server contributions soon. Thank you for your interest in supporting our mission!
                   </p>
                 </div>
               )}
@@ -353,48 +346,47 @@ export default function DonateClient({
                   disabled={isProcessing}
                 />
               </div>
-
             </div>
-            {getDonationAmount() > 0 && (
+            {getSupportAmount() > 0 && (
               <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Donation Amount:</span>
-                  <span className="text-2xl font-bold text-primary">{formatCurrency(getDonationAmount(), currency)}</span>
+                  <span className="text-sm font-medium">Contribution Amount:</span>
+                  <span className="text-2xl font-bold text-primary">{formatCurrency(getSupportAmount(), currency)}</span>
                 </div>
               </div>
             )}
             <Button
-              onClick={handleDonate}
-              disabled={!isDonationsEnabled || isProcessing || getDonationAmount() <= 0}
+              onClick={handleSupport}
+              disabled={!isSupportEnabled || isProcessing || getSupportAmount() <= 0}
               className="w-full h-12 text-base font-semibold"
               size="lg"
             >
               {isProcessing ? (
                 <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Processing...</>
               ) : (
-                <><Sparkles className="w-5 h-5 mr-2" /> Donate Now</>
+                <><Sparkles className="w-5 h-5 mr-2" /> Contribute Now</>
               )}
             </Button>
             <div className="pt-4 border-t">
               <p className="text-xs text-muted-foreground text-center">
-                Your payment is secured by Dodo Payments. All transactions are encrypted and secure.
+                Your payment is secured. All transactions are encrypted and secure.
               </p>
             </div>
           </CardContent>
         </Card>
         <Card className="mt-6">
           <CardHeader>
-            <CardTitle>How Your Donation Helps</CardTitle>
+            <CardTitle>How Your Contribution Helps</CardTitle>
           </CardHeader>
           <CardContent>
             <ul className="space-y-3 text-muted-foreground">
               <li className="flex items-start gap-3">
                 <CheckCircle2 className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
-                <span>Support our platform infrastructure and technology</span>
+                <span>Cover our database hosting and server infrastructure costs</span>
               </li>
               <li className="flex items-start gap-3">
                 <CheckCircle2 className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
-                <span>Enable AI-powered matching to connect missing persons with families</span>
+                <span>Help fund computational API calls for facial recognition matching</span>
               </li>
               <li className="flex items-start gap-3">
                 <CheckCircle2 className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
@@ -407,10 +399,3 @@ export default function DonateClient({
     </div>
   )
 }
-
-
-
-
-
-
-

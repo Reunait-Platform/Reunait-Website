@@ -127,12 +127,12 @@ export const FEATURE_KEYWORDS = {
   ],
   
   // Donations & Support
-  donations: [
-    "donate missing person platform",
+  support: [
+    "support missing person platform",
     "support family reunification",
     "fund missing person search",
     "contribute to reunite families",
-    "donation platform",
+    "voluntary contribution platform",
     "support missing person cause",
   ],
   
@@ -215,12 +215,12 @@ export const PAGE_KEYWORDS = {
     "moderate cases",
   ],
   
-  donate: [
+  support: [
     ...BASE_KEYWORDS,
-    ...FEATURE_KEYWORDS.donations,
+    ...FEATURE_KEYWORDS.support,
     "support Reunait",
     "fund missing person search",
-    "donate to reunite families",
+    "contribute to reunite families",
   ],
 }
 
@@ -254,9 +254,9 @@ export const METADATA_TEMPLATES = {
     description: "Join Reunait as a volunteer to help find missing persons. Review cases, verify information, and help reunite families. Make a difference in your community.",
   },
   
-  donate: {
-    title: "Donate - Support Missing Person Search | Reunait",
-    description: "Support Reunait's mission to help find missing persons. Your donation helps maintain our AI-powered platform, support families, and reunite loved ones. Every contribution makes a difference.",
+  support: {
+    title: "Support - Help Maintain Server | Reunait",
+    description: "Support Reunait's mission to help find missing persons. Your contribution helps maintain our AI-powered platform, cover hosting costs, and reunite loved ones. Every contribution makes a difference.",
   },
 } as const
 

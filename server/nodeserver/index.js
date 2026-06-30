@@ -16,7 +16,7 @@ import testimonialRoutes from "./routes/testimonial.js"
 import volunteerRoutes from "./routes/volunteer.js"
 import notificationsRoutes from "./routes/notifications.js"
 import policeStationsRoutes from "./routes/police-stations.js"
-import donationsRoutes from "./routes/donations.js"
+import supportRoutes from "./routes/support.js"
 import healthRoutes from "./routes/health.js"
 import policiesRoutes from "./routes/policies.js"
 import { clerkMiddleware } from "@clerk/express";
@@ -48,8 +48,8 @@ app.options(/.*/, cors());
 // Clerk middleware: bypass middleware completely for payment callbacks/webhooks and policy routes to prevent redirect loops
 const EXCLUDED_CLERK_ROUTES = [
     '/api/webhooks/clerk',
-    '/api/donations/webhook',
-    '/api/donations/callback',
+    '/api/support/webhook',
+    '/api/support/callback',
 ];
 
 app.use((req, res, next) => {
@@ -84,7 +84,7 @@ app.use("/api/testimonials", testimonialRoutes);
 app.use("/api/volunteer", volunteerRoutes);
 app.use("/api", notificationsRoutes);
 app.use("/api/police-stations", policeStationsRoutes);
-app.use("/api", donationsRoutes);
+app.use("/api", supportRoutes);
 app.use("/api/policies", policiesRoutes);
 
 // Custom error handler for CORS violations (placed before Sentry to prevent noise in dashboard)

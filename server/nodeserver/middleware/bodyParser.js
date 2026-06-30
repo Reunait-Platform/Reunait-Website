@@ -4,7 +4,7 @@ import bodyParser from "body-parser";
 // Webhook routes that need raw body for signature verification
 const WEBHOOK_ROUTES = [
     "/api/webhooks/clerk",
-    "/api/donations/webhook"
+    "/api/support/webhook"
 ];
 
 // Check if request is a webhook route

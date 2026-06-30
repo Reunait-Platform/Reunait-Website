@@ -14,7 +14,7 @@ const dodoPayments = new DodoPayments({
 // Helper function to get currency exponent (decimal places)
 const getCurrencyExponent = (currency) => {
     const currencyUpper = currency.toUpperCase();
-    return config.razorpay?.currencyExponents?.[currencyUpper] ?? 2; // Default to 2 (most currencies)
+    return config.currencyExponents?.[currencyUpper] ?? 2; // Default to 2 (most currencies)
 };
 
 // Helper function to convert amount to smallest currency unit (e.g. cents, paise)
@@ -41,9 +41,9 @@ const convertFromSmallestUnit = (amount, currency) => {
     }
 };
 
-// POST /api/donations/create-order
-// Create a Dodo Payments checkout session for donation
-router.post("/donations/create-order", async (req, res) => {
+// POST /api/support/create-order
+// Create a Dodo Payments checkout session for server support
+router.post("/support/create-order", async (req, res) => {
     try {
         const { amount, currency = "INR" } = req.body;
 
@@ -60,7 +60,7 @@ router.post("/donations/create-order", async (req, res) => {
         if (!amount || typeof amount !== "number" || amount <= 0) {
             return res.status(400).json({
                 success: false,
-                message: "Invalid donation amount. Amount must be a positive number.",
+                message: "Invalid contribution amount. Amount must be a positive number.",
             });
         }
 
@@ -75,7 +75,7 @@ router.post("/donations/create-order", async (req, res) => {
         }
 
         const backendBase = process.env.BACKEND_URL || "http://localhost:3001";
-        const returnUrl = `${backendBase}/api/donations/callback?amount=${amount}&currency=${currencyUpper}`;
+        const returnUrl = `${backendBase}/api/support/callback?amount=${amount}&currency=${currencyUpper}`;
 
         // Create Dodo Payments checkout session
         const session = await dodoPayments.checkoutSessions.create({
@@ -88,7 +88,7 @@ router.post("/donations/create-order", async (req, res) => {
             ],
             billing_currency: currencyUpper,
             metadata: {
-                purpose: "donation",
+                purpose: "support",
                 platform: "reunait",
                 currency: currencyUpper,
                 amount: amount.toString()
@@ -107,21 +107,21 @@ router.post("/donations/create-order", async (req, res) => {
         });
     } catch (error) {
         try {
-            console.error("[POST /api/donations/create-order]", error);
+            console.error("[POST /api/support/create-order]", error);
         } catch {}
         
         return res.status(500).json({
             success: false,
-            message: error.message || "Failed to create donation checkout session. Please try again.",
+            message: error.message || "Failed to create support checkout session. Please try again.",
         });
     }
 });
 
-// POST /api/donations/verify-payment
+// POST /api/support/verify-payment
 // Verify payment status after successful payment (either via redirect or overlay callback)
-router.post("/donations/verify-payment", async (req, res) => {
+router.post("/support/verify-payment", async (req, res) => {
     try {
-        const paymentId = req.body.payment_id || req.body.razorpay_payment_id;
+        const paymentId = req.body.payment_id;
 
         if (!paymentId) {
             return res.status(400).json({
@@ -148,30 +148,29 @@ router.post("/donations/verify-payment", async (req, res) => {
         }
 
         const mainAmount = convertFromSmallestUnit(payment.amount, payment.currency);
-
         return res.json({
             success: true,
+            message: "Payment verified successfully.",
             data: {
                 paymentId: payment.id,
-                orderId: payment.id, // For frontend backwards compatibility
                 amount: mainAmount,
                 currency: payment.currency,
                 status: payment.status,
+                method: payment.payment_method || "",
             },
-            message: "Payment verified successfully.",
         });
     } catch (error) {
         try {
-            console.error("[POST /api/donations/verify-payment]", error);
+            console.error("[POST /api/support/verify-payment]", error);
         } catch {}
         return res.status(500).json({
             success: false,
-            message: error.message || "Payment verification failed. Please contact support.",
+            message: error.message || "Failed to verify payment status.",
         });
     }
 });
 
-// GET & POST /api/donations/callback
+// GET & POST /api/support/callback
 // Dodo callback handler (handles both GET redirect from Dodo checkout page and any POST fallbacks)
 const handleCallback = async (req, res) => {
     try {
@@ -183,11 +182,11 @@ const handleCallback = async (req, res) => {
 
         if (error || status === "failed") {
             const errorDescription = error || "Payment failed";
-            return res.redirect(`${frontendBase}/donate?payment_status=failed&error=${encodeURIComponent(errorDescription)}`);
+            return res.redirect(`${frontendBase}/support?payment_status=failed&error=${encodeURIComponent(errorDescription)}`);
         }
 
         if (!paymentId) {
-            return res.redirect(`${frontendBase}/donate?payment_status=error&error=${encodeURIComponent("Missing payment details")}`);
+            return res.redirect(`${frontendBase}/support?payment_status=error&error=${encodeURIComponent("Missing payment details")}`);
         }
 
         // Retrieve and verify the payment
@@ -195,30 +194,30 @@ const handleCallback = async (req, res) => {
         
         const isSuccess = payment.status === "succeeded" || payment.status === "completed";
         if (!isSuccess) {
-            return res.redirect(`${frontendBase}/donate?payment_status=failed&error=${encodeURIComponent(`Payment not successful. Status: ${payment.status}`)}`);
+            return res.redirect(`${frontendBase}/support?payment_status=failed&error=${encodeURIComponent(`Payment not successful. Status: ${payment.status}`)}`);
         }
 
         const amount = convertFromSmallestUnit(payment.amount, payment.currency);
 
         // Redirect directly to frontend thank-you page with success parameters
         return res.redirect(
-            `${frontendBase}/donate/thank-you?payment_id=${payment.id}&order_id=${payment.id}&amount=${amount}&currency=${payment.currency}`
+            `${frontendBase}/support/thank-you?payment_id=${payment.id}&order_id=${payment.id}&amount=${amount}&currency=${payment.currency}`
         );
     } catch (error) {
         try {
-            console.error("[CALLBACK /api/donations/callback]", error);
+            console.error("[CALLBACK /api/support/callback]", error);
         } catch {}
         const frontendBase = process.env.NEXT_PUBLIC_FRONTEND_URL || process.env.FRONTEND_URL || "http://localhost:3000";
-        return res.redirect(`${frontendBase}/donate?payment_status=error&error=${encodeURIComponent("Payment verification failed")}`);
+        return res.redirect(`${frontendBase}/support?payment_status=error&error=${encodeURIComponent("Payment verification failed")}`);
     }
 };
 
-router.get("/donations/callback", handleCallback);
-router.post("/donations/callback", handleCallback);
+router.get("/support/callback", handleCallback);
+router.post("/support/callback", handleCallback);
 
-// POST /api/donations/webhook
-// Dodo Payments webhook handler (verified using Svix)
-router.post("/donations/webhook", async (req, res) => {
+// POST /api/support/webhook
+// Dodo Webhook handler
+router.post("/support/webhook", async (req, res) => {
     try {
         const webhookId = req.headers["webhook-id"] || req.headers["x-webhook-id"];
         const webhookSignature = req.headers["webhook-signature"] || req.headers["x-webhook-signature"];
@@ -235,7 +234,7 @@ router.post("/donations/webhook", async (req, res) => {
         const webhookSecret = process.env.DODO_PAYMENTS_WEBHOOK_SECRET;
         if (!webhookSecret) {
             try {
-                console.error("[POST /api/donations/webhook] Missing DODO_PAYMENTS_WEBHOOK_SECRET");
+                console.error("[POST /api/support/webhook] Missing DODO_PAYMENTS_WEBHOOK_SECRET");
             } catch {}
             return res.status(500).json({
                 success: false,
@@ -254,7 +253,7 @@ router.post("/donations/webhook", async (req, res) => {
             });
         } catch (err) {
             try {
-                console.error("[POST /api/donations/webhook] Webhook verification failed:", err.message);
+                console.error("[POST /api/support/webhook] Webhook verification failed:", err.message);
             } catch {}
             return res.status(400).json({
                 success: false,
@@ -270,11 +269,9 @@ router.post("/donations/webhook", async (req, res) => {
             case "payment.succeeded":
                 try {
                     console.log(`[WEBHOOK] Dodo Payment captured: ${paymentData.payment_id || paymentData.id}`);
-                    // TODO: Store donation record in database
-                    // TODO: Send confirmation email using Resend
                 } catch (error) {
                     try {
-                        console.error("[POST /api/donations/webhook] Error processing payment.succeeded:", error);
+                        console.error("[POST /api/support/webhook] Error processing payment.succeeded:", error);
                     } catch {}
                 }
                 break;
@@ -284,7 +281,7 @@ router.post("/donations/webhook", async (req, res) => {
                     console.log(`[WEBHOOK] Dodo Payment failed: ${paymentData.payment_id || paymentData.id}`);
                 } catch (error) {
                     try {
-                        console.error("[POST /api/donations/webhook] Error processing payment.failed:", error);
+                        console.error("[POST /api/support/webhook] Error processing payment.failed:", error);
                     } catch {}
                 }
                 break;
@@ -298,7 +295,7 @@ router.post("/donations/webhook", async (req, res) => {
         return res.status(200).json({ success: true, message: "Webhook received" });
     } catch (error) {
         try {
-            console.error("[POST /api/donations/webhook]", error);
+            console.error("[POST /api/support/webhook]", error);
         } catch {}
         return res.status(200).json({ success: false, message: "Webhook processing error" });
     }

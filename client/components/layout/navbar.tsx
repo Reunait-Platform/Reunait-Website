@@ -167,7 +167,7 @@ function NavbarContent() {
                                 <span className="md:hidden">Report</span>
                             </Button>
                             {/* Mobile buttons - always visible */}
-						<Link href="/donate" prefetch={false} className="cursor-pointer" onClick={() => startLoading({ expectRouteChange: pathname !== '/donate' })}>
+						<Link href="/support" prefetch={false} className="cursor-pointer" onClick={() => startLoading({ expectRouteChange: pathname !== '/support' })}>
                                 <Button variant="outline" size="icon" className="h-9 w-9 cursor-pointer hover:bg-accent hover:text-accent-foreground hover:shadow-lg transition-all duration-300 ease-in-out group" aria-label="Buy me a coffee">
                                     <CupSoda className="h-5 w-5 transition-all duration-300 ease-out transform-gpu group-hover:-translate-y-0.5 group-hover:scale-105" />
                                 </Button>
@@ -207,7 +207,7 @@ function NavbarContent() {
 						<div className="h-px w-full bg-border/60 my-2" />
 						{/* Centered actions */}
 						<div className="w-full items-center justify-center gap-4 mb-3 flex">
-                        <Link href="/donate" prefetch={false} className="cursor-pointer" onClick={() => { setMenuState(false); startLoading({ expectRouteChange: pathname !== '/donate' }) }}>
+                        <Link href="/support" prefetch={false} className="cursor-pointer" onClick={() => { setMenuState(false); startLoading({ expectRouteChange: pathname !== '/support' }) }}>
 								<Button variant="outline" size="icon" className="h-10 w-10 cursor-pointer hover:bg-accent hover:text-accent-foreground hover:shadow-lg transition-all duration-300 ease-in-out group" aria-label="Buy me a coffee">
 									<CupSoda className="h-5 w-5 transition-all duration-300 ease-out transform-gpu group-hover:-translate-y-0.5 group-hover:scale-105" />
 								</Button>

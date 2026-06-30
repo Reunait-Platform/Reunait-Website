@@ -1,7 +1,7 @@
 import { Suspense } from "react"
-import DonateClient from "./DonateClient"
+import SupportClient from "./SupportClient"
 
-export default function DonatePage({
+export default function SupportPage({
   searchParams,
 }: {
   searchParams: Promise<{
@@ -16,7 +16,7 @@ export default function DonatePage({
 }) {
   return (
     <Suspense fallback={null}>
-      <DonateClient searchParams={searchParams} />
+      <SupportClient searchParams={searchParams} />
     </Suspense>
   )
 }

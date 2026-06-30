@@ -86,7 +86,7 @@ export default function ThankYouClient({
               Thank You{firstName ? `, ${firstName}` : ""}!
             </h1>
             <p className="text-lg text-muted-foreground max-w-md mx-auto leading-relaxed">
-              Your generosity brings us one step closer to reuniting families and bringing hope to those in need.
+              Your contribution helps cover cloud server and computational resource costs to keep the platform free.
             </p>
           </div>
 
@@ -97,7 +97,7 @@ export default function ThankYouClient({
               <CardContent className="pt-6 pb-6">
                 {/* Amount */}
                 <div className="text-center mb-6">
-                  <p className="text-sm text-muted-foreground mb-1">You donated</p>
+                  <p className="text-sm text-muted-foreground mb-1">You contributed</p>
                   <p className="text-4xl sm:text-5xl font-bold text-primary">
                     {formatCurrency(amount, currency)}
                   </p>
@@ -152,8 +152,8 @@ export default function ThankYouClient({
                 <div>
                   <h3 className="font-semibold mb-1">Your Impact</h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    Every donation directly supports our platform.
-                    Your contribution fuels the technology, infrastructure, and community efforts that make reunification possible.
+                    Every contribution directly supports our platform.
+                    Your contribution fuels the technology, infrastructure, and community efforts that keep search operations running.
                   </p>
                 </div>
               </div>

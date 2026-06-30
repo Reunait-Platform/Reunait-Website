@@ -28,9 +28,8 @@ export const corsMiddleware = cors((req, callback) => {
             // Allow non-browser or same-origin requests (no Origin header)
             if (!origin) return cb(null, true);
 
-            // Always allow Razorpay Checkout redirect posts to callback endpoint
-            // Official flow posts from Razorpay domains via the browser
-            if (req.originalUrl && req.originalUrl.startsWith("/api/donations/callback")) {
+            // Always allow redirect posts to callback endpoint from external payment gateways
+            if (req.originalUrl && req.originalUrl.startsWith("/api/support/callback")) {
                 return cb(null, true);
             }
 

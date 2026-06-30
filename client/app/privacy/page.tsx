@@ -107,7 +107,14 @@ export default function PrivacyPolicy() {
                   </h2>
                   <div className="space-y-4">
                     {section.content.map((p, pIdx) => (
-                      <p key={pIdx} className="text-muted-foreground leading-relaxed text-sm sm:text-base">
+                      <p 
+                        key={pIdx} 
+                        className={`leading-relaxed ${
+                          pIdx === 0 
+                            ? `text-foreground font-medium text-base sm:text-lg border-l-2 border-emerald-500 dark:border-emerald-400 pl-4 py-1 bg-emerald-500/5 dark:bg-emerald-950/30 rounded-r-md ${section.content.length > 1 ? "mb-6" : ""}` 
+                            : "text-muted-foreground text-sm sm:text-base"
+                        }`}
+                      >
                         {p}
                       </p>
                     ))}
