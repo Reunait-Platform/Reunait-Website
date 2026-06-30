@@ -2,7 +2,7 @@
 
 import React from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Mail, Globe } from "lucide-react"
+import { Mail, Globe, Shield } from "lucide-react"
 
 export default function ContactUs() {
   return (
@@ -58,6 +58,20 @@ export default function ContactUs() {
                 </p>
               </div>
             </div>
+
+            {process.env.NEXT_PUBLIC_MERCHANT_LEGAL_NAME && (
+              <div className="flex items-start gap-4 pt-6 border-t border-border/40">
+                <div className="p-3 rounded-lg bg-primary/10 text-primary mt-1 flex-shrink-0">
+                  <Shield className="h-6 w-6" />
+                </div>
+                <div>
+                  <h4 className="font-semibold text-foreground text-lg">Merchant Legal Identity</h4>
+                  <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
+                    This platform is owned and operated under the legal entity name: <strong className="text-foreground font-semibold">{process.env.NEXT_PUBLIC_MERCHANT_LEGAL_NAME}</strong>
+                  </p>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

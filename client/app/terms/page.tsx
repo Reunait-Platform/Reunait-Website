@@ -97,6 +97,11 @@ export default function TermsOfService() {
               <p className="mt-3 text-lg text-muted-foreground">
                 {data.subtitle}
               </p>
+              {process.env.NEXT_PUBLIC_MERCHANT_LEGAL_NAME && (
+                <p className="mt-2 text-xs text-muted-foreground/60 italic">
+                  Legal Entity: {process.env.NEXT_PUBLIC_MERCHANT_LEGAL_NAME}
+                </p>
+              )}
             </div>
 
             {data.sections.map((section, idx) => (

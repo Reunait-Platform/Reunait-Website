@@ -19,11 +19,16 @@ export function Footer() {
         <div className="py-10">
           <div className="flex flex-col items-center justify-between gap-6 md:flex-row">
             {/* Left: Brand & Copyright */}
-            <div className="flex flex-col items-center gap-2 md:items-start">
+            <div className="flex flex-col items-center gap-1 md:items-start">
               <Logo />
               <p className="text-xs text-muted-foreground/70 font-medium mt-1">
                 © {new Date().getFullYear()} Reunait. All rights reserved.
               </p>
+              {process.env.NEXT_PUBLIC_MERCHANT_LEGAL_NAME && (
+                <p className="text-[10px] text-muted-foreground/50 font-medium leading-none">
+                  Merchant Legal Entity: {process.env.NEXT_PUBLIC_MERCHANT_LEGAL_NAME}
+                </p>
+              )}
             </div>
 
             {/* Center: Legal & Contact links */}
