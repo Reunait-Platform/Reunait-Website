@@ -6,7 +6,7 @@ const homepageSectionSchema = new mongoose.Schema({
         type: String,
         required: true,
         unique: true,
-        enum: ['hero', 'impact', 'features', 'guidance', 'testimonials', 'privacy', 'terms', 'refunds']
+        enum: ['hero', 'impact', 'features', 'guidance', 'testimonials', 'faq', 'privacy', 'terms', 'refunds']
     },
     title: {
         type: String,

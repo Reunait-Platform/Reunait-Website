@@ -3,7 +3,7 @@ import type { Metadata } from "next"
 import { auth } from "@clerk/nextjs/server"
 import { fetchCaseById, type CaseDetail, type CaseResponse } from "@/lib/api"
 import { CaseDetailClient } from "@/components/cases/case-detail/CaseDetailClient"
-import { METADATA_TEMPLATES, OPEN_GRAPH_DEFAULTS, TWITTER_DEFAULTS, getLocationKeywords, BASE_KEYWORDS } from "@/lib/seo-config"
+import { SITE_CONFIG, METADATA_TEMPLATES, OPEN_GRAPH_DEFAULTS, TWITTER_DEFAULTS, getLocationKeywords, BASE_KEYWORDS } from "@/lib/seo-config"
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -29,8 +29,42 @@ export default async function CaseDetailPage({ params }: PageProps) {
     notFound()
   }
 
+  const siteUrl = SITE_CONFIG.url || 'https://reunait.com'
+  const personName = initialData.fullName || 'Missing Person Case'
+
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "Home",
+        "item": siteUrl
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": "Cases",
+        "item": `${siteUrl}/cases`
+      },
+      {
+        "@type": "ListItem",
+        "position": 3,
+        "name": personName,
+        "item": `${siteUrl}/cases/${id}`
+      }
+    ]
+  }
+
   return (
-    <CaseDetailClient id={id} initialData={initialData} initialMeta={initialMeta ?? undefined} initialNow={serverNow} />
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <CaseDetailClient id={id} initialData={initialData} initialMeta={initialMeta ?? undefined} initialNow={serverNow} />
+    </>
   )
 }
 

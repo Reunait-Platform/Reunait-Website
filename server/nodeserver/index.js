@@ -32,6 +32,20 @@ const app = express();
 app.set('trust proxy', true);
 
 /*  MIDDLEWARE  */
+// Validate Host header and request URL syntax to block malformed bot scans (RFC 7230)
+app.use((req, res, next) => {
+    try {
+        const host = req.get('host') || '';
+        new URL(req.originalUrl || req.url, `${req.protocol}://${host}`);
+        next();
+    } catch (err) {
+        return res.status(400).json({
+            success: false,
+            message: "Bad Request: Malformed Host header or URL"
+        });
+    }
+});
+
 // Skip JSON body parsing for webhooks so we can verify the raw payload
 app.use(skipJsonForWebhooks);
 app.use(helmet());

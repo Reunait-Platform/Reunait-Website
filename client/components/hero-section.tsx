@@ -78,9 +78,9 @@ export default function HeroSection({ casesRoute = '/cases' }: HeroSectionProps)
 
                                 {/* Mobile Layout (Static / Pure CSS animated for immediate Paint & LCP optimization) */}
                                 <div className="md:hidden">
-                                    <h1 className="mx-auto mt-8 max-w-4xl text-balance text-5xl font-semibold animate-fade-in-blur-mobile">
+                                    <div className="mx-auto mt-8 max-w-4xl text-balance text-5xl font-semibold animate-fade-in-blur-mobile">
                                         Reuniting Families Through Technology
-                                    </h1>
+                                    </div>
                                     <p className="mx-auto mt-8 max-w-2xl text-balance text-lg animate-fade-in-blur-mobile-delayed">
                                         Join thousands of volunteers using AI-powered facial recognition to help find missing persons and bring families back together.
                                     </p>

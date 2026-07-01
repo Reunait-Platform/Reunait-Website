@@ -267,7 +267,7 @@ export const OPEN_GRAPH_DEFAULTS = {
   siteName: SITE_CONFIG.name,
   images: [
     {
-      url: "/og-image.jpg",
+      url: "/og-image.png",
       width: 1200,
       height: 630,
       alt: `${SITE_CONFIG.name} - Missing Person Platform`,

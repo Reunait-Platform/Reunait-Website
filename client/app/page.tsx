@@ -10,6 +10,7 @@ import { InfiniteSlider } from "@/components/ui/infinite-slider"
 import { ProgressiveBlur } from "@/components/ui/progressive-blur"
 import TestimonialDialog from "@/components/testimonial-dialog"
 import { LocationDetector } from "@/components/location-detector"
+import { FaqsSection } from "@/components/ui/faq"
 import { StructuredData } from "@/components/seo/structured-data"
 import type { Metadata } from "next"
 import { 
@@ -64,7 +65,21 @@ export default async function Home() {
     // Sort sections by order and filter active ones
     orderedSections = homepageData
       .filter(section => section.isActive)
-      .sort((a, b) => a.order - b.order)
+
+    // Resilient fallback: If faq section is missing from database, inject default and adjust order
+    if (!orderedSections.some(section => section.section === "faq")) {
+      const defaultFaq = DEFAULT_HOMEPAGE_SECTIONS.find(section => section.section === "faq")
+      if (defaultFaq) {
+        orderedSections.forEach(section => {
+          if (section.section === "testimonials" && section.order <= defaultFaq.order) {
+            section.order = defaultFaq.order + 1
+          }
+        })
+        orderedSections.push(defaultFaq)
+      }
+    }
+
+    orderedSections.sort((a, b) => a.order - b.order)
   } catch {
     // Backend unreachable — render page with static fallback sections
     console.warn('[Homepage] Failed to fetch homepage data — using default static fallback sections')
@@ -79,7 +94,7 @@ export default async function Home() {
       
       case "features":
         return (
-          <section key={section.section} className="py-20">
+          <section key={section.section} className="pt-20 pb-[60px]">
             <div className="container mx-auto px-6">
               <div className="max-w-6xl mx-auto">
                 <div className="text-center mb-16">
@@ -133,7 +148,7 @@ export default async function Home() {
 
       case "impact":
   return (
-          <section key={section.section} className="pt-16 pb-12">
+          <section key={section.section} className="pt-16 pb-[60px]">
             <div className="container mx-auto px-6">
               <div className="max-w-4xl mx-auto">
                 <div className="text-center mb-12">
@@ -185,7 +200,7 @@ export default async function Home() {
 
       case "guidance":
         return (
-          <section key={section.section} className="py-20">
+          <section key={section.section} className="pt-20 pb-[60px]">
             <div className="container mx-auto px-6">
               <div className="max-w-6xl mx-auto">
                 <div className="text-center mb-16">
@@ -356,7 +371,7 @@ export default async function Home() {
 
       case "testimonials":
         return (
-          <section key={section.section} className="py-20">
+          <section key={section.section} className="pt-20 pb-[60px]">
             <div className="container mx-auto">
               <div className="max-w-6xl mx-auto">
                 <div className="text-center mb-16 px-6">
@@ -431,33 +446,74 @@ export default async function Home() {
           </section>
         )
 
+      case "faq":
+        return (
+          <FaqsSection
+            key={section.section}
+            title={section.title}
+            subtitle={section.subtitle}
+            faqs={(section.data as { faqs?: Array<{ question: string; answer: string }> })?.faqs}
+          />
+        )
+
       default:
         return null
     }
   }
+
+  // Helper to filter out generic root domains/placeholders (e.g. https://facebook.com) from sameAs
+  const filterSocialUrls = (urls: (string | undefined)[]) => {
+    return urls.filter((url): url is string => {
+      if (!url) return false;
+      try {
+        const parsed = new URL(url);
+        const path = parsed.pathname.replace(/^\/|\/$/g, '');
+        return path.length > 0;
+      } catch {
+        return false;
+      }
+    });
+  };
 
   // Structured data for SEO (JSON-LD) - using centralized config
   const websiteData = {
     ...STRUCTURED_DATA.website,
     publisher: {
       ...STRUCTURED_DATA.organization,
-      sameAs: [
+      sameAs: filterSocialUrls([
         process.env.NEXT_PUBLIC_SOCIAL_FACEBOOK_URL,
         process.env.NEXT_PUBLIC_SOCIAL_TWITTER_URL,
         process.env.NEXT_PUBLIC_SOCIAL_INSTAGRAM_URL,
         process.env.NEXT_PUBLIC_SOCIAL_LINKEDIN_URL
-      ].filter(Boolean)
+      ])
     }
   }
 
   const organizationData = {
     ...STRUCTURED_DATA.organization,
-    sameAs: [
+    sameAs: filterSocialUrls([
       process.env.NEXT_PUBLIC_SOCIAL_FACEBOOK_URL,
       process.env.NEXT_PUBLIC_SOCIAL_TWITTER_URL,
       process.env.NEXT_PUBLIC_SOCIAL_INSTAGRAM_URL,
       process.env.NEXT_PUBLIC_SOCIAL_LINKEDIN_URL
-    ].filter(Boolean)
+    ])
+  }
+
+  const faqSection = orderedSections.find(section => section.section === "faq")
+  const faqs = (faqSection?.data as { faqs?: Array<{ question: string; answer: string }> })?.faqs || []
+
+  // FAQPage structured data for high-leverage AI search engine visibility (GEO)
+  const faqData = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": faqs.map(faq => ({
+      "@type": "Question",
+      "name": faq.question,
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": faq.answer
+      }
+    }))
   }
 
   return (
@@ -465,6 +521,7 @@ export default async function Home() {
       {/* Structured Data for SEO */}
       <StructuredData data={websiteData} />
       <StructuredData data={organizationData} />
+      <StructuredData data={faqData} />
       
       <div className="min-h-screen bg-white dark:bg-black relative">
         {/* Location Detector - requests permission automatically */}
