@@ -10,15 +10,12 @@ export const getHomepageData = async (req, res) => {
         const CACHE_KEY = 'homepage:cache';
         const ENABLED_KEY = 'homepage:cache:enabled';
 
-        // Check if cache is enabled and present
+        // Check if cache is enabled and present (single read RTT)
         try {
-            const enabled = await redis.get(ENABLED_KEY);
-            if (enabled === 'true') {
-                const cached = await redis.get(CACHE_KEY);
-                if (cached) {
-                    const json = JSON.parse(cached);
-                    return res.status(200).json(json);
-                }
+            const [enabled, cached] = await redis.mget(ENABLED_KEY, CACHE_KEY);
+            if (enabled === 'true' && cached) {
+                const json = JSON.parse(cached);
+                return res.status(200).json(json);
             }
         } catch (e) {
             // On Redis error, fall back to DB fetch
@@ -28,10 +25,12 @@ export const getHomepageData = async (req, res) => {
         // Fetch homepage data from MongoDB (fresh)
         const homepageData = await HomepageSection.getHomepageData();
 
-        // Write to Redis (best-effort)
+        // Write to Redis (single write RTT)
         try {
-            await redis.set(CACHE_KEY, JSON.stringify(homepageData));
-            await redis.set(ENABLED_KEY, 'true');
+            await redis.mset(
+                CACHE_KEY, JSON.stringify(homepageData),
+                ENABLED_KEY, 'true'
+            );
         } catch (e) {
             console.error('Homepage cache write error:', e?.message || e);
         }
