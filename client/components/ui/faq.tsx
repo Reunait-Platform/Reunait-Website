@@ -8,7 +8,20 @@ import {
 
 import { Typography } from "@/components/ui/typography";
 
-export function FaqsSection() {
+interface FaqsSectionProps {
+	title?: string;
+	subtitle?: string;
+	faqs?: Array<{ question: string; answer: string }>;
+}
+
+export function FaqsSection({ title, subtitle, faqs }: FaqsSectionProps = {}) {
+	const displayTitle = title || "Frequently Asked Questions";
+	const displaySubtitle = subtitle || "Here are some common questions and answers about how Reunait helps find missing persons. If you don't find what you are looking for, feel free to reach out to our team.";
+
+	const displayQuestions = faqs && faqs.length > 0
+		? faqs.map((f, idx) => ({ id: `item-${idx + 1}`, title: f.question, content: f.answer }))
+		: questions;
+
 	return (
 		<section className="pt-20 pb-[60px] bg-background relative overflow-hidden">
 			{/* Decorative background gradients */}
@@ -20,11 +33,10 @@ export function FaqsSection() {
 			<div className="mx-auto w-full max-w-3xl space-y-8 px-4 relative z-10">
 				<div className="text-center mb-16">
 					<Typography variant="h2" as="h2" className="text-4xl font-bold mb-6">
-						Frequently Asked Questions
+						{displayTitle}
 					</Typography>
 					<Typography variant="lead" className="text-xl text-muted-foreground max-w-2xl mx-auto">
-						Here are some common questions and answers about how Reunait helps find missing persons. If
-						you don't find what you are looking for, feel free to reach out to our team.
+						{displaySubtitle}
 					</Typography>
 				</div>
 				<Accordion
@@ -32,7 +44,7 @@ export function FaqsSection() {
 					collapsible
 					className="bg-card/40 dark:bg-card/25 backdrop-blur-sm w-full -space-y-px rounded-xl border border-border/60 overflow-hidden shadow-sm"
 				>
-					{questions.map((item) => (
+					{displayQuestions.map((item) => (
 						<AccordionItem
 							value={item.id}
 							key={item.id}
