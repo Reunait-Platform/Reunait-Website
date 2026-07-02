@@ -233,7 +233,7 @@ export default async function Home() {
                                     inactiveZone={0.01}
                                   />
                                   {/* Modern Status Badge */}
-                                  <div className="mb-4 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-red-500/20 dark:bg-red-500/25 text-red-700 dark:text-red-400 text-xs font-semibold uppercase tracking-wider border border-red-400/70 dark:border-red-600/40 backdrop-blur-sm shadow-md shadow-red-500/15">
+                                  <div className="mb-4 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-red-500/20 dark:bg-red-500/25 text-red-800 dark:text-red-300 text-xs font-semibold uppercase tracking-wider border border-red-400/70 dark:border-red-600/40 backdrop-blur-sm shadow-md shadow-red-500/15">
                                     <AlertTriangle className="w-3.5 h-3.5" /> Missing
                                   </div>
                                   
@@ -245,13 +245,13 @@ export default async function Home() {
                                       <Typography variant="h4" as="h3" className="font-bold text-xl mb-3 text-red-900 dark:text-red-100 leading-tight">
                                         {step.title}
                                       </Typography>
-                                      <Typography variant="muted" className="text-base leading-relaxed text-red-700 dark:text-red-300 font-medium">
+                                      <Typography variant="muted" className="text-base leading-relaxed text-red-800 dark:text-red-300 font-medium">
                                         {step.description}
                                       </Typography>
                                     </div>
                                   </div>
                                 </div>
-        </div>
+                              </div>
                             )}
 
                             {/* Found Person Steps */}
@@ -268,7 +268,7 @@ export default async function Home() {
                                     inactiveZone={0.01}
                                   />
                                   {/* Modern Status Badge */}
-                                  <div className="mb-4 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/20 dark:bg-emerald-500/25 text-emerald-700 dark:text-emerald-400 text-xs font-semibold uppercase tracking-wider border border-emerald-400/70 dark:border-emerald-600/40 backdrop-blur-sm shadow-md shadow-emerald-500/15">
+                                  <div className="mb-4 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/20 dark:bg-emerald-500/25 text-emerald-800 dark:text-emerald-300 text-xs font-semibold uppercase tracking-wider border border-emerald-400/70 dark:border-emerald-600/40 backdrop-blur-sm shadow-md shadow-emerald-500/15">
                                     <CheckCircle className="w-3.5 h-3.5" /> Found
                                   </div>
                                   
@@ -280,7 +280,7 @@ export default async function Home() {
                                       <Typography variant="h4" as="h3" className="font-bold text-xl mb-3 text-emerald-900 dark:text-emerald-100 leading-tight">
                                         {step.title}
                                       </Typography>
-                                      <Typography variant="muted" className="text-base leading-relaxed text-emerald-700 dark:text-emerald-300 font-medium">
+                                      <Typography variant="muted" className="text-base leading-relaxed text-emerald-800 dark:text-emerald-300 font-medium">
                                         {step.description}
                                       </Typography>
                                     </div>
@@ -301,7 +301,7 @@ export default async function Home() {
                     {/* Missing Group */}
                     <div>
                       <div className="mb-5 text-center">
-                        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 text-sm font-semibold border border-red-300/60">
+                        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-red-500/10 text-red-800 dark:text-red-300 text-sm font-semibold border border-red-300/60">
                           <AlertTriangle className="w-4 h-4" /> Missing Person Cases
                         </div>
                       </div>
@@ -315,10 +315,10 @@ export default async function Home() {
                                 <span className="font-bold text-base">{step.step}</span>
                               </div>
                               <div className="text-left">
-                                <Typography variant="h4" as="h3" className="font-semibold text-base mb-1 text-red-900 dark:text-red-100 leading-tight">
+                                <Typography variant="h4" as="p" className="font-semibold text-base mb-1 text-red-900 dark:text-red-100 leading-tight">
                                   {step.title}
                                 </Typography>
-                                <Typography variant="muted" className="text-sm leading-relaxed text-red-700 dark:text-red-300">
+                                <Typography variant="muted" className="text-sm leading-relaxed text-red-800 dark:text-red-300">
                                   {step.description}
                                 </Typography>
                               </div>
@@ -336,7 +336,7 @@ export default async function Home() {
                     {/* Found Group */}
                     <div>
                       <div className="mb-5 text-center">
-                        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 text-sm font-semibold border border-emerald-300/60">
+                        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 text-sm font-semibold border border-emerald-300/60">
                           <CheckCircle className="w-4 h-4" /> Found Person Cases
                         </div>
                       </div>
@@ -350,10 +350,10 @@ export default async function Home() {
                                 <span className="font-bold text-base">{step.step}</span>
                               </div>
                               <div className="text-left">
-                                <Typography variant="h4" as="h3" className="font-semibold text-base mb-1 text-emerald-900 dark:text-emerald-100 leading-tight">
+                                <Typography variant="h4" as="p" className="font-semibold text-base mb-1 text-emerald-900 dark:text-emerald-100 leading-tight">
                                   {step.title}
                                 </Typography>
-                                <Typography variant="muted" className="text-sm leading-relaxed text-emerald-700 dark:text-emerald-300">
+                                <Typography variant="muted" className="text-sm leading-relaxed text-emerald-800 dark:text-emerald-300">
                                   {step.description}
                                 </Typography>
                               </div>

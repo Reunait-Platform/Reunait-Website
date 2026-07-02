@@ -17,7 +17,7 @@
     --secondary: oklch(0.94 0.003 285.823);
     --secondary-foreground: oklch(0.21 0.006 285.885);
     --muted: oklch(0.94 0.003 285.823);
-    --muted-foreground: oklch(0.552 0.016 285.938);
+    --muted-foreground: oklch(0.46 0.016 285.938);
     --accent: oklch(0.94 0.003 285.823);
     --accent-foreground: oklch(0.21 0.006 285.885);
   --destructive: oklch(0.577 0.245 27.325);
@@ -498,4 +498,11 @@
 /* Prevent layout shift of the fixed navbar when body scroll is locked by Radix/Clerk */
 body[data-scroll-locked] header nav {
   padding-right: calc(0.5rem + var(--removed-body-scroll-bar-size)) !important;
+}
+
+/* Global focus-visible rings for keyboard accessibility (WCAG 2.1 AA) */
+:focus-visible {
+  outline: 2px solid var(--primary) !important;
+  outline-offset: 4px !important;
+  box-shadow: 0 0 0 4px var(--background) !important;
 }
